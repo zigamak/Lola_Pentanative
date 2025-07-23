@@ -1,0 +1,178 @@
+{
+  "Food": [
+    {
+      "id": "69",
+      "name": "JOLLOF RICE",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Classic Nigerian Jollof Rice, rich and flavorful.",
+      "quantity": 100
+    },
+    {
+      "id": "70",
+      "name": "FRIED RICE",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Savory Fried Rice with mixed vegetables.",
+      "quantity": 100
+    },
+    {
+      "id": "71",
+      "name": "BASMATI TERIYAKI RICE",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Fragrant Basmati Rice infused with sweet and savory Teriyaki sauce.",
+      "quantity": 100
+    },
+    {
+      "id": "72",
+      "name": "YAM & EGG SAUCE",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Boiled Yam served with a delicious Egg Sauce.",
+      "quantity": 100
+    },
+    {
+      "id": "73",
+      "name": "EWA AGONYI",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Mashed Beans served with a spicy, rich Agonyi sauce.",
+      "quantity": 100
+    },
+    {
+      "id": "74",
+      "name": "AFANG",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Traditional Afang Soup, a hearty vegetable soup from Akwa Ibom/Cross River.",
+      "quantity": 100
+    },
+    {
+      "id": "75",
+      "name": "OKRA SOUP",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Nutritious Okra Soup, perfect with swallows.",
+      "quantity": 100
+    },
+    {
+      "id": "76",
+      "name": "POUNDO",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Smooth Pounded Yam, a staple swallow.",
+      "quantity": 100
+    },
+    {
+      "id": "77",
+      "name": "FUFU",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Soft Fufu, ideal for pairing with various soups.",
+      "quantity": 100
+    }
+  ],
+  "Protein": [
+    {
+      "id": "78",
+      "name": "CHICKEN",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Well-seasoned fried or grilled chicken piece.",
+      "quantity": 100
+    },
+    {
+      "id": "79",
+      "name": "FISH",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Delicious fried or grilled fish.",
+      "quantity": 100
+    },
+    {
+      "id": "80",
+      "name": "BEEF",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Tender beef chunks, cooked to perfection.",
+      "quantity": 100
+    }
+  ],
+  "Side": [
+    {
+      "id": "81",
+      "name": "EGG",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Boiled or fried egg.",
+      "quantity": 100
+    },
+    {
+      "id": "82",
+      "name": "PONMO",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Soft, seasoned cow skin.",
+      "quantity": 100
+    },
+    {
+      "id": "83",
+      "name": "SALAD",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Fresh mixed green salad.",
+      "quantity": 100
+    },
+    {
+      "id": "84",
+      "name": "MOI-MOI",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Steamed bean pudding, rich and flavorful.",
+      "quantity": 100
+    },
+    {
+      "id": "85",
+      "name": "PLANTAIN",
+      "variant": "Standard",
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Sweet fried plantain (Dodo).",
+      "quantity": 100
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+[
+  {
+    "phone_number": "2348055614455",
+    "user_name": "Ziga",
+    "cart_items": [
+      {
+        "name": "Jollof Rice",
+        "item_id": "1",
+        "quantity": 1,
+        "price": 2500.0,
+        "total_price": 2500.0,
+        "variations": {}
+      }
+    ],
+    "total_value": 2500.0,
+    "cart_created": "2025-06-11T05:14:13.012038",
+    "last_updated": "2025-07-03T23:57:44.247809",
+    "status": "active",
+    "reminder_sent": false,
+    "conversion_probability": 0.7,
+    "items_count": 1,
+    "most_expensive_item": 2500.0,
+    "cart_sessions": 118
+  },
+  {
+    "phone_number": "2349030918492",
+    "user_name": "Benny",
+    "cart_items": [
+      {
+        "name": "Boiled Yam Slices",
+        "item_id": "Boiled Yam Slices",
+        "quantity": 4,
+        "price": 400.0,
+        "total_price": 1600.0,
+        "variations": {}
+      }
+    ],
+    "total_value": 1600.0,
+    "cart_created": "2025-06-12T16:55:44.651917",
+    "last_updated": "2025-06-12T18:32:35.675738",
+    "status": "active",
+    "reminder_sent": false,
+    "conversion_probability": 0.6,
+    "items_count": 4,
+    "most_expensive_item": 400.0,
+    "cart_sessions": 30
+  },
+  {
+    "phone_number": "2348026314159",
+    "user_name": "Daniel Israel",
+    "cart_items": [
+      {
+        "name": "Suya-Spiced Chicken Platter",
+        "item_id": "Suya-Spiced Chicken Platter",
+        "quantity": 2,
+        "price": 1600.0,
+        "total_price": 3200.0,
+        "variations": {}
+      }
+    ],
+    "total_value": 3200.0,
+    "cart_created": "2025-06-12T17:01:06.442654",
+    "last_updated": "2025-06-12T17:02:07.069808",
+    "status": "active",
+    "reminder_sent": false,
+    "conversion_probability": 0.7,
+    "items_count": 2,
+    "most_expensive_item": 1600.0,
+    "cart_sessions": 5
+  },
+  {
+    "phone_number": "2347082345056",
+    "user_name": "Olumayowa Oyaleke",
+    "cart_items": [
+      {
+        "name": "Smoky Jollof Fiesta",
+        "item_id": "Smoky Jollof Fiesta",
+        "quantity": 2,
+        "price": 1500,
+        "total_price": 3000,
+        "variations": {}
+      },
+      {
+        "name": "Coca-Cola (50cl)",
+        "item_id": "Coca-Cola (50cl)",
+        "quantity": 3,
+        "price": 250,
+        "total_price": 750,
+        "variations": {}
+      },
+      {
+        "name": "Fried Rice Fiesta",
+        "item_id": "Fried Rice Fiesta",
+        "quantity": 1,
+        "price": 1400,
+        "total_price": 1400,
+        "variations": {}
+      },
+      {
+        "name": "Suya-Spiced Chicken Platter",
+        "item_id": "Suya-Spiced Chicken Platter",
+        "quantity": 3,
+        "price": 1600,
+        "total_price": 4800,
+        "variations": {}
+      }
+    ],
+    "total_value": 9950,
+    "cart_created": "2025-06-12T18:26:11.174153",
+    "last_updated": "2025-06-19T17:18:37.297913",
+    "status": "active",
+    "reminder_sent": false,
+    "conversion_probability": 0.95,
+    "items_count": 9,
+    "most_expensive_item": 1600,
+    "cart_sessions": 28
+  }
+]
