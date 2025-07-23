@@ -1,0 +1,544 @@
+import gradio as gr
+import datetime
+import random
+import json
+import os
+
+# Initialize data structures
+if os.path.exists("user_details.json"):
+    with open("user_details.json", "r") as f:
+        user_details = json.load(f)
+else:
+    user_details = {}
+
+# Menu data
+menu_data = {
+    "Rice Meals": {
+        "Jollof Rice": 1500,
+        "Fried Rice": 1500,
+        "Coconut Rice": 1800,
+        "White Rice & Stew": 1300
+    },
+    "Swallow": {
+        "Amala & Ewedu": 2000,
+        "Pounded Yam & Egusi": 2500,
+        "Eba & Okra": 1800,
+        "Semo & Vegetable Soup": 2200
+    },
+    "Proteins": {
+        "Chicken": 1000,
+        "Beef": 800,
+        "Fish": 1200,
+        "Assorted Meat": 1500
+    },
+    "Drinks": {
+        "Coke": 500,
+        "Water": 300,
+        "Chapman": 800,
+        "Zobo": 500
+    }
+}
+
+# Complaint types
+complaint_types = ["Late delivery", "Wrong order", "Payment issue", "Food quality", "Other"]
+
+# To store user's session data
+class SessionState:
+    def __init__(self):
+        self.current_state = "start"
+        self.cart = {}
+        self.selected_category = None
+        self.user_info = {}
+        self.complaint_type = None
+        self.order_id = None
+        self.previous_state = None  # Added to support "Back" functionality
+        self.enquiry_topic = None  # Added to track enquiry topics
+        self.enquiry_details = None  # Added to store enquiry details
+        self.return_state = None  # Added to track where to return after collecting user info
+
+# Initialize session state for each user (in a real app, this would be handled differently)
+session_states = {}
+
+def get_session_state(session_id="default_user"):
+    if session_id not in session_states:
+        session_states[session_id] = SessionState()
+    return session_states[session_id]
+
+# Function to generate order ID
+def generate_order_id():
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    random_num = random.randint(1000, 9999)
+    return f"ORDER-{timestamp}-{random_num}"
+
+# Function to generate complaint ID
+def generate_complaint_id():
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M")
+    random_num = random.randint(100, 999)
+    return f"COMP-{timestamp}-{random_num}"
+
+# Function to generate enquiry ID
+def generate_enquiry_id():
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M")
+    random_num = random.randint(100, 999)
+    return f"ENQ-{timestamp}-{random_num}"
+
+# Helper function to calculate total price
+def calculate_total(cart):
+    total = 0
+    for item, details in cart.items():
+        total += details["price"] * details["quantity"]
+    return total
+
+# Function to format cart as readable text
+def format_cart(cart):
+    if not cart:
+        return "Your cart is currently empty. What deliciousness are you craving?"
+
+    cart_text = "Here's what's in your delightful basket:\n"
+    total = 0
+    for item, details in cart.items():
+        subtotal = details["price"] * details["quantity"]
+        cart_text += f"- {details['quantity']} x {item} (₦{details['price']} each) = ₦{subtotal}\n"
+        total += subtotal
+
+    cart_text += f"\nGrand Total: ₦{total}. Ready to checkout?"
+    return cart_text
+
+# Function to save order to user_details.json
+def save_order(user_info, cart, order_id, total):
+    phone = user_info.get('phone')
+    if not phone:
+        return False
+
+    # Initialize user record if it doesn't exist
+    if phone not in user_details:
+        user_details[phone] = {
+            "name": user_info.get('name', ''),
+            "address": user_info.get('address', ''),
+            "orders": {},
+            "complaints": {},
+            "enquiries": {}
+        }
+    # Make sure orders dict exists
+    if "orders" not in user_details[phone]:
+        user_details[phone]["orders"] = {}
+
+    # Add the order
+    order_items = {}
+    for item, details in cart.items():
+        order_items[item] = {
+            "quantity": details["quantity"],
+            "price": details["price"],
+            "subtotal": details["price"] * details["quantity"]
+        }
+
+    user_details[phone]["orders"][order_id] = {
+        "items": order_items,
+        "total": total,
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "confirmed"
+    }
+
+    # Save to file
+    with open("user_details.json", "w") as f:
+        json.dump(user_details, f, indent=4)
+
+    return True
+def generate_response(message, session_id, user_name):
+    state = get_session_state(session_id)
+    message = message.lower()
+
+    if message == "back" and state.previous_state:
+        print(f"Going back to: {state.previous_state}")
+        current = state.current_state
+        state.current_state = state.previous_state
+        state.previous_state = current  # To allow going back again
+        if state.current_state == "menu":
+            return "Alright, let's go back to the main menu. What culinary delight are you interested in today?"
+        elif state.current_state == "view_cart":
+            return format_cart(state.cart) + "\nWhat would you like to do next? (e.g., 'add more', 'remove item', 'checkout')"
+        elif state.current_state == "category_selected" and state.selected_category:
+            items = list(menu_data[state.selected_category].keys())
+            menu_text = f"Great! Here are the items in the '{state.selected_category}' category:\n"
+            for i, item in enumerate(items):
+                menu_text += f"{i+1}. {item} (₦{menu_data[state.selected_category][item]})\n"
+            menu_text += "\nEnter the number of the item you'd like to add, or say 'back' to see categories."
+            return menu_text
+        elif state.current_state == "report_complaint":
+            return "Okay, let's get your complaint registered. What type of issue are you experiencing?" + "\n" + "\n".join([f"{i+1}. {comp}" for i, comp in enumerate(complaint_types)]) + "\nOr say 'back'."
+        elif state.current_state == "submit_enquiry":
+            return "Sure, what would you like to ask us about today?" + "\nOr say 'back'."
+        elif state.current_state == "get_user_info":
+            if state.return_state == "checkout":
+                return "Okay, before we finalize your order, could I please get a few details? First, your name?"
+            elif state.return_state == "submit_complaint_details":
+                return f"Alright, regarding the '{state.complaint_type}' issue, could you please provide some more details?"
+            elif state.return_state == "submit_enquiry_details":
+                return f"Okay, regarding your enquiry about '{state.enquiry_topic}', please provide the details."
+        elif state.current_state == "get_quantity" and state.selected_item:
+            return f"You've chosen '{state.selected_item}' (₦{menu_data[state.selected_category][state.selected_item]}). How many would you like to add to your order?"
+        else:
+            return "Going back..."  # Generic back message
+
+    if state.current_state == "start":
+        state.user_info = {}  # Reset user info on a new interaction
+        state.cart = {}  # Reset cart on a new interaction
+        state.selected_category = None
+        state.selected_item = None
+        state.complaint_type = None
+        state.order_id = None
+        state.previous_state = None
+        state.enquiry_topic = None
+        state.enquiry_details = None
+        state.return_state = None
+        state.current_state = "greeting"
+        return f"Hello {user_name}! Welcome to Lola. How can I assist you today? (e.g., 'order', 'menu', 'complaint', 'enquiry')"
+
+    elif state.current_state == "greeting":
+        if "order" in message:
+            state.previous_state = "greeting"
+            state.current_state = "menu"
+            categories = list(menu_data.keys())
+            menu_text = "Great! Here's our menu categories:\n"
+            for i, category in enumerate(categories):
+                menu_text += f"{i+1}. {category}\n"
+            menu_text += "Please enter the number of the category you'd like to explore, or say 'back'."
+            return menu_text
+        elif "menu" in message:
+            state.previous_state = "greeting"
+            state.current_state = "menu"
+            categories = list(menu_data.keys())
+            menu_text = "Here's a look at our menu categories:\n"
+            for i, category in enumerate(categories):
+                menu_text += f"{i+1}. {category}\n"
+            menu_text += "Tell me the number of the category you're interested in, or say 'back'."
+            return menu_text
+        elif "complaint" in message:
+            state.previous_state = "greeting"
+            state.current_state = "report_complaint"
+            return "We're sorry to hear you have a complaint. What type of issue are you experiencing?" + "\n" + "\n".join([f"{i+1}. {comp}" for i, comp in enumerate(complaint_types)]) + "\nOr say 'back'."
+        elif "enquiry" in message or "ask" in message or "question" in message:
+            state.previous_state = "greeting"
+            state.current_state = "submit_enquiry"
+            return "Certainly, what would you like to ask us about today?" + "\nOr say 'back'."
+        else:
+            return "I understand you said '" + message + "'. Did you want to place an order, see the menu, report a complaint, or make an enquiry?"
+
+    elif state.current_state == "menu":
+        if message.isdigit():
+            category_index = int(message) - 1
+            categories = list(menu_data.keys())
+            if 0 <= category_index < len(categories):
+                state.selected_category = categories[category_index]
+                state.previous_state = "menu"
+                state.current_state = "category_selected"
+                items = list(menu_data[state.selected_category].keys())
+                menu_text = f"Fantastic! You've selected '{state.selected_category}'. Here are the items available:\n"
+                for i, item in enumerate(items):
+                    menu_text += f"{i+1}. {item} (₦{menu_data[state.selected_category][item]})\n"
+                menu_text += "Enter the number of the item you'd like to add to your order, or say 'back' to see categories."
+                return menu_text
+            else:
+                return "Invalid category number. Please enter a number from the list, or say 'back'."
+        else:
+            return "Please enter the number corresponding to the category you're interested in, or say 'back'."
+
+    elif state.current_state == "category_selected":
+        if message.isdigit():
+            item_index = int(message) - 1
+            if state.selected_category and 0 <= item_index < len(menu_data[state.selected_category]):
+                state.selected_item = list(menu_data[state.selected_category].keys())[item_index]
+                state.previous_state = "category_selected"
+                state.current_state = "get_quantity"
+                return f"You've chosen '{state.selected_item}' (₦{menu_data[state.selected_category][state.selected_item]}). How many would you like to add to your order?"
+            else:
+                return "Invalid item number. Please enter a number from the list, or say 'back'."
+        elif "back" in message:
+            state.current_state = "menu"
+            categories = list(menu_data.keys())
+            menu_text = "Here are our menu categories again:\n"
+            for i, category in enumerate(categories):
+                menu_text += f"{i+1}. {category}\n"
+            menu_text += "Please enter the number of the category you'd like to explore, or say 'back'."
+            return menu_text
+        else:
+            return "Please enter the number of the item you wish to add, or say 'back'."
+
+    elif state.current_state == "get_quantity":
+        if message.isdigit() and int(message) > 0:
+            quantity = int(message)
+            item_name = state.selected_item
+            price = menu_data[state.selected_category][item_name]
+
+            if item_name in state.cart:
+                state.cart[item_name]["quantity"] += quantity
+            else:
+                state.cart[item_name] = {"quantity": quantity, "price": price}
+
+            state.previous_state = "get_quantity"
+            state.current_state = "order_summary"
+            return (f"{quantity} x '{item_name}' added to your cart. "
+                    f"Would you like to add more items? (Say 'view cart' to see your order or select another category)")
+        else:
+            return "Please enter a valid quantity (a number greater than 0)."
+
+    elif state.current_state == "order_summary":
+        if "view cart" in message.lower():
+            state.previous_state = "order_summary"
+            state.current_state = "view_cart"
+            return format_cart(state.cart) + "\nWhat would you like to do next? (e.g., 'add more', 'remove item', 'checkout')"
+
+        # Check if message matches any category name
+        matched_categories = [cat for cat in menu_data.keys() if cat.lower() in message.lower()]
+        if matched_categories:
+            state.selected_category = matched_categories[0]
+            state.previous_state = "order_summary"
+            state.current_state = "category_selected"
+            items = list(menu_data[state.selected_category].keys())
+            menu_text = f"Great! Here are the items in the '{state.selected_category}' category:\n"
+            for i, item in enumerate(items):
+                menu_text += f"{i+1}. {item} (₦{menu_data[state.selected_category][item]})\n"
+            menu_text += "Enter the number of the item you'd like to add, or say 'back' to see categories."
+            return menu_text
+
+        # Check if message is a category number
+        elif message.isdigit():
+            category_index = int(message) - 1
+            categories = list(menu_data.keys())
+            if 0 <= category_index < len(categories):
+                state.selected_category = categories[category_index]
+                state.previous_state = "order_summary"
+                state.current_state = "category_selected"
+                items = list(menu_data[state.selected_category].keys())
+                menu_text = f"Fantastic! You've selected '{state.selected_category}'. Here are the items available:\n"
+                for i, item in enumerate(items):
+                    menu_text += f"{i+1}. {item} (₦{menu_data[state.selected_category][item]})\n"
+                menu_text += "Enter the number of the item you'd like to add to your order, or say 'back' to see categories."
+                return menu_text
+            else:
+                return "Invalid category number. Please try again or say 'view cart' to see your current order."
+
+        elif "back" in message.lower():
+            state.current_state = "menu"
+            categories = list(menu_data.keys())
+            menu_text = "Here are our menu categories:\n"
+            for i, category in enumerate(categories):
+                menu_text += f"{i+1}. {category}\n"
+            menu_text += "Please enter the number of the category you'd like to explore, or say 'back'."
+            return menu_text
+
+        else:
+            return ("Got it. Would you like to add more items to your order? "
+                    "You can:\n"
+                    "- Say a category name or number\n"
+                    "- Say 'view cart' to see your current order\n"
+                    "- Say 'back' to return to main categories")
+
+    elif state.current_state == "view_cart":
+        if "add more" in message:
+            state.previous_state = "view_cart"
+            state.current_state = "menu"
+            categories = list(menu_data.keys())
+            menu_text = "Here are our menu categories:\n"
+            for i, category in enumerate(categories):
+                menu_text += f"{i+1}. {category}\n"
+            menu_text += "Please enter the number of the category you'd like to explore, or say 'back'."
+            return menu_text
+        elif "remove" in message or "delete" in message:
+            state.previous_state = "view_cart"
+            state.current_state = "remove_item"
+            if not state.cart:
+                return "Your cart is empty. Nothing to remove."
+            items = list(state.cart.keys())
+            return "Which item would you like to remove?\n" + "\n".join([f"{i+1}. {item}" for i, item in enumerate(items)]) + "\nOr say 'back'."
+        elif "checkout" in message or "place order" in message:
+            if not state.cart:
+                return "Your cart is empty. Please add items before checkout."
+            state.previous_state = "view_cart"
+            state.return_state = "checkout"
+            state.current_state = "get_user_info"
+            if "name" not in state.user_info:
+                return "Before we proceed with your order, may I have your name please?"
+            elif "phone" not in state.user_info:
+                return "Thank you. What's your phone number?"
+            elif "address" not in state.user_info:
+                return "Great! Finally, what's your delivery address?"
+        elif "back" in message:
+            state.current_state = "menu"
+            categories = list(menu_data.keys())
+            menu_text = "Here are our menu categories:\n"
+            for i, category in enumerate(categories):
+                menu_text += f"{i+1}. {category}\n"
+            menu_text += "Please enter the number of the category you'd like to explore, or say 'back'."
+            return menu_text
+        else:
+            return "I didn't understand that. Please say 'add more', 'remove item', 'checkout', or 'back'."
+
+    elif state.current_state == "remove_item":
+        if message.isdigit():
+            item_index = int(message) - 1
+            items = list(state.cart.keys())
+            if 0 <= item_index < len(items):
+                item_name = items[item_index]
+                del state.cart[item_name]
+                state.previous_state = "remove_item"
+                state.current_state = "view_cart"
+                return f"'{item_name}' has been removed from your cart.\n\n" + format_cart(state.cart) + "\nWhat would you like to do next?"
+            else:
+                return "Invalid item number. Please try again or say 'back'."
+        elif "back" in message:
+            state.current_state = "view_cart"
+            return format_cart(state.cart) + "\nWhat would you like to do next?"
+        else:
+            return "Please enter the number of the item to remove or say 'back'."
+
+    elif state.current_state == "get_user_info":
+        if "name" not in state.user_info:
+            state.user_info["name"] = message.title()
+            return "Thank you. What's your phone number?"
+        elif "phone" not in state.user_info:
+            if not message.isdigit() or len(message) < 10:
+                return "Please enter a valid phone number (digits only, at least 10 characters)."
+            state.user_info["phone"] = message
+            return "Great! Finally, what's your delivery address?"
+        elif "address" not in state.user_info:
+            state.user_info["address"] = message
+            
+            # Determine where to return after collecting info
+            if state.return_state == "checkout":
+                state.order_id = generate_order_id()
+                total = calculate_total(state.cart)
+                save_success = save_order(state.user_info, state.cart, state.order_id, total)
+                
+                if save_success:
+                    state.previous_state = "get_user_info"
+                    state.current_state = "order_confirmation"
+                    return (f"Thank you, {state.user_info['name']}! Your order #{state.order_id} has been confirmed.\n"
+                           f"Total: ₦{total}\n"
+                           f"Delivery to: {state.user_info['address']}\n"
+                           "We'll contact you shortly on your phone to confirm delivery time. Enjoy your meal!")
+                else:
+                    return "There was an issue processing your order. Please try again later."
+            
+            elif state.return_state == "submit_complaint_details":
+                state.previous_state = "get_user_info"
+                state.current_state = "submit_complaint_details"
+                return f"Thank you. Now, could you please describe your '{state.complaint_type}' issue in more detail?"
+            
+            elif state.return_state == "submit_enquiry_details":
+                state.previous_state = "get_user_info"
+                state.current_state = "submit_enquiry_details"
+                return f"Thank you. Please provide the details of your enquiry about '{state.enquiry_topic}'."
+
+    elif state.current_state == "report_complaint":
+        if message.isdigit():
+            comp_index = int(message) - 1
+            if 0 <= comp_index < len(complaint_types):
+                state.complaint_type = complaint_types[comp_index]
+                state.previous_state = "report_complaint"
+                state.return_state = "submit_complaint_details"
+                state.current_state = "get_user_info"
+                if "name" not in state.user_info:
+                    return f"To help with your '{state.complaint_type}' issue, may I have your name please?"
+                elif "phone" not in state.user_info:
+                    return "Thank you. What's your phone number?"
+                elif "address" not in state.user_info:
+                    return "Great! Finally, what's your address?"
+            else:
+                return "Invalid complaint type number. Please try again or say 'back'."
+        elif "back" in message:
+            state.current_state = "greeting"
+            return f"Hello {user_name}! How can I assist you today? (e.g., 'order', 'menu', 'complaint', 'enquiry')"
+        else:
+            return "Please select a complaint type by number or say 'back'."
+
+    elif state.current_state == "submit_complaint_details":
+        complaint_id = generate_complaint_id()
+        phone = state.user_info.get('phone')
+        
+        if phone:
+            if phone not in user_details:
+                user_details[phone] = {
+                    "name": state.user_info.get('name', ''),
+                    "address": state.user_info.get('address', ''),
+                    "orders": {},
+                    "complaints": {},
+                    "enquiries": {}
+                }
+            
+            user_details[phone]["complaints"][complaint_id] = {
+                "type": state.complaint_type,
+                "details": message,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "received"
+            }
+            
+            with open("user_details.json", "w") as f:
+                json.dump(user_details, f, indent=4)
+            
+            state.previous_state = "submit_complaint_details"
+            state.current_state = "complaint_confirmation"
+            return (f"Thank you for your feedback. Your complaint #{complaint_id} has been recorded.\n"
+                    f"We'll contact you shortly at {phone} to resolve this issue.\n"
+                    "Is there anything else I can help you with?")
+        else:
+            return "There was an issue recording your complaint. Please try again."
+
+    elif state.current_state == "submit_enquiry":
+        state.enquiry_topic = message
+        state.previous_state = "submit_enquiry"
+        state.return_state = "submit_enquiry_details"
+        state.current_state = "get_user_info"
+        if "name" not in state.user_info:
+            return f"To help with your enquiry about '{state.enquiry_topic}', may I have your name please?"
+        elif "phone" not in state.user_info:
+            return "Thank you. What's your phone number?"
+        elif "address" not in state.user_info:
+            return "Great! Finally, what's your address?"
+
+    elif state.current_state == "submit_enquiry_details":
+        enquiry_id = generate_enquiry_id()
+        phone = state.user_info.get('phone')
+        
+        if phone:
+            if phone not in user_details:
+                user_details[phone] = {
+                    "name": state.user_info.get('name', ''),
+                    "address": state.user_info.get('address', ''),
+                    "orders": {},
+                    "complaints": {},
+                    "enquiries": {}
+                }
+            
+            user_details[phone]["enquiries"][enquiry_id] = {
+                "topic": state.enquiry_topic,
+                "details": message,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "received"
+            }
+            
+            with open("user_details.json", "w") as f:
+                json.dump(user_details, f, indent=4)
+            
+            state.previous_state = "submit_enquiry_details"
+            state.current_state = "enquiry_confirmation"
+            return (f"Thank you for your enquiry. Your reference number is #{enquiry_id}.\n"
+                    f"We'll contact you shortly at {phone} with more information.\n"
+                    "Is there anything else I can help you with?")
+        else:
+            return "There was an issue recording your enquiry. Please try again."
+
+    elif state.current_state in ["order_confirmation", "complaint_confirmation", "enquiry_confirmation"]:
+        if "yes" in message.lower() or "yeah" in message.lower():
+            state.current_state = "greeting"
+            return f"Great! How else can I assist you today, {user_name}? (e.g., 'order', 'menu', 'complaint', 'enquiry')"
+        else:
+            state.current_state = "end"
+            return f"Thank you for using Lola's service, {user_name}! Have a wonderful day."
+
+    elif state.current_state == "end":
+        state.current_state = "start"
+        return "Session ended. Type anything to start a new conversation."
+
+    else:
+        return "I'm not sure how to handle that. Let's start over. How can I help you today?"

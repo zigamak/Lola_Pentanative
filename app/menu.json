@@ -1,0 +1,86 @@
+{
+  "Main Dishes": {
+    "Smoky Jollof Fiesta": 1500,
+    "Egusi Pasta Primavera": 1800,
+    "Grilled Tilapia with Herb Crust": 2000,
+    "Pounded Yam with Vegetable Soup": 1700,
+    "Fried Rice Fiesta": 1400,
+    "Suya-Spiced Chicken Platter": 1600,
+    "Banga Rice Delight": 1300,
+    "Plantain Porridge with Fish": 1500,
+    "Amala with Gbegiri and Ewedu": 1600,
+    "Spicy Beef Stir-Fry": 1700
+  },
+  "Soups & Stews": {
+    "Egusi Soup": 1200,
+    "Ogbono Soup with Uziza": 1200,
+    "Seafood Pepper Soup": 2000,
+    "Vegetable Soup (Edikang Ikong)": 1500,
+    "Bitterleaf Soup": 1000,
+    "Okra Soup with Spinach": 1300,
+    "Afang Soup": 1400,
+    "Oha Soup": 1300,
+    "Nsala Soup (White Soup)": 1500,
+    "Chicken Curry Stew": 1400
+  },
+  "Sides": {
+    "Fried Plantain": 500,
+    "Yam Fries with Pepper Dip": 600,
+    "Coleslaw": 400,
+    "Moi Moi": 500,
+    "Boiled Yam Slices": 400,
+    "Vegetable Salad": 500,
+    "Spicy Gizdodo": 700,
+    "Jollof Beans": 600,
+    "Sweet Potato Wedges": 500,
+    "Garlic Bread Rolls": 400
+  },
+  "Snacks": {
+    "Puff Puff": 200,
+    "Samosa (4pcs)": 300,
+    "Spring Rolls (4pcs)": 300,
+    "Chin Chin (Small Pack)": 150,
+    "Meat Pie": 300,
+    "Chicken Shawarma": 800,
+    "Fish Rolls (4pcs)": 400,
+    "Plantaintain Chips": 200,
+    "Akara Balls (6pcs)": 200,
+    "Peppered Snail": 1200
+  },
+  "Drinks": {
+    "Chapman (Non-Alcoholic)": 600,
+    "Zobo with Citrus Twist": 400,
+    "Fresh Pineapple Juice": 500,
+    "Mango Smoothie": 600,
+    "Coca-Cola (50cl)": 250,
+    "Fanta Orange (50cl)": 250,
+    "Water (75cl)": 150,
+    "Pineapple-Ginger Mocktail": 500,
+    "Tropical Fruit Punch": 700,
+    "Coconut Water": 600
+  },
+  "Desserts": {
+    "Chocolate Lava Cake": 1000,
+    "Coconut Panna Cotta": 800,
+    "Banana Bread with Cream": 700,
+    "Vanilla Ice Cream": 600,
+    "Fruit Tartlet": 500,
+    "Cinnamon Chin Chin": 400,
+    "Mango Sorbet": 600,
+    "Caramel Custard": 500,
+    "Chocolate Chip Cookies (4)": 400,
+    "Pineapple Upside-Down Cake": 600
+  },
+  "Specialties": {
+    "Vegan Jollof Rice with Tofu": 1500,
+    "Afro-Mexican Tacos": 1400,
+    "Spicy Suya Burger": 1200,
+    "Grilled Veggie Platter": 1300,
+    "Seafood Okra Gumbo": 1800,
+    "Plantain Lasagna": 1600,
+    "Mushroom Pepper Soup": 1400,
+    "BBQ Chicken Pizza (Slice)": 800,
+    "Zobo-Infused Fruit Salad": 700,
+    "Gluten-Free Amala with Soup": 1700
+  }
+}

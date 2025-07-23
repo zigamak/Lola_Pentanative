@@ -1,0 +1,109 @@
+{
+  "categories": {
+    "ordering": {
+      "title": "🛒 Ordering",
+      "questions": {
+        "how_to_order": {
+          "question": "How do I place an order?",
+          "answer": "To place an order:\n1. Send any message to start\n2. Click 'Order Menu'\n3. Choose a category\n4. Select items and quantities\n5. Provide delivery address\n6. Complete payment\n\nIt's that simple! 😊"
+        },
+        "minimum_order": {
+          "question": "What's the minimum order amount?",
+          "answer": "Our minimum order amount is ₦1,000. This helps us maintain quality service and reasonable delivery costs. 📦"
+        },
+        "cancel_order": {
+          "question": "Can I cancel my order?",
+          "answer": "Yes! You can cancel your order:\n• Before payment: Just click 'Cancel' during checkout\n• After payment: Contact us immediately and we'll process a refund if the order hasn't been prepared yet. ⏰"
+        },
+        "modify_order": {
+          "question": "Can I modify my order after placing it?",
+          "answer": "Order modifications depend on timing:\n• Before payment: Yes, you can add/remove items\n• After payment but before preparation: Contact us immediately\n• After preparation: Unfortunately, no changes possible 📝"
+        }
+      }
+    },
+    "payment": {
+      "title": "💳 Payment",
+      "questions": {
+        "payment_methods": {
+          "question": "What payment methods do you accept?",
+          "answer": "We accept all major payment methods through Paystack:\n• Debit/Credit Cards (Visa, Mastercard, Verve)\n• Bank Transfer\n• USSD\n• Mobile Money\n• QR Code payments 💳"
+        },
+        "payment_security": {
+          "question": "Is my payment information secure?",
+          "answer": "Absolutely! We use Paystack, a PCI DSS compliant payment processor. Your card details are encrypted and never stored on our servers. Your security is our priority! 🔒"
+        },
+        "payment_failed": {
+          "question": "What if my payment fails?",
+          "answer": "If payment fails:\n1. Check your card details and try again\n2. Ensure sufficient funds are available\n3. Contact your bank if issues persist\n4. Try a different payment method\n\nNeed help? Just ask! 🤝"
+        },
+        "refund_policy": {
+          "question": "What's your refund policy?",
+          "answer": "Refunds are processed as follows:\n• Order cancellation before preparation: Full refund within 3-5 business days\n• Quality issues: Full refund or replacement\n• Change of mind after delivery: No refund possible\n\nRefunds go back to your original payment method 💰"
+        }
+      }
+    },
+    "delivery": {
+      "title": "🚚 Delivery",
+      "questions": {
+        "delivery_time": {
+          "question": "How long does delivery take?",
+          "answer": "Delivery times vary by location:\n• Within city center: 30-45 minutes\n• Suburban areas: 45-60 minutes\n• Remote areas: 60-90 minutes\n\nWe'll keep you updated on your order status! ⏱️"
+        },
+        "delivery_fee": {
+          "question": "How much is delivery?",
+          "answer": "Delivery fees are calculated based on distance:\n• Within 5km: ₦500\n• 5-10km: ₦800\n• 10-15km: ₦1,200\n• Beyond 15km: Contact us for pricing\n\n🎉 Free delivery on orders above ₦5,000!"
+        },
+        "delivery_areas": {
+          "question": "Do you deliver to my area?",
+          "answer": "We deliver across Lagos, Abuja, and Port Harcourt! If you're unsure about your area, share your location during checkout and we'll confirm availability. We're always expanding our coverage! 📍"
+        },
+        "track_order": {
+          "question": "Can I track my order?",
+          "answer": "Yes! You'll receive updates via WhatsApp:\n• Order confirmed\n• Preparation started\n• Out for delivery\n• Delivered\n\nYou can also contact us anytime for updates! 📱"
+        }
+      }
+    },
+    "menu": {
+      "title": "🍽️ Menu & Food",
+      "questions": {
+        "menu_updates": {
+          "question": "How often is the menu updated?",
+          "answer": "Our menu is updated regularly:\n• Daily specials added each morning\n• Seasonal items change monthly\n• New dishes introduced quarterly\n\nFollow us for menu updates and special offers! 📋"
+        },
+        "ingredients": {
+          "question": "Can I know the ingredients in my food?",
+          "answer": "Absolutely! We're happy to share ingredient information for any dish. This is especially important for allergies and dietary restrictions. Just ask when ordering! 🥗"
+        },
+        "allergies": {
+          "question": "Do you cater to food allergies?",
+          "answer": "Yes, we take allergies seriously! Please inform us of any allergies when ordering. We'll ensure your meal is prepared safely and can suggest suitable alternatives. Your safety matters! ⚠️"
+        },
+        "customization": {
+          "question": "Can I customize my order?",
+          "answer": "Many items can be customized:\n• Spice level (mild, medium, hot)\n• Extra/less ingredients\n• Side substitutions\n• Special preparations\n\nJust mention your preferences when ordering! 👨‍🍳"
+        }
+      }
+    },
+    "support": {
+      "title": "📞 Support",
+      "questions": {
+        "contact_support": {
+          "question": "How can I contact customer support?",
+          "answer": "You can reach us through:\n• This WhatsApp chat (fastest response)\n• Phone: +234-XXX-XXX-XXXX\n• Email: support@yourrestaurant.com\n\nWe're here to help 24/7! 📞"
+        },
+        "business_hours": {
+          "question": "What are your business hours?",
+          "answer": "We're open:\n• Monday - Sunday: 8:00 AM - 11:00 PM\n• Kitchen closes at 10:30 PM\n• Customer service available 24/7 via WhatsApp\n\nWe're here when you need us! 🕐"
+        },
+        "save_address": {
+          "question": "Will you save my delivery address?",
+          "answer": "Yes! We automatically save your delivery address for faster future orders. You can always update it when placing new orders or ask us to change your saved address. 🏠"
+        },
+        "order_history": {
+          "question": "Can I see my order history?",
+          "answer": "Currently, order history is managed internally. You can ask us about your previous orders anytime, and we'll provide the details. We're working on a customer portal for easy access! 📚"
+        }
+      }
+    }
+  }
+}
