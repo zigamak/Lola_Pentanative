@@ -26,7 +26,7 @@ def signature_required(f):
     """
 
     @wraps(f)
-    def decorated_function(*args, *kwargs):
+    def decorated_function(*args, **kwargs):    
         signature = request.headers.get("X-Hub-Signature-256", "")[
             7:
         ]  # Removing 'sha256='
