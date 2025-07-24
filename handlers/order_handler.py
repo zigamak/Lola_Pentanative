@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger(__name__)
 
 class OrderHandler(BaseHandler):
-    """Handles order processing and cart management, integrated with DataManager for database operations."""
+    """Handles order processing and cart management."""
 
     def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service=None, location_service=None, lead_tracking_handler=None):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
@@ -64,9 +64,9 @@ class OrderHandler(BaseHandler):
                     
                     if item_name not in state["cart"]:
                         state["cart"][item_name] = {
-                            "item_id": item_name,
+                            "item_name": item_name,  # Changed from item_id to item_name for consistency
                             "quantity": quantity, 
-                            "price": float(price),
+                            "unit_price": float(price),  # Changed from price to unit_price
                             "total_price": total_price,
                             "variations": {}
                         }
@@ -316,25 +316,6 @@ class OrderHandler(BaseHandler):
                 self.session_manager.update_session_state(session_id, state)
                 return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
             else:
-                # Save user details to database to ensure consistency
-                user_data = {
-                    "name": state.get("user_name", "Guest"),
-                    "phone_number": state.get("phone_number", session_id),
-                    "address": state.get("address", ""),
-                    "user_perferred_name": state.get("user_name", "Guest"),
-                    "address2": "",
-                    "address3": ""
-                }
-                try:
-                    self.data_manager.save_user_details(session_id, user_data)
-                    logger.info(f"User details saved for session {session_id} during checkout.")
-                except Exception as e:
-                    logger.error(f"Failed to save user details for session {session_id}: {e}")
-                    return self.whatsapp_service.create_text_message(
-                        session_id,
-                        "❌ Sorry, there was an error saving your details. Please try again."
-                    )
-
                 state["current_state"] = "confirm_order"
                 self.session_manager.update_session_state(session_id, state)
                 logger.info(f"Address set, proceeding to confirm order for manual session {session_id}.")
@@ -385,8 +366,8 @@ class OrderHandler(BaseHandler):
             
             for item_name, item_data in cart.items():
                 quantity = item_data.get("quantity", 1)
-                price = item_data.get("price", 0.0)
-                total_price = item_data.get("total_price", quantity * price)
+                unit_price = item_data.get("unit_price", 0.0)
+                total_price = item_data.get("total_price", quantity * unit_price)
                 
                 order_details += f"• {quantity}x {item_name} - ₦{total_price:,.2f}\n"
                 total_amount += total_price
@@ -397,7 +378,7 @@ class OrderHandler(BaseHandler):
             address = state.get("address", user_data.get("address", "Not provided") if user_data else "Not provided")
             
             order_details += f"\n📍 *Delivery Details:*\n"
-            order_details += f"👤 Nameaciją: Name: {user_name}\n"
+            order_details += f"👤 Name: {user_name}\n"
             order_details += f"📱 Phone: {phone_number}\n"
             order_details += f"🏠 Address: {address}\n"
             order_details += f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
@@ -442,7 +423,7 @@ class OrderHandler(BaseHandler):
                 )
             
             total_amount = sum(
-                item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
+                item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("unit_price", 0.0))
                 for item_data in cart.values()
             )
             
@@ -452,24 +433,35 @@ class OrderHandler(BaseHandler):
             phone_number = user_data.get("phone_number", session_id) if user_data else session_id
             address = state.get("address", user_data.get("address", "") if user_data else "")
             
+            # Structure items for whatsapp_order_details table
+            items = [
+                {
+                    "item_name": item_name,
+                    "quantity": item_data.get("quantity", 1),
+                    "unit_price": item_data.get("unit_price", 0.0)
+                }
+                for item_name, item_data in cart.items()
+            ]
+            
             order_data = {
                 "order_id": order_id,
-                "merchant_details_id": getattr(self.config, 'MERCHANT_ID', "default_merchant"),
+                "merchant_id": getattr(self.config, 'MERCHANT_ID', "default_merchant"),
                 "user_id": session_id,
+                "user_name": user_name,
+                "user_number": phone_number,
                 "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "default_business"),
                 "address": address,
-                "status": "confirmed",
+                "status": "pending",
                 "total_amount": total_amount,
                 "payment_reference": "",
                 "payment_method_type": "",
                 "timestamp": datetime.datetime.now(),
-                "timestamp_enddate": None,
-                "DateAdded": datetime.datetime.now()
+                "items": items  # Use the structured items list
             }
             
             try:
                 self.data_manager.save_user_order(order_data)
-                logger.info(f"Order {order_id} saved to database for session {session_id}")
+                logger.info(f"Order {order_id} saved to database with status 'pending' for session {session_id}")
             except Exception as e:
                 logger.error(f"Failed to save order {order_id} to database for session {session_id}: {e}")
                 return self.whatsapp_service.create_text_message(
@@ -477,31 +469,12 @@ class OrderHandler(BaseHandler):
                     "❌ Sorry, there was an error saving your order. Please try again or contact support."
                 )
             
-            # Save user details to ensure consistency
-            user_data_to_save = {
-                "name": user_name,
-                "phone_number": phone_number,
-                "address": address,
-                "user_perferred_name": user_name,
-                "address2": user_data.get("address2", "") if user_data else "",
-                "address3": user_data.get("address3", "") if user_data else ""
-            }
-            try:
-                self.data_manager.save_user_details(session_id, user_data_to_save)
-                logger.info(f"User details saved for session {session_id} during order confirmation.")
-            except Exception as e:
-                logger.error(f"Failed to save user details for session {session_id}: {e}")
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ Sorry, there was an error saving your details. Please try again."
-                )
-            
             state["order_id"] = order_id
             state["total_amount"] = total_amount
-            state["order_status"] = "confirmed"
+            state["order_status"] = "pending"
             state["order_timestamp"] = order_data["timestamp"].isoformat()
             
-            logger.info(f"Order {order_id} confirmed for session {session_id}. Amount: ₦{total_amount:,.2f}")
+            logger.info(f"Order {order_id} created with status 'pending' for session {session_id}. Amount: ₦{total_amount:,.2f}")
             
             try:
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
@@ -522,7 +495,7 @@ class OrderHandler(BaseHandler):
                 self.session_manager.update_session_state(session_id, state)
                 
                 payment_message = (
-                    f"🎉 *Order Confirmed!*\n\n"
+                    f"🎉 *Order Created!*\n\n"
                     f"📋 Order ID: {order_id}\n"
                     f"💰 Total Amount: ₦{total_amount:,.2f}\n\n"
                     f"💳 *Payment Instructions:*\n"

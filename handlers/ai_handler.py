@@ -137,14 +137,49 @@ class AIHandler(BaseHandler):
                 )
                 return self.whatsapp_service.create_text_message(session_id, error_message)
             
+            # --- NEW LOGIC START ---
+            # If any items are unrecognized, prioritize this message and ask user to rephrase.
+            # This prevents entering clarification for ambiguous items if there are clear unrecognized ones.
+            if parsed_order.get("unrecognized_items"):
+                summary_with_unrecognized = self._create_order_summary(parsed_order)
+                
+                response_message = (
+                    f"{summary_with_unrecognized}\n\n"
+                    "🚫 *Some items in your order were not found in our menu (Unrecognized Items above).*\n"
+                    "Please ensure you are selecting from our *existing products* only. "
+                    "You can rephrase your order, or type 'menu' to go back to the main menu."
+                )
+                
+                # Keep the user in the 'ai_bulk_order' state to allow them to retry or go back
+                state["current_state"] = "ai_bulk_order" 
+                state["current_handler"] = "ai_handler"
+                self.session_manager.update_session_state(session_id, state)
+                
+                return self.whatsapp_service.create_text_message(session_id, response_message)
+            # --- NEW LOGIC END ---
+
+            # If no unrecognized items, proceed with existing logic for ambiguous or recognized items
             state["parsed_order"] = parsed_order
-            state["current_state"] = "ai_order_confirmation"
-            state["current_handler"] = "ai_handler"
-            self.session_manager.update_session_state(session_id, state)
+            state["current_handler"] = "ai_handler" # Keep handler consistent
             
-            summary = self._create_order_summary(parsed_order)
+            if parsed_order.get("ambiguous_items"):
+                state["current_state"] = "ai_order_clarification"
+                self.session_manager.update_session_state(session_id, state)
+                
+                clarification_buttons = self._create_clarification_buttons(parsed_order["ambiguous_items"])
+                
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    self._create_order_summary(parsed_order) + "\n\nPlease help me clarify:",
+                    clarification_buttons
+                )
             
-            if parsed_order.get("recognized_items") and not parsed_order.get("ambiguous_items"):
+            elif parsed_order.get("recognized_items"):
+                state["current_state"] = "ai_order_confirmation"
+                self.session_manager.update_session_state(session_id, state)
+                
+                summary = self._create_order_summary(parsed_order)
+                
                 buttons = [
                     {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
                     {"type": "reply", "reply": {"id": "modify_ai_order", "title": "✏️ Modify Order"}},
@@ -157,23 +192,10 @@ class AIHandler(BaseHandler):
                     buttons
                 )
             
-            elif parsed_order.get("ambiguous_items"):
-                state["current_state"] = "ai_order_clarification"
-                state["current_handler"] = "ai_handler"
-                self.session_manager.update_session_state(session_id, state)
-                
-                clarification_buttons = self._create_clarification_buttons(parsed_order["ambiguous_items"])
-                
-                return self.whatsapp_service.create_button_message(
-                    session_id,
-                    summary + "\n\nPlease help me clarify:",
-                    clarification_buttons
-                )
-            
-            else:
+            else: # Fallback for cases where no items are recognized, ambiguous, or unrecognized
                 return self.whatsapp_service.create_text_message(
                     session_id,
-                    summary + "\n\nI couldn't find any items to add to your order. Would you like to try again or see our menu?"
+                    "I couldn't find any items to add to your order. Would you like to try again or see our menu?"
                 )
         
         except Exception as e:
@@ -259,6 +281,8 @@ class AIHandler(BaseHandler):
         
         selected_item_name = None
         for match_name in possible_matches:
+            # Use original message for matching if needed, or stick to processed 'message'
+            # Assuming 'message' is already cleaned for button IDs
             if message.lower().strip() == match_name.lower().replace(" ", "_").replace("-", "_"):
                 selected_item_name = match_name
                 break
@@ -268,14 +292,15 @@ class AIHandler(BaseHandler):
             item_id = None
             found_item_data = None
 
+            # Iterate through menu_data to find the selected item's full details
             for category, items_data in self.data_manager.menu_data.items():
-                if isinstance(items_data, dict):
+                if isinstance(items_data, dict): # Old format, likely not used with product_inventory sync
                     if selected_item_name in items_data:
                         item_price = items_data[selected_item_name]
                         item_id = f"{category.lower().replace(' ', '_')}_{selected_item_name.lower().replace(' ', '_')}"
                         found_item_data = {"name": selected_item_name, "price": item_price, "id": item_id}
                         break
-                elif isinstance(items_data, list):
+                elif isinstance(items_data, list): # Expected format from product_inventory sync
                     for item_dict in items_data:
                         if isinstance(item_dict, dict) and item_dict.get("name") == selected_item_name:
                             item_price = item_dict.get("price", 0.0)
@@ -292,7 +317,7 @@ class AIHandler(BaseHandler):
                     "item_id": item_id,
                     "name": selected_item_name,
                     "quantity": original_qty, 
-                    "variations": {},
+                    "variations": found_item_data.get("variations", {}), # Use variations from found_item_data
                     "price": item_price,
                     "total_price": original_qty * item_price
                 }
@@ -303,7 +328,7 @@ class AIHandler(BaseHandler):
                 
                 parsed_order["order_total"] = parsed_order.get("order_total", 0.0) + recognized_item["total_price"]
 
-                ambiguous_items.pop(0)
+                ambiguous_items.pop(0) # Remove the clarified item
 
                 state["parsed_order"] = parsed_order
                 self.session_manager.update_session_state(session_id, state)
@@ -322,6 +347,7 @@ class AIHandler(BaseHandler):
                         clarification_buttons
                     )
                 else:
+                    # All ambiguous items clarified, move to confirmation
                     state["current_state"] = "ai_order_confirmation"
                     state["current_handler"] = "ai_handler"
                     self.session_manager.update_session_state(session_id, state)
@@ -338,7 +364,7 @@ class AIHandler(BaseHandler):
                         buttons
                     )
             else:
-                self.logger.error(f"Selected item '{selected_item_name}' not found in menu data for session {session_id}.")
+                self.logger.error(f"Selected item '{selected_item_name}' not found in menu data during clarification for session {session_id}.")
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     "Sorry, I couldn't find details for that item in our menu. Please try again or type 'menu' to go back."
@@ -418,7 +444,7 @@ class AIHandler(BaseHandler):
         """Create buttons for clarifying an ambiguous item."""
         buttons = []
         if ambiguous_items:
-            ambiguous_item = ambiguous_items[0]
+            ambiguous_item = ambiguous_items[0] # Only create buttons for the first ambiguous item
             for i, match in enumerate(ambiguous_item.get("possible_matches", [])):
                 button_id = match.lower().replace(" ", "_").replace("-", "_") 
                 buttons.append({"type": "reply", "reply": {"id": button_id, "title": match}})
