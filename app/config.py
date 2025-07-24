@@ -1,7 +1,7 @@
 # app/config.py
 import os
 from dotenv import load_dotenv
-import logging # <-- Add this import
+import logging
 
 load_dotenv()
 
@@ -20,6 +20,7 @@ class Config:
         self.WHATSAPP_ACCESS_TOKEN = os.getenv('WHATSAPP_ACCESS_TOKEN')
         self.WHATSAPP_PHONE_NUMBER_ID = os.getenv('WHATSAPP_PHONE_NUMBER_ID')
         self.VERIFY_TOKEN = os.getenv('VERIFY_TOKEN')
+        self.APP_SECRET = os.getenv('APP_SECRET') # <-- THIS LINE WAS ADDED/FIXED
 
         # Payment configuration
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
