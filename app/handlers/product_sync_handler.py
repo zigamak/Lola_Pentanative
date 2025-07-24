@@ -61,11 +61,24 @@ class ProductSyncHandler:
                         if category not in menu_data:
                             menu_data[category] = []
 
+                        # Handle potential None for 'price' before conversion
+                        item_price = row['price']
+                        if item_price is None:
+                            logger.warning(f"Product '{row.get('product_name', 'Unknown')}' (ID: {row.get('id', 'Unknown')}) has a NULL price. Defaulting to 0.0.")
+                            item_price = 0.0
+                        else:
+                            try:
+                                item_price = float(item_price)
+                            except (ValueError, TypeError):
+                                logger.error(f"Could not convert price '{item_price}' for product '{row.get('product_name', 'Unknown')}' (ID: {row.get('id', 'Unknown')}) to float. Defaulting to 0.0.")
+                                item_price = 0.0
+
+
                         item = {
                             'id': str(row['id']),  # Corrected: Use 'id' from the fetched row
                             'name': row['product_name'],
                             'variant': row['variant_name'],
-                            'price': float(row['price']),
+                            'price': item_price, # Use the handled item_price
                             'currency': row['currency'],
                             'availability_status': row['availability_status'],
                             'description': row['description'],
