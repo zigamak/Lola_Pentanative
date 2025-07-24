@@ -85,8 +85,3 @@ def webhook_get():
 @signature_required
 def webhook_post():
     return handle_message()
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 2e274a46615689b672f45b3d3219859d4a35d5af
