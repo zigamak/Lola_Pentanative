@@ -68,7 +68,7 @@ class DataManager:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
-                        SELECT 
+                        SELECT
                             user_id,
                             user_name,
                             user_number,
@@ -109,12 +109,12 @@ class DataManager:
                 with conn.cursor() as cur:
                     query = """
                         INSERT INTO whatsapp_user_details (
-                            user_id, user_name, user_number, address, 
+                            user_id, user_name, user_number, address,
                             user_perferred_name, address2, address3
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (user_id) DO UPDATE
-                        SET 
+                        SET
                             user_name = EXCLUDED.user_name,
                             user_number = EXCLUDED.user_number,
                             address = EXCLUDED.address,
@@ -163,30 +163,29 @@ class DataManager:
                 with conn.cursor() as cur:
                     query = """
                         INSERT INTO whatsapp_orders (
-                            order_id, merchant_id, user_id, user_name, user_number, 
-                            business_type_id, address, status, total_amount, 
-                            payment_reference, payment_method_type, timestamp
+                            order_id, merchant_details_id, customer_id, 
+                            business_type_id, address, status, total_amount,
+                            payment_reference, payment_method_type, timestamp,
+                            timestamp_enddate, DateAdded
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """
-                    # Safely get MERCHANT_ID, defaulting to None if not present or explicitly null
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', None)
-                    # Safely get BUSINESS_TYPE_ID, defaulting to None if not present or explicitly null
+                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', None) # Assuming MERCHANT_ID maps to merchant_details_id
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', None)
 
                     cur.execute(query, (
                         order_data.get("order_id"),
-                        merchant_id,  # Now will be None if not found in config
-                        order_data.get("user_id"),
-                        order_data.get("user_name"),
-                        order_data.get("user_number"),
-                        business_type_id,  # Now will be None if not found in config
+                        merchant_details_id,
+                        order_data.get("user_id"), # Maps to customer_id in DB
+                        business_type_id,
                         order_data.get("address"),
                         order_data.get("status"),
                         int(order_data.get("total_amount") * 100),
                         order_data.get("payment_reference", ""),
                         order_data.get("payment_method_type", ""),
-                        order_data.get("timestamp")
+                        order_data.get("timestamp"),
+                        None, # Assuming timestamp_enddate is populated later or is nullable
+                        datetime.datetime.now() # Populate DateAdded with current timestamp
                     ))
                     conn.commit()
                     logger.info(f"Order {order_data.get('order_id')} saved to database")
@@ -239,35 +238,48 @@ class DataManager:
         existing_data = self._load_json_data(filename)
         if not isinstance(existing_data, list):
             existing_data = []
-        
+
         existing_data.append(data)
         self._save_json_data(filename, existing_data)
         logger.info(f"{data_type.capitalize()} details saved to {filename}")
 
     def get_address_from_order_details(self, phone_number: str) -> Optional[str]:
-        """Get the most recent address for a phone number from whatsapp_orders."""
+        """
+        Get the most recent address for a phone number.
+        This function now fetches the address from 'whatsapp_user_details'
+        as per the new requirement, instead of 'whatsapp_orders'.
+        A more descriptive name for this function might be get_address_from_user_details.
+        """
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Querying whatsapp_user_details as per the latest instruction
                     query = """
-                        SELECT address, timestamp
-                        FROM whatsapp_orders
-                        WHERE user_number = %s AND address IS NOT NULL
-                        ORDER BY timestamp DESC
-                        LIMIT 1
+                        SELECT address, address2, address3
+                        FROM whatsapp_user_details
+                        WHERE user_number = %s
+                        LIMIT 1 -- Assuming one user number maps to one set of addresses
                     """
                     cur.execute(query, (phone_number,))
                     result = cur.fetchone()
                     if result:
-                        logger.debug(f"Found address '{result['address']}' for phone number {phone_number}")
-                        return result['address']
-                    logger.debug(f"No address found for phone number {phone_number}")
+                        # Prioritize address, then address2, then address3
+                        if result.get('address'):
+                            logger.debug(f"Found primary address '{result['address']}' for phone number {phone_number} from user details.")
+                            return result['address']
+                        elif result.get('address2'):
+                            logger.debug(f"Found secondary address '{result['address2']}' for phone number {phone_number} from user details.")
+                            return result['address2']
+                        elif result.get('address3'):
+                            logger.debug(f"Found tertiary address '{result['address3']}' for phone number {phone_number} from user details.")
+                            return result['address3']
+                    logger.debug(f"No address found for phone number {phone_number} in whatsapp_user_details.")
                     return None
         except psycopg2.Error as e:
-            logger.error(f"Database error while fetching address for {phone_number}: {e}", exc_info=True)
+            logger.error(f"Database error while fetching address for {phone_number} from user details: {e}", exc_info=True)
             return None
         except Exception as e:
-            logger.error(f"Unexpected error while fetching address for {phone_number}: {e}", exc_info=True)
+            logger.error(f"Unexpected error while fetching address for {phone_number} from user details: {e}", exc_info=True)
             return None
 
     def get_order_by_payment_reference(self, payment_reference: str) -> Optional[Dict]:
@@ -276,10 +288,11 @@ class DataManager:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
-                        SELECT 
-                            order_id, merchant_id, user_id, user_name, user_number,
+                        SELECT
+                            order_id, merchant_details_id, customer_id,
                             business_type_id, address, status, total_amount,
-                            payment_reference, payment_method_type, timestamp
+                            payment_reference, payment_method_type, timestamp,
+                            timestamp_enddate, DateAdded
                         FROM whatsapp_orders
                         WHERE payment_reference = %s
                     """
@@ -288,6 +301,9 @@ class DataManager:
                     if result:
                         order_data = dict(result)
                         order_data['total_amount'] = order_data['total_amount'] / 100.0
+                        # Map DB column names back to code's expected names if necessary
+                        order_data['user_id'] = order_data.pop('customer_id')
+                        order_data['merchant_id'] = order_data.pop('merchant_details_id')
                         logger.debug(f"Found order for payment reference {payment_reference}: {order_data}")
                         return order_data
                     logger.debug(f"No order found for payment reference {payment_reference}")
