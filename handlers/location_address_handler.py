@@ -329,9 +329,8 @@ class LocationAddressHandler:
         Provides options to the user when a Google Maps search yields no results.
         """
         buttons = [
-            {"type": "reply", "reply": {"id": "search_again", "title": "🔍 Try Different Search"}},
-            {"type": "reply", "reply": {"id": "type_manually", "title": "✏️ Type Address"}},
-            {"type": "reply", "reply": {"id": "share_location", "title": "📍 Share Location"}}
+            {'type': 'reply', 'reply': {'id': 'share_location', 'title': '📍 Share Location'}},
+            {'type': 'reply', 'reply': {'id': 'type_address_manually', 'title': '✏️ Type Address'}}
         ]
 
         return self.whatsapp_service.create_button_message(

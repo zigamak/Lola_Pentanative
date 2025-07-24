@@ -23,7 +23,7 @@ class DataManager:
         }
         self._ensure_data_directory_exists()
         self.user_details = self.load_user_details()
-        self.menu_data = self.load_products_data() # Initial load
+        self.menu_data = self.load_products_data()
 
     def _ensure_data_directory_exists(self):
         """Ensures the data directory exists for JSON files."""
@@ -170,28 +170,29 @@ class DataManager:
                     # Insert into whatsapp_orders
                     order_query = """
                         INSERT INTO whatsapp_orders (
-                            order_id, merchant_id, user_id, user_name, user_number, 
+                            order_id, merchant_details_id, customer_id, 
                             business_type_id, address, status, total_amount, 
-                            payment_reference, payment_method_type, timestamp
+                            payment_reference, payment_method_type, timestamp, 
+                            timestamp_enddate, DateAdded
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', None)
+                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', None)
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', None)
 
                     cur.execute(order_query, (
                         order_data.get("order_id"),
-                        merchant_id,
-                        order_data.get("user_id"),
-                        order_data.get("user_name"),
-                        order_data.get("user_number"),
+                        merchant_details_id,
+                        order_data.get("customer_id"),
                         business_type_id,
                         order_data.get("address"),
                         order_data.get("status"),
-                        int(order_data.get("total_amount") * 100),
+                        float(order_data.get("total_amount", 0.0)),
                         order_data.get("payment_reference", ""),
                         order_data.get("payment_method_type", ""),
-                        order_data.get("timestamp")
+                        order_data.get("timestamp"),
+                        order_data.get("timestamp_enddate", None),
+                        order_data.get("DateAdded", datetime.datetime.now())
                     ))
 
                     # Insert into whatsapp_order_details
@@ -202,12 +203,14 @@ class DataManager:
                         VALUES (%s, %s, %s, %s)
                     """
                     order_items = order_data.get("items", [])
+                    if not order_items:
+                        logger.warning(f"No items provided for order {order_data.get('order_id', 'unknown')}")
                     for item in order_items:
                         cur.execute(order_details_query, (
                             order_data.get("order_id"),
                             item.get("item_name"),
                             item.get("quantity"),
-                            item.get("unit_price")
+                            float(item.get("unit_price", 0.0))
                         ))
 
                     conn.commit()
@@ -260,13 +263,13 @@ class DataManager:
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', None) 
+                    merchant_id = getattr(self.config, 'MERCHANT_ID', None)
                     
                     cur.execute(query, (
                         merchant_id,
                         enquiry_data.get("user_name"),
                         enquiry_data.get("user_id"),
-                        enquiry_data.get("enquiry_categories", ""), 
+                        enquiry_data.get("enquiry_categories", ""),
                         enquiry_data.get("enquiry_text"),
                         enquiry_data.get("timestamp"),
                         enquiry_data.get("channel", "whatsapp")
@@ -294,7 +297,7 @@ class DataManager:
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', None) 
+                    merchant_id = getattr(self.config, 'MERCHANT_ID', None)
                     
                     cur.execute(query, (
                         complaint_data.get("complaint_id"),
@@ -327,26 +330,71 @@ class DataManager:
         logger.info(f"{data_type.capitalize()} details saved to {filename}")
 
     def get_address_from_order_details(self, phone_number: str) -> Optional[str]:
-        """Get the most recent address for a phone number from whatsapp_orders."""
+        """Get the most recent address for a phone number from whatsapp_orders, with fallback to whatsapp_user_details."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Query whatsapp_orders by customer_id
                     query = """
                         SELECT address, timestamp
                         FROM whatsapp_orders
-                        WHERE user_number = %s AND address IS NOT NULL
+                        WHERE customer_id = %s AND address IS NOT NULL
                         ORDER BY timestamp DESC
                         LIMIT 1
                     """
                     cur.execute(query, (phone_number,))
                     result = cur.fetchone()
                     if result:
-                        logger.debug(f"Found address '{result['address']}' for phone number {phone_number}")
+                        logger.debug(f"Found address '{result['address']}' for phone number {phone_number} in whatsapp_orders")
                         return result['address']
-                    logger.debug(f"No address found for phone number {phone_number}")
+
+                    # Fallback: Query whatsapp_user_details by user_number
+                    logger.debug(f"No address found in whatsapp_orders for phone number {phone_number}. Trying whatsapp_user_details (user_number).")
+                    query = """
+                        SELECT address, address2, address3
+                        FROM whatsapp_user_details
+                        WHERE user_number = %s
+                        LIMIT 1
+                    """
+                    cur.execute(query, (phone_number,))
+                    result = cur.fetchone()
+                    if result:
+                        if result.get('address'):
+                            logger.debug(f"Found primary address '{result['address']}' for phone number {phone_number} in whatsapp_user_details")
+                            return result['address']
+                        elif result.get('address2'):
+                            logger.debug(f"Found secondary address '{result['address2']}' for phone number {phone_number} in whatsapp_user_details")
+                            return result['address2']
+                        elif result.get('address3'):
+                            logger.debug(f"Found tertiary address '{result['address3']}' for phone number {phone_number} in whatsapp_user_details")
+                            return result['address3']
+
+                    # Final fallback: Query whatsapp_user_details by user_id
+                    logger.debug(f"No address found in whatsapp_user_details (user_number). Trying user_id.")
+                    query = """
+                        SELECT address, address2, address3
+                        FROM whatsapp_user_details
+                        WHERE user_id = %s
+                        LIMIT 1
+                    """
+                    cur.execute(query, (phone_number,))
+                    result = cur.fetchone()
+                    if result:
+                        if result.get('address'):
+                            logger.debug(f"Found primary address '{result['address']}' for phone number {phone_number} in whatsapp_user_details (user_id)")
+                            return result['address']
+                        elif result.get('address2'):
+                            logger.debug(f"Found secondary address '{result['address2']}' for phone number {phone_number} in whatsapp_user_details (user_id)")
+                            return result['address2']
+                        elif result.get('address3'):
+                            logger.debug(f"Found tertiary address '{result['address3']}' for phone number {phone_number} in whatsapp_user_details (user_id)")
+                            return result['address3']
+
+                    logger.debug(f"No address found for phone number {phone_number} in either whatsapp_orders or whatsapp_user_details")
                     return None
         except psycopg2.Error as e:
             logger.error(f"Database error while fetching address for {phone_number}: {e}", exc_info=True)
+            logger.debug(f"Database connection parameters: {self.db_params}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error while fetching address for {phone_number}: {e}", exc_info=True)
@@ -359,9 +407,10 @@ class DataManager:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
                         SELECT 
-                            order_id, merchant_id, user_id, user_name, user_number,
+                            order_id, merchant_details_id, customer_id,
                             business_type_id, address, status, total_amount,
-                            payment_reference, payment_method_type, timestamp
+                            payment_reference, payment_method_type, timestamp,
+                            timestamp_enddate, DateAdded
                         FROM whatsapp_orders
                         WHERE payment_reference = %s
                     """
@@ -369,7 +418,9 @@ class DataManager:
                     result = cur.fetchone()
                     if result:
                         order_data = dict(result)
-                        order_data['total_amount'] = order_data['total_amount'] / 100.0
+                        order_data['total_amount'] = float(order_data['total_amount'])
+                        order_data['user_id'] = order_data.pop('customer_id')
+                        order_data['merchant_id'] = order_data.pop('merchant_details_id')
                         logger.debug(f"Found order for payment reference {payment_reference}: {order_data}")
                         return order_data
                     logger.debug(f"No order found for payment reference {payment_reference}")
