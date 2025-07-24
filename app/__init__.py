@@ -1,5 +1,7 @@
 # app/__init__.py
 from flask import Flask
+# Import Config and configure_logging from your config module
+from .config import Config, configure_logging # Assuming config.py is in the same directory as __init__.py
 
 from .views import webhook_blueprint
 
@@ -21,3 +23,7 @@ def create_app():
     app.register_blueprint(webhook_blueprint)
 
     return app
+
+# Add this line: Gunicorn looks for a top-level 'app' variable.
+# This calls your factory function and assigns the Flask app instance to 'app'.
+app = create_app()
