@@ -174,5 +174,17 @@
       "description": "Sweet fried plantain (Dodo).",
       "quantity": 100
     }
+  ],
+  "test": [
+    {
+      "id": "93",
+      "name": "test",
+      "variant": null,
+      "price": 0.0,
+      "currency": null,
+      "availability_status": false,
+      "description": "test",
+      "quantity": 23
+    }
   ]
 }

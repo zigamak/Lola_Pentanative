@@ -1,3 +1,4 @@
+# app/__init__.py
 from flask import Flask
 
 from .views import webhook_blueprint
@@ -6,8 +7,14 @@ from .views import webhook_blueprint
 def create_app():
     app = Flask(__name__)
 
-    # Load configurations and logging settings
-    load_configurations(app)
+    # Instantiate the Config class to load environment variables
+    config_obj = Config()
+
+    # Load configurations into the Flask app from the Config object
+    # This will set app.config['DB_URL'] = config_obj.DB_URL, etc.
+    app.config.from_object(config_obj)
+
+    # Configure logging (assuming configure_logging is a standalone function in config.py)
     configure_logging()
 
     # Register blueprints

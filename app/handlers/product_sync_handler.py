@@ -19,7 +19,6 @@ class ProductSyncHandler:
             'host': self.config.DB_HOST,
             'port': self.config.DB_PORT
         }
-        # Corrected: Use self.config.PRODUCTS_FILE directly as it's already the full path
         self.json_file_path = self.config.PRODUCTS_FILE
         self._ensure_directory_exists()
 
@@ -37,8 +36,8 @@ class ProductSyncHandler:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
                         SELECT
-                            id,  -- Corrected: Changed from product_variant_id to id
-                            merchant_details_id AS merchant_id, -- Alias merchant_details_id to merchant_id for consistency
+                            id,
+                            merchant_details_id AS merchant_id,
                             product_name,
                             product_category,
                             variant_name,
@@ -54,31 +53,20 @@ class ProductSyncHandler:
                     cur.execute(query)
                     rows = cur.fetchall()
 
-                    # Structure data by category for compatibility with AIHandler
                     menu_data: Dict[str, List[Dict]] = {}
                     for row in rows:
                         category = row['product_category'] or 'Uncategorized'
                         if category not in menu_data:
                             menu_data[category] = []
 
-                        # Handle potential None for 'price' before conversion
-                        item_price = row['price']
-                        if item_price is None:
-                            logger.warning(f"Product '{row.get('product_name', 'Unknown')}' (ID: {row.get('id', 'Unknown')}) has a NULL price. Defaulting to 0.0.")
-                            item_price = 0.0
-                        else:
-                            try:
-                                item_price = float(item_price)
-                            except (ValueError, TypeError):
-                                logger.error(f"Could not convert price '{item_price}' for product '{row.get('product_name', 'Unknown')}' (ID: {row.get('id', 'Unknown')}) to float. Defaulting to 0.0.")
-                                item_price = 0.0
-
+                        # Corrected Line: Handle NoneType for 'price'
+                        price_value = float(row['price']) if row['price'] is not None else 0.0
 
                         item = {
-                            'id': str(row['id']),  # Corrected: Use 'id' from the fetched row
+                            'id': str(row['id']),
                             'name': row['product_name'],
                             'variant': row['variant_name'],
-                            'price': item_price, # Use the handled item_price
+                            'price': price_value, # Use the handled price_value
                             'currency': row['currency'],
                             'availability_status': row['availability_status'],
                             'description': row['description'],
@@ -86,7 +74,6 @@ class ProductSyncHandler:
                         }
                         menu_data[category].append(item)
 
-                    # Save to products.json
                     try:
                         with open(self.json_file_path, 'w', encoding='utf-8') as f:
                             json.dump(menu_data, f, indent=2)
