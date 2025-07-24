@@ -1,10 +1,15 @@
 import logging
 import json
 import re
+import os # Import os to potentially check for env vars, or advise removing them
 from typing import Dict, List, Any
 from dataclasses import dataclass
 from openai import AzureOpenAI
 from openai import APIConnectionError, RateLimitError, OpenAIError
+
+# Import httpx if you *intend* to use custom proxy configurations.
+# For simply avoiding the 'proxies' error when it's undesired, you don't need to import httpx.
+# import httpx 
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +67,44 @@ class AIService:
         self.azure_client = None
         if self.ai_enabled and self.azure_api_key and self.azure_endpoint:
             try:
+                # IMPORTANT for openai==1.x.x:
+                # The 'proxies' argument is NOT accepted directly by AzureOpenAI client.
+                # If you encounter "TypeError: Client.__init__() got an unexpected keyword argument 'proxies'",
+                # it's likely due to HTTP_PROXY/HTTPS_PROXY environment variables being set.
+                #
+                # SOLUTION:
+                # 1. ENSURE no HTTP_PROXY or HTTPS_PROXY environment variables are set in your Render deployment.
+                #    This is the most common cause of the error when you don't explicitly configure proxies.
+                # 2. If you *do* need a proxy, you must configure it via an httpx.Client and pass it
+                #    using the `http_client` argument to AzureOpenAI. Example below (commented out).
+                #
+                # Example of explicit proxy configuration (uncomment if needed):
+                # proxy_url = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
+                # custom_httpx_client = None
+                # if proxy_url:
+                #     try:
+                #         custom_httpx_client = httpx.Client(
+                #             proxies={
+                #                 "http://": proxy_url,
+                #                 "https://": proxy_url,
+                #             }
+                #         )
+                #         logger.info(f"Using custom httpx client with proxy: {proxy_url}")
+                #     except Exception as http_e:
+                #         logger.error(f"Failed to configure httpx client with proxy: {http_e}")
+                #         custom_httpx_client = None # Fallback to no custom client
+                
                 self.azure_client = AzureOpenAI(
                     api_key=self.azure_api_key,
                     api_version=self.api_version,
-                    azure_endpoint=self.azure_endpoint
+                    azure_endpoint=self.azure_endpoint,
+                    # http_client=custom_httpx_client # Pass custom client if configured
                 )
                 logger.info("Azure OpenAI client initialized successfully in AIService.")
             except Exception as e:
+                # This is the exact error point from your traceback.
+                # The cause is likely implicit proxy settings the library picks up
+                # which are incompatible with this version's constructor.
                 logger.error(f"Failed to initialize Azure OpenAI client in AIService: {e}", exc_info=True)
                 self.ai_enabled = False # Disable AI if client initialization fails
         else:
@@ -201,7 +237,7 @@ For quantities without specification, assume 1.
                 ],
                 max_tokens=800,
                 temperature=0.3,
-                # response_format={"type": "json_object"} # Use this if your Azure deployment supports it
+                # response_format={"type": "json_object"} # Use this if your Azure deployment supports it and you want stricter JSON output
             )
             
             ai_response_content = response.choices[0].message.content.strip()
@@ -223,7 +259,7 @@ For quantities without specification, assume 1.
             else:
                 logger.error(f"No JSON found in AI response: {ai_response_content}")
                 return {"success": False, "error": "Could not parse AI response (no JSON found)", "recognized_items": [], "ambiguous_items": [], "unrecognized_items": [], "order_total": 0.0}
-        
+            
         except json.JSONDecodeError as jde:
             logger.error(f"JSON decoding error from LLM response: {jde} - Response: {ai_response_content}")
             return {"success": False, "error": "Invalid AI response format", "recognized_items": [], "ambiguous_items": [], "unrecognized_items": [], "order_total": 0.0}
