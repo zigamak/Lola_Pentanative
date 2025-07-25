@@ -1,7 +1,9 @@
 import datetime
 import threading
 from threading import Timer
-from typing import Dict, Any
+from typing import Dict, Any, List
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from utils.helpers import format_cart
 from .base_handler import BaseHandler
 
@@ -119,11 +121,16 @@ class PaymentHandler(BaseHandler):
                 
                 self.logger.info(f"Payment link created successfully for order {order_id}")
                 
+                # Fetch order items from database for display
+                order_items = self._get_order_items_from_db(order_id)
+                formatted_items = self._format_order_items(order_items)
+                
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"🛒 *Order Created Successfully!*\n\n"
                     f"📋 *Order ID:* {order_id}\n"
-                    f"💰 *Total:* ₦{total_amount // 100:,}\n\n"
+                    f"💰 *Total:* ₦{total_amount // 100:,}\n"
+                    f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
                     f"✅ We'll automatically confirm your order once payment is received!\n"
                     f"💬 You can also send 'paid' after payment to check status immediately.\n\n"
@@ -148,6 +155,39 @@ class PaymentHandler(BaseHandler):
                 session_id,
                 "⚠️ Error processing payment. Please try again or contact support."
             )
+    
+    def _get_order_items_from_db(self, order_id: str) -> List[Dict]:
+        """Fetch order items from whatsapp_order_details table."""
+        try:
+            with psycopg2.connect(**self.data_manager.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT item_name, quantity, unit_price, subtotal
+                        FROM whatsapp_order_details
+                        WHERE order_id = %s
+                    """
+                    cur.execute(query, (order_id,))
+                    items = cur.fetchall()
+                    return [dict(item) for item in items]
+        except psycopg2.Error as e:
+            self.logger.error(f"Database error while fetching order items for order {order_id}: {e}", exc_info=True)
+            return []
+        except Exception as e:
+            self.logger.error(f"Unexpected error while fetching order items for order {order_id}: {e}", exc_info=True)
+            return []
+    
+    def _format_order_items(self, items: List[Dict]) -> str:
+  
+        if not items:
+            return "No items found."
+        formatted = "\n"
+        for item in items:
+            item_name = item.get("item_name", "Unknown Item")
+            quantity = item.get("quantity", 0)
+            unit_price = item.get("unit_price", 0.0)
+            subtotal = item.get("subtotal", 0.0)
+            formatted += f"- {item_name} (x{quantity}): ₦{int(subtotal) // 100:,}\n"
+        return formatted
     
     def start_payment_monitoring(self, session_id, payment_reference, order_id):
         """Start monitoring payment status every minute for up to 15 minutes."""
@@ -267,12 +307,16 @@ class PaymentHandler(BaseHandler):
             # Generate maps info
             maps_info = self._generate_maps_info(state)
             
+            # Fetch order items from database
+            order_items = self._get_order_items_from_db(order_id)
+            formatted_items = self._format_order_items(order_items)
+            
             # Send automatic success message
             success_message = (
                 f"🎉 *Payment Automatically Confirmed!*\n\n"
                 f"📋 *Order ID:* {order_id}\n"
                 f"💰 *Amount Paid:* ₦{payment_data.get('amount', 0) // 100:,}\n"
-                f"🛒 *Items:* {format_cart(order_data.get('cart', {}))}\n"
+                f"🛒 *Items:* {formatted_items}\n"
                 f"🚚 *Delivery to:* {state.get('address', 'Not provided')}{maps_info}\n\n"
                 f"✅ Your order has been received and is being processed!\n"
                 f"📱 We'll contact you shortly for delivery updates.\n\n"
@@ -293,13 +337,13 @@ class PaymentHandler(BaseHandler):
         try:
             state = self.session_manager.get_session_state(session_id)
             
-            # Fetch the original cart from the order data
+            # Fetch order data from database
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             if not order_data:
                 self.logger.error(f"Order data not found for reminder for order {order_id}.")
                 return
-
-            total_amount = self.payment_service.calculate_cart_total(order_data["cart"])
+            
+            total_amount = order_data["total_amount"]
             customer_email = self.payment_service.generate_customer_email(
                 state.get("phone_number", session_id), 
                 state.get("user_name", "Guest")
@@ -319,10 +363,15 @@ class PaymentHandler(BaseHandler):
             )
             
             if payment_url:
+                # Fetch order items from database
+                order_items = self._get_order_items_from_db(order_id)
+                formatted_items = self._format_order_items(order_items)
+                
                 reminder_message = (
                     f"⏰ *Payment Reminder*\n\n"
                     f"We notice your payment for Order #{order_id} hasn't been completed yet.\n\n"
-                    f"💰 *Total Amount:* ₦{total_amount // 100:,}\n\n"
+                    f"💰 *Total Amount:* ₦{total_amount // 100:,}\n"
+                    f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
                     f"🔄 We're still monitoring for your payment automatically.\n"
                     f"💬 You can also send 'paid' after payment to check immediately.\n\n"
@@ -352,10 +401,15 @@ class PaymentHandler(BaseHandler):
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             
+            # Fetch order items from database
+            order_items = self._get_order_items_from_db(order_id)
+            formatted_items = self._format_order_items(order_items)
+            
             # Send timeout message
             timeout_message = (
                 f"⏰ *Payment Expired*\n\n"
                 f"Your payment for Order #{order_id} has expired after 15 minutes.\n\n"
+                f"🛒 *Items:* {formatted_items}\n"
                 f"❌ The order has been automatically cancelled.\n"
                 f"🛒 You can place a new order anytime by sending any message.\n\n"
                 f"💬 Need help? Just ask!"
@@ -447,13 +501,17 @@ class PaymentHandler(BaseHandler):
                 except Exception as e:
                     self.logger.error(f"Error tracking order conversion: {e}")
                 
+                # Fetch order items from database
+                order_items = self._get_order_items_from_db(order_data["order_id"])
+                formatted_items = self._format_order_items(order_items)
+                
                 maps_info = self._generate_maps_info(state)
                 
                 success_message = (
                     f"🎉 *Payment Confirmed!*\n\n"
                     f"📋 *Order ID:* {order_data['order_id']}\n"
                     f"💰 *Amount Paid:* ₦{payment_data.get('amount', 0) // 100:,}\n"
-                    f"🛒 *Items:* {format_cart(order_data.get('cart', {}))}\n"
+                    f"🛒 *Items:* {formatted_items}\n"
                     f"🚚 *Delivery to:* {state.get('address', 'Not provided')}{maps_info}\n\n"
                     f"✅ Your order is confirmed and being processed!\n"
                     f"📱 You'll receive delivery updates soon.\n\n"
@@ -469,10 +527,18 @@ class PaymentHandler(BaseHandler):
                 
             elif not payment_verified:
                 self.logger.info(f"Manual payment verification failed for reference {payment_reference}. Paystack status: {payment_data.get('status', 'N/A') if payment_data else 'N/A'}")
+                
+                # Fetch order items from database
+                order_items = self._get_order_items_from_db(order_data["order_id"] if order_data else "0")
+                formatted_items = self._format_order_items(order_items)
+                
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"⏳ *Payment Not Yet Received*\n\n"
-                    f"We haven't received your payment yet. Please:\n\n"
+                    f"📋 *Order ID:* {order_data['order_id'] if order_data else 'N/A'}\n"
+                    f"🛒 *Items:* {formatted_items}\n"
+                    f"💰 *Total:* ₦{order_data['total_amount'] // 100:, if order_data else 0}\n\n"
+                    f"Please:\n"
                     f"1️⃣ Complete the payment using the link provided\n"
                     f"2️⃣ Wait a moment for processing\n"
                     f"3️⃣ Try sending 'paid' again\n\n"
@@ -548,12 +614,15 @@ class PaymentHandler(BaseHandler):
             state["cart"] = {}
             self.session_manager.update_session_state(session_id, state)
 
+            # Fetch order items from database
+            order_items = self._get_order_items_from_db(order_data["order_id"])
+            formatted_items = self._format_order_items(order_items)
             maps_info = self._generate_maps_info(state)
             
             message_text = (
                 f"🎉 *Payment Already Confirmed!*\n\n"
                 f"📋 *Order ID:* {order_data['order_id']}\n"
-                f"🛒 *Items:* {format_cart(order_data.get('cart', {}))}\n"
+                f"🛒 *Items:* {formatted_items}\n"
                 f"🚚 *Delivery to:* {state.get('address', 'Not provided')}{maps_info}\n\n"
                 f"✅ Your order is confirmed and being processed!"
             )
@@ -561,11 +630,17 @@ class PaymentHandler(BaseHandler):
         else:
             # Still waiting for payment
             self.logger.info(f"User sent message while still awaiting payment for order {state.get('order_id', 'N/A')}.")
+            
+            # Fetch order items from database
+            order_id = state.get("order_id", "0")
+            order_items = self._get_order_items_from_db(order_id)
+            formatted_items = self._format_order_items(order_items)
+            
             return self.whatsapp_service.create_text_message(
                 session_id,
                 f"🔄 *Payment Monitoring Active*\n\n"
-                f"We're automatically checking your payment status every minute.\n\n"
-                f"📋 *Order ID:* {state.get('order_id', 'N/A')}\n\n"
+                f"📋 *Order ID:* {state.get('order_id', 'N/A')}\n"
+                f"🛒 *Items:* {formatted_items}\n\n"
                 f"✅ Once payment is confirmed, you'll receive an automatic confirmation.\n"
                 f"💬 Send 'paid' to check status immediately.\n"
                 f"❌ Send 'cancel' to cancel this order."
@@ -601,12 +676,15 @@ class PaymentHandler(BaseHandler):
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             
+            # Fetch order items from database
+            order_items = self._get_order_items_from_db(order_id)
+            formatted_items = self._format_order_items(order_items)
             maps_info = self._generate_maps_info(state)
             
             message_text = (
                 f"✅ *Order Processing*\n\n"
                 f"📋 *Order ID:* {order_id}\n"
-                f"🛒 *Items:* {order_data['order_details']}\n"
+                f"🛒 *Items:* {formatted_items}\n"
                 f"🚚 *Delivery to:* {state.get('address', 'Not provided')}{maps_info}\n\n"
                 f"🍽️ Your order is confirmed and being prepared!\n"
                 f"📱 We'll notify you when it's ready for delivery.\n\n"
@@ -667,14 +745,16 @@ class PaymentHandler(BaseHandler):
                     except Exception as e:
                         self.logger.error(f"Error tracking order conversion: {e}")
 
-                    # Send proactive confirmation message
+                    # Fetch order items from database
+                    order_items = self._get_order_items_from_db(order_data["order_id"])
+                    formatted_items = self._format_order_items(order_items)
                     maps_info = self._generate_maps_info(state)
 
                     message = (
                         f"🎉 *Payment Successful!*\n\n"
                         f"📋 *Order ID:* {order_data['order_id']}\n"
                         f"💰 *Amount:* ₦{webhook_data['data']['amount'] // 100:,}\n"
-                        f"🛒 *Items:* {format_cart(order_data.get('cart', {}))}\n"
+                        f"🛒 *Items:* {formatted_items}\n"
                         f"🚚 *Delivery to:* {order_data['address']}{maps_info}\n\n"
                         f"✅ Thank you for your purchase!\n"
                         f"📱 You'll receive delivery updates soon."
