@@ -166,22 +166,22 @@ class DataManager:
         """Save a new order to the whatsapp_orders and whatsapp_order_details tables."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
-                with conn.cursor() as cur:
-                    # Insert into whatsapp_orders
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Insert into whatsapp_orders, letting the database generate the id
                     order_query = """
                         INSERT INTO whatsapp_orders (
-                            order_id, merchant_details_id, customer_id, 
+                            merchant_details_id, customer_id, 
                             business_type_id, address, status, total_amount, 
                             payment_reference, payment_method_type, timestamp, 
                             timestamp_enddate, DateAdded
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
                     """
                     merchant_details_id = getattr(self.config, 'MERCHANT_ID', None)
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', None)
 
                     cur.execute(order_query, (
-                        order_data.get("order_id"),
                         merchant_details_id,
                         order_data.get("customer_id"),
                         business_type_id,
@@ -194,6 +194,7 @@ class DataManager:
                         order_data.get("timestamp_enddate", None),
                         order_data.get("DateAdded", datetime.datetime.now())
                     ))
+                    order_id = cur.fetchone()['id']
 
                     # Insert into whatsapp_order_details
                     order_details_query = """
@@ -204,21 +205,24 @@ class DataManager:
                     """
                     order_items = order_data.get("items", [])
                     if not order_items:
-                        logger.warning(f"No items provided for order {order_data.get('order_id', 'unknown')}")
+                        logger.warning(f"No items provided for order {order_id}")
                     for item in order_items:
                         cur.execute(order_details_query, (
-                            order_data.get("order_id"),
+                            order_id,
                             item.get("item_name"),
                             item.get("quantity"),
                             float(item.get("unit_price", 0.0))
                         ))
 
                     conn.commit()
-                    logger.info(f"Order {order_data.get('order_id')} and its details saved to database")
+                    logger.info(f"Order {order_id} and its details saved to database")
+                    return order_id  # Return the generated id for use in OrderHandler
         except psycopg2.Error as e:
             logger.error(f"Database error while saving order {order_data.get('order_id', 'unknown')}: {e}", exc_info=True)
+            raise
         except Exception as e:
             logger.error(f"Unexpected error while saving order {order_data.get('order_id', 'unknown')}: {e}", exc_info=True)
+            raise
 
     def update_order_status(self, order_id: str, status: str, payment_data: Optional[Dict] = None) -> bool:
         """Update order status in the whatsapp_orders table."""
@@ -230,8 +234,8 @@ class DataManager:
                         SET status = %s,
                             payment_reference = %s,
                             payment_method_type = %s
-                        WHERE order_id = %s
-                        RETURNING order_id
+                        WHERE id = %s
+                        RETURNING id
                     """
                     payment_reference = payment_data.get("payment_reference", "") if payment_data else ""
                     payment_method_type = payment_data.get("payment_method_type", "") if payment_data else ""
@@ -407,7 +411,7 @@ class DataManager:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
                         SELECT 
-                            order_id, merchant_details_id, customer_id,
+                            id, merchant_details_id, customer_id,
                             business_type_id, address, status, total_amount,
                             payment_reference, payment_method_type, timestamp,
                             timestamp_enddate, DateAdded
@@ -419,6 +423,7 @@ class DataManager:
                     if result:
                         order_data = dict(result)
                         order_data['total_amount'] = float(order_data['total_amount'])
+                        order_data['order_id'] = str(order_data.pop('id'))  # Map id to order_id for compatibility
                         order_data['user_id'] = order_data.pop('customer_id')
                         order_data['merchant_id'] = order_data.pop('merchant_details_id')
                         logger.debug(f"Found order for payment reference {payment_reference}: {order_data}")

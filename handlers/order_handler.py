@@ -395,7 +395,7 @@ class OrderHandler(BaseHandler):
             order_details += f"📱 Phone: {phone_number}\n"
             order_details += f"🏠 Address: {address}\n"
             order_details += f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
-            order_details += "Please confirm to proceed with payment."
+            order_details += "Please confirm to proceed with payment via Paystack."
             
             buttons = [
                 {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},
@@ -440,7 +440,6 @@ class OrderHandler(BaseHandler):
                 for item_data in cart.values()
             )
             
-            order_id = f"ORDER_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
             user_data = self.data_manager.get_user_data(session_id)
             user_name = user_data.get("display_name", state.get("user_name", "Guest")) if user_data else state.get("user_name", "Guest")
             phone_number = user_data.get("phone_number", session_id) if user_data else session_id
@@ -456,23 +455,22 @@ class OrderHandler(BaseHandler):
             ]
             
             order_data = {
-                "order_id": order_id,
                 "customer_id": session_id,
                 "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "default_business"),
                 "address": address,
                 "status": "confirmed",
                 "total_amount": total_amount,
                 "payment_reference": "",
-                "payment_method_type": "",
+                "payment_method_type": "paystack",
                 "timestamp": datetime.datetime.now(),
                 "items": items
             }
             
             try:
-                self.data_manager.save_user_order(order_data)
+                order_id = self.data_manager.save_user_order(order_data)
                 logger.info(f"Order {order_id} saved to database for session {session_id}")
             except Exception as e:
-                logger.error(f"Failed to save order {order_id} to database for session {session_id}: {e}")
+                logger.error(f"Failed to save order for session {session_id}: {e}")
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     "❌ Sorry, there was an error saving your order. Please try again or contact support."
@@ -496,7 +494,7 @@ class OrderHandler(BaseHandler):
                     "❌ Sorry, there was an error saving your details. Please try again."
                 )
             
-            state["order_id"] = order_id
+            state["order_id"] = str(order_id)  # Convert to string for consistency
             state["total_amount"] = total_amount
             state["order_status"] = "confirmed"
             state["order_timestamp"] = order_data["timestamp"].isoformat()
@@ -505,7 +503,7 @@ class OrderHandler(BaseHandler):
             
             try:
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                    self.lead_tracking_handler.track_order_conversion(session_id, order_id, total_amount)
+                    self.lead_tracking_handler.track_order_conversion(session_id, str(order_id), total_amount)
                 else:
                     logger.debug("Lead tracking handler not available for order conversion tracking")
             except Exception as e:
@@ -515,28 +513,25 @@ class OrderHandler(BaseHandler):
                 state["current_state"] = "payment_processing"
                 state["current_handler"] = "payment_handler"
                 self.session_manager.update_session_state(session_id, state)
-                return {"redirect": "payment_handler", "redirect_message": "initiate_payment"}
+                return {
+                    "redirect": "payment_handler",
+                    "redirect_message": "initiate_payment",
+                    "order_id": str(order_id),
+                    "total_amount": total_amount,
+                    "phone_number": phone_number
+                }
             else:
+                logger.error(f"Paystack payment service not available for session {session_id}")
                 state["current_state"] = "payment_pending"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
-                
-                payment_message = (
+                return self.whatsapp_service.create_text_message(
+                    session_id,
                     f"🎉 *Order Confirmed!*\n\n"
                     f"📋 Order ID: {order_id}\n"
                     f"💰 Total Amount: ₦{total_amount:,.2f}\n\n"
-                    f"💳 *Payment Instructions:*\n"
-                    f"Please transfer ₦{total_amount:,.2f} to:\n\n"
-                    f"*Bank:* GTBank\n"
-                    f"*Account:* 0123456789\n"
-                    f"*Name:* Lola's Kitchen\n\n"
-                    f"📱 Send payment screenshot as confirmation.\n"
-                    f"📞 Call us at +234-XXX-XXXX if you need help.\n\n"
-                    f"🚚 Your order will be prepared once payment is confirmed.\n\n"
-                    f"Thank you for choosing Lola's Kitchen! 🍽️"
+                    f"⚠️ Payment service is currently unavailable. Please try again later or contact support."
                 )
-                
-                return self.whatsapp_service.create_text_message(session_id, payment_message)
         
         elif message_lower == "edit_order":
             logger.info(f"User chose to edit order for session {session_id}")
@@ -627,55 +622,36 @@ class OrderHandler(BaseHandler):
             )
 
     def handle_payment_pending_state(self, state: Dict, message: str, session_id: str) -> Dict:
-        """Handle messages when payment is pending."""
+        """Handle messages when payment is pending with Paystack."""
         logger.debug(f"Handling payment pending state for session {session_id}, message: {message}")
         
         message_lower = message.lower()
+        order_id = state.get("order_id", "N/A")
         
         if any(keyword in message_lower for keyword in ["paid", "payment", "transferred", "sent"]):
-            try:
-                payment_data = {
-                    "payment_reference": f"PAY_{uuid.uuid4().hex[:8]}",
-                    "payment_method_type": "bank_transfer"
-                }
-                order_id = state.get("order_id")
-                if order_id and self.data_manager.update_order_status(order_id, "paid", payment_data):
-                    logger.info(f"Payment status updated to 'paid' for order {order_id}, session {session_id}")
-                    state["order_status"] = "paid"
-                    self.session_manager.update_session_state(session_id, state)
-                    return self.whatsapp_service.create_text_message(
-                        session_id,
-                        "Thank you! We've received your payment notification. "
-                        "Our team will verify the payment and start preparing your order. "
-                        "You'll receive an update shortly. 📱"
-                    )
-                else:
-                    logger.warning(f"Failed to update payment status for order {order_id}, session {session_id}")
-                    return self.whatsapp_service.create_text_message(
-                        session_id,
-                        "There was an issue processing your payment notification. Please try again or contact support."
-                    )
-            except Exception as e:
-                logger.error(f"Error processing payment notification for session {session_id}: {e}")
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "There was an error processing your payment. Please try again or contact support."
-                )
-        elif "status" in message_lower or "order" in message_lower:
-            order_id = state.get("order_id", "N/A")
+            logger.info(f"User indicated payment completion for session {session_id}, order {order_id}")
             return self.whatsapp_service.create_text_message(
                 session_id,
-                f"📋 Your order ID: {order_id}\n"
+                f"📋 Order ID: {order_id}\n"
+                f"💳 Your payment is being processed via Paystack. Please wait for confirmation.\n"
+                f"Type 'status' to check your order status or contact support if you encounter issues."
+            )
+        elif "status" in message_lower or "order" in message_lower:
+            logger.debug(f"User requested order status for session {session_id}, order {order_id}")
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                f"📋 Order ID: {order_id}\n"
                 f"Status: Payment Pending\n\n"
-                f"Please complete payment and send us the screenshot. "
-                f"Your order will be prepared once payment is confirmed."
+                f"💳 Your payment is being processed via Paystack. You'll receive a confirmation soon.\n"
+                f"Contact support if you need assistance."
             )
         else:
+            logger.debug(f"Invalid input '{message}' in payment pending state for session {session_id}")
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "Your order is confirmed and awaiting payment. "
-                "Please send us your payment screenshot once transferred. "
-                "Type 'status' to check your order status."
+                f"📋 Order ID: {order_id}\n"
+                f"💳 Your order is awaiting payment confirmation via Paystack.\n"
+                f"Type 'status' to check your order status or contact support."
             )
 
     def track_order_conversion(self, session_id: str, order_id: str, order_value: float) -> None:
