@@ -435,6 +435,17 @@ class OrderHandler(BaseHandler):
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
             
+            # Validate session_id (user's phone number) as customer_id
+            if not session_id or session_id.strip() == "":
+                logger.error(f"Invalid or missing session_id for order confirmation: {session_id}")
+                state["current_state"] = "greeting"
+                state["current_handler"] = "greeting_handler"
+                self.session_manager.update_session_state(session_id, state)
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "❌ Sorry, there was an error processing your order due to an invalid session. Please try again or contact support."
+                )
+            
             total_amount = sum(
                 item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
                 for item_data in cart.values()
@@ -455,7 +466,7 @@ class OrderHandler(BaseHandler):
             ]
             
             order_data = {
-                "customer_id": session_id,
+                "customer_id": session_id,  # Use the user's phone number as customer_id
                 "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "default_business"),
                 "address": address,
                 "status": "confirmed",
@@ -470,7 +481,7 @@ class OrderHandler(BaseHandler):
                 order_id = self.data_manager.save_user_order(order_data)
                 logger.info(f"Order {order_id} saved to database for session {session_id}")
             except Exception as e:
-                logger.error(f"Failed to save order for session {session_id}: {e}")
+                logger.error(f"Failed to save order for session {session_id}: {e}", exc_info=True)
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     "❌ Sorry, there was an error saving your order. Please try again or contact support."
