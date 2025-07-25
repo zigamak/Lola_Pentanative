@@ -178,13 +178,22 @@ class DataManager:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """
-                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', '14')  # Use 'Lola1' as fallback
+                    # Provide a default for MERCHANT_ID and BUSINESS_TYPE_ID if they are not set in config
+                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', '14')
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', '1')
 
-                    # Validate merchant_details_id
-                    if merchant_details_id is None:
+                    # Validate merchant_details_id (this check helps prevent foreign key errors)
+                    if merchant_details_id is None: # Redundant with the getattr default, but good for clarity
                         logger.error("MERCHANT_ID is not set in config and no default provided.")
                         raise ValueError("MERCHANT_ID is required but was not provided.")
+
+                    # Ensure timestamp and timestamp_enddate are datetime objects
+                    # If they come from order_data as strings, you might need to parse them
+                    # Assuming they are already datetime objects or will be handled by psycopg2's type adaptation
+                    order_timestamp = order_data.get("timestamp", datetime.datetime.now(datetime.timezone.utc))
+                    # Ensure timestamp_enddate is not None for NOT NULL constraint
+                    order_timestamp_enddate = order_data.get("timestamp_enddate", datetime.datetime.now(datetime.timezone.utc))
+                    order_dateadded = order_data.get("dateadded", datetime.datetime.now(datetime.timezone.utc))
 
                     cur.execute(order_query, (
                         merchant_details_id,
@@ -195,40 +204,58 @@ class DataManager:
                         float(order_data.get("total_amount", 0.0)),
                         order_data.get("payment_reference", ""),
                         order_data.get("payment_method_type", ""),
-                        order_data.get("timestamp"),
-                        order_data.get("timestamp_enddate", None),
-                        order_data.get("dateadded", datetime.datetime.now())
+                        order_timestamp,
+                        order_timestamp_enddate,
+                        order_dateadded
                     ))
                     order_id = cur.fetchone()['id']
 
                     # Insert into whatsapp_order_details
                     order_details_query = """
                         INSERT INTO whatsapp_order_details (
-                            order_id, item_name, quantity, unit_price
+                            order_id, item_name, quantity, unit_price, subtotal, total_price, dateadded
                         )
-                        VALUES (%s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """
                     order_items = order_data.get("items", [])
                     if not order_items:
                         logger.warning(f"No items provided for order {order_id}")
+                    
                     for item in order_items:
+                        item_name = item.get("item_name")
+                        quantity = item.get("quantity")
+                        unit_price = float(item.get("unit_price", 0.0))
+                        
+                        # Calculate subtotal for the current item
+                        item_subtotal = quantity * unit_price
+                        
+                        # For a single item, total_price is often the same as subtotal.
+                        # Adjust if your schema means something different for total_price at item level.
+                        item_total_price = item_subtotal 
+                        
+                        # Get current timestamp for DateAdded
+                        item_dateadded = datetime.datetime.now(datetime.timezone.utc)
+
                         cur.execute(order_details_query, (
                             order_id,
-                            item.get("item_name"),
-                            item.get("quantity"),
-                            float(item.get("unit_price", 0.0))
+                            item_name,
+                            quantity,
+                            unit_price,
+                            item_subtotal,
+                            item_total_price,
+                            item_dateadded
                         ))
 
                     conn.commit()
                     logger.info(f"Order {order_id} and its details saved to database")
                     return order_id  # Return the generated id for use in OrderHandler
         except psycopg2.Error as e:
-            logger.error(f"Database error while saving order {order_data.get('order_id', 'unknown')}: {e}", exc_info=True)
-            raise
+            logger.error(f"Database error while saving order {order_data.get('customer_id', 'unknown')}: {e}", exc_info=True)
+            raise # Re-raise the exception after logging
         except Exception as e:
-            logger.error(f"Unexpected error while saving order {order_data.get('order_id', 'unknown')}: {e}", exc_info=True)
-            raise
-        
+            logger.error(f"Unexpected error while saving order {order_data.get('customer_id', 'unknown')}: {e}", exc_info=True)
+            raise # Re-raise the exception after logging
+            
     def update_order_status(self, order_id: str, status: str, payment_data: Optional[Dict] = None) -> bool:
         """Update order status in the whatsapp_orders table."""
         try:
