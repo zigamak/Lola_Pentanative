@@ -31,7 +31,7 @@ class PaymentHandler(BaseHandler):
             )
     
     def create_payment_link(self, state, session_id):
-        """Create payment link and order with automatic monitoring."""
+        """Create payment link for an existing order with automatic monitoring."""
         try:
             self.logger.info(f"Creating payment link for session {session_id}")
             
@@ -46,12 +46,20 @@ class PaymentHandler(BaseHandler):
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
             
-            # Generate order ID and payment reference
-            order_id = self.payment_service.generate_order_id()
-            payment_reference = f"PAY-{order_id}"
+            # Retrieve existing order ID from state (set by OrderHandler)
+            order_id = state.get("order_id")
+            if not order_id:
+                self.logger.error(f"No order_id found in state for session {session_id}")
+                state["current_state"] = "order_summary"
+                state["current_handler"] = "order_handler"
+                self.session_manager.update_session_state(session_id, state)
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ No order found. Please try checking out again."
+                )
             
-            # Store order and payment info in session
-            state["order_id"] = order_id
+            # Generate payment reference
+            payment_reference = f"PAY-{order_id}"
             state["payment_reference"] = payment_reference
             
             # Calculate total amount in kobo
@@ -67,26 +75,21 @@ class PaymentHandler(BaseHandler):
                     "⚠️ Invalid order total. Please check your cart and try again."
                 )
             
-            # Create initial order record with pending status
-            order_data = {
-                "order_id": order_id,
-                "user_name": state.get("user_name", "Guest"),
-                "phone_number": state.get("phone_number", session_id),
-                "address": state.get("address", "Not provided"),
-                "cart": state["cart"],
-                "order_details": format_cart(state["cart"]),
-                "total_amount": total_amount // 100,  # Store in naira
+            # Update order with payment reference and pending_payment status
+            payment_data = {
                 "payment_reference": payment_reference,
-                "status": "pending_payment",
-                "timestamp": datetime.datetime.now().isoformat(),
-                "payment_monitoring_started": datetime.datetime.now().isoformat()
+                "payment_method_type": "paystack"
             }
-            
-            # Add location coordinates if available
-            if state.get("location_coordinates"):
-                order_data["location_coordinates"] = state["location_coordinates"]
-            
-            self.data_manager.save_user_order(order_data)
+            success = self.data_manager.update_order_status(order_id, "pending_payment", payment_data)
+            if not success:
+                self.logger.error(f"Failed to update order {order_id} to pending_payment status for session {session_id}")
+                state["current_state"] = "order_summary"
+                state["current_handler"] = "order_handler"
+                self.session_manager.update_session_state(session_id, state)
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ Error accessing order. Please try checking out again."
+                )
             
             # Create Paystack payment link
             customer_email = self.payment_service.generate_customer_email(
@@ -155,7 +158,7 @@ class PaymentHandler(BaseHandler):
             try:
                 payment_status, payment_data = self.payment_service.verify_payment_detailed(payment_reference)
                 
-                if payment_status: # payment_status is now a boolean
+                if payment_status:  # payment_status is a boolean
                     # Payment successful - notify user and update order
                     self.logger.info(f"Payment verified for order {order_id} on attempt {attempt}")
                     self.handle_successful_auto_payment(session_id, order_id, payment_reference)
@@ -206,21 +209,26 @@ class PaymentHandler(BaseHandler):
             payment_verified, payment_data = self.payment_service.verify_payment_detailed(payment_reference)
             
             if not payment_verified:
-                # This should ideally not happen if called after a successful verification, but for robustness
                 self.logger.warning(f"handle_successful_auto_payment called but payment not verified for {payment_reference}")
                 return
             
             # Update order status
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             if order_data:
-                order_data["status"] = "confirmed"
-                order_data["payment_confirmed_at"] = datetime.datetime.now().isoformat()
-                order_data["payment_data"] = payment_data
-                order_data["verification_method"] = "automatic"
-                self.data_manager.save_user_order(order_data)
+                success = self.data_manager.update_order_status(
+                    order_id,
+                    "confirmed",
+                    {
+                        "payment_reference": payment_reference,
+                        "payment_method_type": payment_data.get("payment_method_type", "paystack")
+                    }
+                )
+                if not success:
+                    self.logger.error(f"Failed to update order {order_id} to confirmed status for session {session_id}")
+                    return
             else:
                 self.logger.error(f"Order data not found for payment reference {payment_reference} during auto-payment handling.")
-                return # Exit if no order data
+                return  # Exit if no order data
             
             # Update session state
             state = self.session_manager.get_session_state(session_id)
@@ -285,7 +293,7 @@ class PaymentHandler(BaseHandler):
         try:
             state = self.session_manager.get_session_state(session_id)
             
-            # Fetch the original cart from the order data, as session cart might be cleared
+            # Fetch the original cart from the order data
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             if not order_data:
                 self.logger.error(f"Order data not found for reminder for order {order_id}.")
@@ -333,14 +341,10 @@ class PaymentHandler(BaseHandler):
         """Handle payment timeout after 15 minutes."""
         try:
             # Update order status to expired
-            order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
-            if order_data:
-                order_data["status"] = "expired"
-                order_data["expired_at"] = datetime.datetime.now().isoformat()
-                self.data_manager.save_user_order(order_data)
-            else:
-                self.logger.error(f"Order data not found for payment reference {payment_reference} during timeout handling.")
-                
+            success = self.data_manager.update_order_status(order_id, "expired", {})
+            if not success:
+                self.logger.error(f"Failed to update order {order_id} to expired status for session {session_id}")
+            
             # Update session state
             state = self.session_manager.get_session_state(session_id)
             state["cart"] = {}  # Clear cart
@@ -414,11 +418,20 @@ class PaymentHandler(BaseHandler):
                 self.stop_payment_monitoring(session_id)
                 
                 # Update order and session
-                order_data["status"] = "confirmed"
-                order_data["payment_confirmed_at"] = datetime.datetime.now().isoformat()
-                order_data["payment_data"] = payment_data
-                order_data["verification_method"] = "manual"
-                self.data_manager.save_user_order(order_data)
+                success = self.data_manager.update_order_status(
+                    order_data["order_id"],
+                    "confirmed",
+                    {
+                        "payment_reference": payment_reference,
+                        "payment_method_type": payment_data.get("payment_method_type", "paystack")
+                    }
+                )
+                if not success:
+                    self.logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for session {session_id}")
+                    return self.whatsapp_service.create_text_message(
+                        session_id,
+                        "⚠️ Error confirming payment. Please contact support."
+                    )
                 
                 state["current_state"] = "order_confirmation"
                 state["current_handler"] = "payment_handler"
@@ -466,7 +479,7 @@ class PaymentHandler(BaseHandler):
                     f"🔄 We're also checking automatically every minute.\n"
                     f"❌ Send 'cancel' to cancel the order."
                 )
-            else: # order_data is None
+            else:  # order_data is None
                 self.logger.error(f"Order not found for payment reference {payment_reference} during manual verification.")
                 return self.whatsapp_service.create_text_message(
                     session_id,
@@ -492,10 +505,9 @@ class PaymentHandler(BaseHandler):
             if state.get("payment_reference"):
                 order_data = self.data_manager.get_order_by_payment_reference(state["payment_reference"])
                 if order_data:
-                    order_data["status"] = "cancelled"
-                    order_data["cancelled_at"] = datetime.datetime.now().isoformat()
-                    self.data_manager.save_user_order(order_data)
-                    self.logger.info(f"Order {order_data.get('order_id', 'N/A')} cancelled due to user request.")
+                    success = self.data_manager.update_order_status(order_data["order_id"], "cancelled", {})
+                    if not success:
+                        self.logger.error(f"Failed to update order {order_data['order_id']} to cancelled status for session {session_id}")
                 else:
                     self.logger.warning(f"No order found for payment reference {state['payment_reference']} during cancellation.")
             
@@ -627,11 +639,17 @@ class PaymentHandler(BaseHandler):
                     self.stop_payment_monitoring(session_id)
                     
                     # Update order status
-                    order_data["status"] = "confirmed"
-                    order_data["payment_confirmed_at"] = datetime.datetime.now().isoformat()
-                    order_data["payment_data"] = webhook_data["data"]
-                    order_data["verification_method"] = "webhook"
-                    self.data_manager.save_user_order(order_data)
+                    success = self.data_manager.update_order_status(
+                        order_data["order_id"],
+                        "confirmed",
+                        {
+                            "payment_reference": payment_reference,
+                            "payment_method_type": webhook_data["data"].get("payment_method_type", "paystack")
+                        }
+                    )
+                    if not success:
+                        self.logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for webhook")
+                        return
                     
                     # Update session
                     state = session_manager.get_session_state(session_id)
@@ -682,10 +700,6 @@ class PaymentHandler(BaseHandler):
             for session_id in list(self.payment_timers.keys()):
                 # Check if session is still valid
                 state = self.session_manager.get_session_state(session_id)
-                # A session should be cleaned up if its state is no longer 'awaiting_payment'
-                # AND its timer is still running (though timer.cancel() handles that).
-                # The timer itself reaching its max attempts will call handle_payment_timeout,
-                # which also clears the timer. This cleanup acts as a safeguard.
                 if state.get("current_state") != "awaiting_payment":
                     self.logger.info(f"Session {session_id} state changed from awaiting_payment, cleaning up timer.")
                     expired_sessions.append(session_id)
@@ -702,7 +716,6 @@ class PaymentHandler(BaseHandler):
     def _initiate_feedback_collection(self, state: Dict, session_id: str, order_id: str) -> None:
         """Initiate feedback collection after successful payment."""
         try:
-            # Small delay before asking for feedback (you might want to implement this differently)
             if hasattr(self, 'feedback_handler') and self.feedback_handler:
                 self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
             else:
