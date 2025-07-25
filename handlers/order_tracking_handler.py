@@ -10,7 +10,24 @@ class TrackOrderHandler(BaseHandler):
     def __init__(self, config, session_manager, data_manager, whatsapp_service):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
     
-    def handle_track_order_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
+    def handle(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict[str, Any]:
+        """Top-level handler for track order state and redirects."""
+        self.logger.info(f"Session {session_id}: Handling message '{message}' in state '{state.get('current_state')}'.")
+        
+        current_state = state.get("current_state")
+        
+        if message == "start_track_order":
+            state["current_state"] = "track_order"
+            state["current_handler"] = "track_order_handler"
+            self.session_manager.update_session_state(session_id, state)
+            return self.handle_track_order_state(state, original_message, session_id)
+        elif current_state == "track_order":
+            return self.handle_track_order_state(state, original_message, session_id)
+        else:
+            self.logger.warning(f"Session {session_id}: Unhandled state '{current_state}' with message '{message}'.")
+            return self._handle_invalid_state(state, session_id)
+    
+    def handle_track_order_state(self, state: Dict, original_message: str, session_id: str) -> Dict[str, Any]:
         """
         Handles the 'track_order' state by querying the whatsapp_orders table for the latest order status.
         Returns the user to the main menu after displaying the status.
@@ -80,7 +97,7 @@ class TrackOrderHandler(BaseHandler):
             else:
                 self.logger.info(f"Session {session_id}: Returning to non-paid user main menu after tracking order.")
                 buttons = [
-                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
                     {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                     {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
                 ]
@@ -92,7 +109,7 @@ class TrackOrderHandler(BaseHandler):
         
         except Exception as e:
             self.logger.error(f"Session {session_id}: Error handling order tracking: {e}", exc_info=True)
-            return self._handle_error(state, session_id)
+            return self._handle_invalid_state(state, session_id)
     
     def _handle_no_orders_found(self, state: Dict, session_id: str) -> Dict[str, Any]:
         """Handle case where no orders are found for the user."""
@@ -128,7 +145,7 @@ class TrackOrderHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (no orders found).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
@@ -173,7 +190,7 @@ class TrackOrderHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (invalid order status).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
@@ -183,7 +200,7 @@ class TrackOrderHandler(BaseHandler):
                 buttons
             )
     
-    def _handle_error(self, state: Dict, session_id: str) -> Dict[str, Any]:
+    def _handle_invalid_state(self, state: Dict, session_id: str) -> Dict[str, Any]:
         """Handle general errors during order tracking."""
         user_data = self.data_manager.get_user_data(session_id)
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
@@ -218,7 +235,7 @@ class TrackOrderHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (error).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]

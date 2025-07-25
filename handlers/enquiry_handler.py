@@ -1,6 +1,10 @@
+import logging
 import datetime
 import uuid
+from typing import Dict, Any
 from .base_handler import BaseHandler
+
+logger = logging.getLogger(__name__)
 
 class EnquiryHandler(BaseHandler):
     """Handles enquiry-related interactions, including FAQ navigation and question submission."""
@@ -171,7 +175,7 @@ class EnquiryHandler(BaseHandler):
         enquiry_lower = enquiry_text.lower()
         
         if any(keyword in enquiry_lower for keyword in urgent_keywords):
-            self.logger.debug(f"Session {session_id}: Enquiry contains urgent keywords: {enquiry_lower}")
+            self.logger.debug(f"Enquiry contains urgent keywords: {enquiry_lower}")
             return "high"
         return "normal"
     
