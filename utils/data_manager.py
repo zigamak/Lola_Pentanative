@@ -178,8 +178,8 @@ class DataManager:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """
-                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', '1344')  # Use 'Lola1' as fallback
-                    business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', '1234')
+                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', '14')  # Use 'Lola1' as fallback
+                    business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', '1')
 
                     # Validate merchant_details_id
                     if merchant_details_id is None:
