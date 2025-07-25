@@ -21,7 +21,7 @@ class GreetingHandler(BaseHandler):
             return self.handle_collect_delivery_address_state(state, message, session_id)
 
         # Check if user has made a payment
-        if self._has_user_made_payment(state, session_id):
+        if self._has_user_made_payment(session_id):
             # Handle paid user options
             if message == "track_order":
                 return self._handle_track_order(state, session_id)
@@ -46,18 +46,15 @@ class GreetingHandler(BaseHandler):
                 # Handle invalid options for non-paid users
                 return self._handle_invalid_option(state, session_id, message)
     
-    def _has_user_made_payment(self, state: Dict, session_id: str) -> bool:
+    def _has_user_made_payment(self, session_id: str) -> bool:
         """
-        Check if the user has made a payment based on session state.
-        Assumes session state contains payment information or order status.
+        Check if the user has made a payment using SessionManager's paid status.
         """
         try:
-            # Check if the session state has a confirmed order or payment reference
-            order_data = self.data_manager.get_order_by_payment_reference(state.get("payment_reference", ""))
-            if order_data and order_data.get("status") == "confirmed":
-                self.logger.info(f"Session {session_id}: User has a confirmed payment.")
-                return True
-            return False
+            is_paid = self.session_manager.is_paid_user_session(session_id)
+            if is_paid:
+                self.logger.info(f"Session {session_id}: User has an active paid session.")
+            return is_paid
         except Exception as e:
             self.logger.error(f"Error checking payment status for session {session_id}: {e}")
             return False
@@ -161,7 +158,7 @@ class GreetingHandler(BaseHandler):
             self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
             
             # Check if user has made a payment
-            if self._has_user_made_payment(state, session_id):
+            if self._has_user_made_payment(session_id):
                 return self.send_main_menu_paid(
                     session_id, 
                     username, 
@@ -238,7 +235,7 @@ class GreetingHandler(BaseHandler):
         self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
         
         # Check if user has made a payment
-        if self._has_user_made_payment(state, session_id):
+        if self._has_user_made_payment(session_id):
             return self.send_main_menu_paid(
                 session_id, 
                 username, 
@@ -295,7 +292,7 @@ class GreetingHandler(BaseHandler):
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
         
         # Check if user has made a payment
-        if self._has_user_made_payment(state, session_id):
+        if self._has_user_made_payment(session_id):
             return self.send_main_menu_paid(session_id, user_name, f"Welcome Back {user_name}\nWhat would you like to do?")
         else:
             return self.send_main_menu(session_id, user_name, message)

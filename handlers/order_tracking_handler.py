@@ -1,287 +1,229 @@
-import json
-import os
-import datetime
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 from .base_handler import BaseHandler
 
 logger = logging.getLogger(__name__)
 
-class OrderTrackingHandler(BaseHandler):
-    """Handles order status tracking and updates."""
+class TrackOrderHandler(BaseHandler):
+    """Handles order tracking interactions by checking the whatsapp_orders table."""
     
     def __init__(self, config, session_manager, data_manager, whatsapp_service):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
-        self.order_status_file = "data/order_status.json"
-        self._ensure_order_status_file_exists()
-        logger.info("OrderTrackingHandler initialized.")
     
-    def _ensure_order_status_file_exists(self):
-        """Ensure order status JSON file exists."""
-        if not os.path.exists(self.order_status_file):
-            os.makedirs(os.path.dirname(self.order_status_file), exist_ok=True)
-            with open(self.order_status_file, 'w') as f:
-                json.dump({}, f, indent=2)
-            logger.info(f"Created order status file: {self.order_status_file}")
-    
-    def track_order_status(self, state: Dict, session_id: str) -> Dict[str, Any]:
+    def handle_track_order_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """
-        Track order status for the user's recent order.
-        
-        Args:
-            state (Dict): Session state
-            session_id (str): User's session ID
-            
-        Returns:
-            Dict: WhatsApp message response
+        Handles the 'track_order' state by querying the whatsapp_orders table for the latest order status.
+        Returns the user to the main menu after displaying the status.
         """
         try:
-            order_id = state.get("recent_order_id")
-            if not order_id:
-                logger.warning(f"No recent order found for session {session_id}")
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ No recent order found to track. Please place a new order."
-                )
+            # Fetch the latest order for the user (session_id matches customer_id)
+            order = self.data_manager.get_latest_order_by_customer_id(session_id)
+            if not order:
+                self.logger.info(f"Session {session_id}: No orders found for tracking.")
+                return self._handle_no_orders_found(state, session_id)
             
-            # Get order status
-            order_status = self._get_order_status(order_id)
-            status_message = self._format_order_status_message(order_id, order_status)
+            order_id = order.get("id", "Unknown")
+            status = order.get("status", "").lower()
+            timestamp = order.get("timestamp", None)
+            user_data = self.data_manager.get_user_data(session_id)
+            user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
             
-            # Add tracking options
-            buttons = [
-                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
-                {"type": "reply", "reply": {"id": "track_refresh", "title": "🔄 Refresh Status"}},
-                {"type": "reply", "reply": {"id": "contact_support", "title": "📞 Contact Support"}}
-            ]
+            # Format timestamp if available
+            timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S") if timestamp else "Unknown"
             
-            return self.whatsapp_service.create_button_message(
-                session_id,
-                status_message,
-                buttons
-            )
-            
-        except Exception as e:
-            logger.error(f"Error tracking order for session {session_id}: {e}", exc_info=True)
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "❌ Sorry, there was an error tracking your order. Please try again or contact support."
-            )
-    
-    def handle_tracking_action(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
-        """Handle tracking-related actions."""
-        logger.debug(f"Handling tracking action '{message}' for session {session_id}")
-        
-        if message == "order_again":
-            return self._handle_order_again(state, session_id)
-        elif message == "track_refresh":
-            return self.track_order_status(state, session_id)
-        elif message == "contact_support":
-            return self._handle_contact_support(state, session_id)
-        else:
-            # Invalid action, show tracking status again
-            return self.track_order_status(state, session_id)
-    
-    def _get_order_status(self, order_id: str) -> Dict[str, Any]:
-        """Get order status from file or database."""
-        try:
-            # Load order status data
-            status_data = {}
-            if os.path.exists(self.order_status_file):
-                with open(self.order_status_file, 'r') as f:
-                    status_data = json.load(f)
-            
-            # Return status or default
-            return status_data.get(order_id, {
-                "status": "received",
-                "status_text": "Order Received",
-                "description": "Your order has been received and is being processed.",
-                "updated_at": datetime.datetime.now().isoformat(),
-                "estimated_delivery": self._calculate_estimated_delivery()
-            })
-            
-        except Exception as e:
-            logger.error(f"Error getting order status for {order_id}: {e}", exc_info=True)
-            return {
-                "status": "unknown",
-                "status_text": "Status Unknown",
-                "description": "Unable to retrieve order status. Please contact support.",
-                "updated_at": datetime.datetime.now().isoformat()
+            # Map status to user-friendly message
+            status_messages = {
+                "confirmed": "Your order is confirmed and being prepared to be delivered.",
+                "in_transit": "Your order is on its way, it has been sent out.",
+                "delivered": "Your order has been delivered."
             }
+            
+            status_message = status_messages.get(status, None)
+            if not status_message:
+                self.logger.warning(f"Session {session_id}: Invalid order status '{status}' for order ID {order_id}.")
+                return self._handle_invalid_order_status(state, session_id)
+            
+            self.logger.info(f"Session {session_id}: Retrieved status '{status}' for order ID {order_id}.")
+            
+            # Prepare status message
+            tracking_message = (
+                f"📍 Order Status for Order ID: {order_id}\n"
+                f"Placed on: {timestamp_str}\n\n"
+                f"{status_message}\n\n"
+                f"What would you like to do next?"
+            )
+            
+            # Reset session state to main menu
+            state["current_state"] = "greeting"
+            state["current_handler"] = "greeting_handler"
+            # Clear order-related data but preserve user info
+            state["cart"] = {}
+            if "selected_category" in state:
+                del state["selected_category"]
+            if "selected_item" in state:
+                del state["selected_item"]
+            self.session_manager.update_session_state(session_id, state)
+            
+            # Check if user is paid to show appropriate menu
+            if self.session_manager.is_paid_user_session(session_id):
+                self.logger.info(f"Session {session_id}: Returning to paid user main menu after tracking order.")
+                buttons = [
+                    {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                    {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                    {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
+                ]
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    f"Welcome Back {user_name}\n{tracking_message}",
+                    buttons
+                )
+            else:
+                self.logger.info(f"Session {session_id}: Returning to non-paid user main menu after tracking order.")
+                buttons = [
+                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                    {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                    {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+                ]
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    f"Hi {user_name}, {tracking_message}",
+                    buttons
+                )
+        
+        except Exception as e:
+            self.logger.error(f"Session {session_id}: Error handling order tracking: {e}", exc_info=True)
+            return self._handle_error(state, session_id)
     
-    def _format_order_status_message(self, order_id: str, status_info: Dict) -> str:
-        """Format order status message for user."""
-        status = status_info.get("status", "unknown")
-        status_text = status_info.get("status_text", "Unknown")
-        description = status_info.get("description", "")
-        updated_at = status_info.get("updated_at", "")
-        estimated_delivery = status_info.get("estimated_delivery", "")
-        
-        # Status emojis
-        status_emojis = {
-            "received": "📋",
-            "confirmed": "✅", 
-            "preparing": "👨‍🍳",
-            "ready": "🍽️",
-            "on_the_way": "🚚",
-            "delivered": "✅",
-            "cancelled": "❌"
-        }
-        
-        emoji = status_emojis.get(status, "📋")
-        
-        message = f"📦 *Order Tracking*\n\n"
-        message += f"📋 *Order ID:* {order_id}\n"
-        message += f"{emoji} *Status:* {status_text}\n\n"
-        message += f"💬 *Details:* {description}\n\n"
-        
-        if estimated_delivery and status not in ["delivered", "cancelled"]:
-            message += f"⏰ *Estimated Delivery:* {estimated_delivery}\n\n"
-        
-        if updated_at:
-            try:
-                updated_time = datetime.datetime.fromisoformat(updated_at)
-                formatted_time = updated_time.strftime("%I:%M %p")
-                message += f"🕐 *Last Updated:* {formatted_time}\n\n"
-            except:
-                pass
-        
-        # Add status-specific messages
-        if status == "delivered":
-            message += "🎉 Your order has been delivered! We hope you enjoyed your meal!"
-        elif status == "on_the_way":
-            message += "🚚 Your order is on the way! Please be available to receive it."
-        elif status == "ready":
-            message += "🍽️ Your order is ready for pickup/delivery!"
-        elif status == "preparing":
-            message += "👨‍🍳 Our kitchen is preparing your delicious meal!"
-        else:
-            message += "📱 We'll keep you updated on your order progress."
-        
-        return message
-    
-    def _calculate_estimated_delivery(self) -> str:
-        """Calculate estimated delivery time."""
-        try:
-            # Add 30-45 minutes from now
-            estimated_time = datetime.datetime.now() + datetime.timedelta(minutes=37)
-            return estimated_time.strftime("%I:%M %p")
-        except:
-            return "30-45 minutes"
-    
-    def _handle_order_again(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle when user wants to order again."""
-        # Reset to normal session flow but keep paid user status
+    def _handle_no_orders_found(self, state: Dict, session_id: str) -> Dict[str, Any]:
+        """Handle case where no orders are found for the user."""
+        user_data = self.data_manager.get_user_data(session_id)
+        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
         state["current_state"] = "greeting"
         state["current_handler"] = "greeting_handler"
+        # Clear order-related data
+        state["cart"] = {}
+        if "selected_category" in state:
+            del state["selected_category"]
+        if "selected_item" in state:
+            del state["selected_item"]
         self.session_manager.update_session_state(session_id, state)
         
-        return {"redirect": "greeting_handler", "redirect_message": "order"}
-    
-    def _handle_contact_support(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle contact support request."""
-        order_id = state.get("recent_order_id", "N/A")
-        
-        support_message = (
-            f"📞 *Customer Support*\n\n"
-            f"📋 *Your Order ID:* {order_id}\n\n"
-            f"📱 *WhatsApp:* +234-XXX-XXXX\n"
-            f"📧 *Email:* support@lolaskitchen.com\n"
-            f"⏰ *Hours:* 9:00 AM - 10:00 PM daily\n\n"
-            f"💬 You can also send us a message here and we'll respond shortly!"
+        message = (
+            f"No orders found for your account. Would you like to place a new order or do something else?"
         )
         
-        buttons = [
-            {"type": "reply", "reply": {"id": "track_refresh", "title": "🔄 Check Status"}},
-            {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
-            {"type": "reply", "reply": {"id": "back_to_main", "title": "🏠 Main Menu"}}
-        ]
+        # Check if user is paid to show appropriate menu
+        if self.session_manager.is_paid_user_session(session_id):
+            self.logger.info(f"Session {session_id}: Returning to paid user main menu (no orders found).")
+            buttons = [
+                {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"Welcome Back {user_name}\n{message}",
+                buttons
+            )
+        else:
+            self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (no orders found).")
+            buttons = [
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"Hi {user_name}, {message}",
+                buttons
+            )
+    
+    def _handle_invalid_order_status(self, state: Dict, session_id: str) -> Dict[str, Any]:
+        """Handle case where the order status is invalid."""
+        user_data = self.data_manager.get_user_data(session_id)
+        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
+        state["current_state"] = "greeting"
+        state["current_handler"] = "greeting_handler"
+        # Clear order-related data
+        state["cart"] = {}
+        if "selected_category" in state:
+            del state["selected_category"]
+        if "selected_item" in state:
+            del state["selected_item"]
+        self.session_manager.update_session_state(session_id, state)
         
-        return self.whatsapp_service.create_button_message(
-            session_id,
-            support_message,
-            buttons
+        message = (
+            f"Unable to retrieve your order status at this time. Please contact support or try again later.\n\n"
+            f"What would you like to do next?"
         )
-    
-    def update_order_status(self, order_id: str, status: str, description: str = "") -> bool:
-        """
-        Update order status (to be called by admin/kitchen staff).
         
-        Args:
-            order_id (str): Order ID to update
-            status (str): New status (received/confirmed/preparing/ready/on_the_way/delivered)
-            description (str): Optional description
-            
-        Returns:
-            bool: Success status
-        """
-        try:
-            # Load existing status data
-            status_data = {}
-            if os.path.exists(self.order_status_file):
-                with open(self.order_status_file, 'r') as f:
-                    status_data = json.load(f)
-            
-            # Status text mapping
-            status_texts = {
-                "received": "Order Received",
-                "confirmed": "Order Confirmed", 
-                "preparing": "Preparing Your Order",
-                "ready": "Ready for Delivery",
-                "on_the_way": "On The Way",
-                "delivered": "Delivered",
-                "cancelled": "Cancelled"
-            }
-            
-            # Update status
-            status_data[order_id] = {
-                "status": status,
-                "status_text": status_texts.get(status, status.title()),
-                "description": description or f"Your order is {status_texts.get(status, status)}.",
-                "updated_at": datetime.datetime.now().isoformat(),
-                "estimated_delivery": self._calculate_estimated_delivery() if status not in ["delivered", "cancelled"] else ""
-            }
-            
-            # Save updated status
-            with open(self.order_status_file, 'w') as f:
-                json.dump(status_data, f, indent=2, default=str)
-            
-            logger.info(f"Updated order {order_id} status to: {status}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error updating order status for {order_id}: {e}", exc_info=True)
-            return False
+        # Check if user is paid to show appropriate menu
+        if self.session_manager.is_paid_user_session(session_id):
+            self.logger.info(f"Session {session_id}: Returning to paid user main menu (invalid order status).")
+            buttons = [
+                {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"Welcome Back {user_name}\n{message}",
+                buttons
+            )
+        else:
+            self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (invalid order status).")
+            buttons = [
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"Hi {user_name}, {message}",
+                buttons
+            )
     
-    def get_order_analytics(self) -> Dict[str, Any]:
-        """Get order status analytics."""
-        try:
-            if not os.path.exists(self.order_status_file):
-                return {"total_orders": 0, "message": "No order data available"}
-            
-            with open(self.order_status_file, 'r') as f:
-                status_data = json.load(f)
-            
-            if not status_data:
-                return {"total_orders": 0, "message": "No order data available"}
-            
-            total_orders = len(status_data)
-            status_counts = {}
-            
-            for order_id, order_info in status_data.items():
-                status = order_info.get("status", "unknown")
-                status_counts[status] = status_counts.get(status, 0) + 1
-            
-            return {
-                "total_orders": total_orders,
-                "status_counts": status_counts,
-                "status_percentages": {
-                    status: round((count / total_orders) * 100, 1)
-                    for status, count in status_counts.items()
-                },
-                "last_updated": datetime.datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting order analytics: {e}", exc_info=True)
-            return {"error": "Failed to load order analytics"}
+    def _handle_error(self, state: Dict, session_id: str) -> Dict[str, Any]:
+        """Handle general errors during order tracking."""
+        user_data = self.data_manager.get_user_data(session_id)
+        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
+        state["current_state"] = "greeting"
+        state["current_handler"] = "greeting_handler"
+        # Clear order-related data
+        state["cart"] = {}
+        if "selected_category" in state:
+            del state["selected_category"]
+        if "selected_item" in state:
+            del state["selected_item"]
+        self.session_manager.update_session_state(session_id, state)
+        
+        message = (
+            f"⚠️ An error occurred while tracking your order. Please try again or contact support.\n\n"
+            f"What would you like to do next?"
+        )
+        
+        # Check if user is paid to show appropriate menu
+        if self.session_manager.is_paid_user_session(session_id):
+            self.logger.info(f"Session {session_id}: Returning to paid user main menu (error).")
+            buttons = [
+                {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"Welcome Back {user_name}\n{message}",
+                buttons
+            )
+        else:
+            self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (error).")
+            buttons = [
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"Hi {user_name}, {message}",
+                buttons
+            )
