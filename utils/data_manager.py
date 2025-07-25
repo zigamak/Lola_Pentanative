@@ -173,7 +173,7 @@ class DataManager:
                             merchant_details_id, customer_id, 
                             business_type_id, address, status, total_amount, 
                             payment_reference, payment_method_type, timestamp, 
-                            timestamp_enddate, DateAdded
+                            timestamp_enddate, dateadded
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
@@ -192,7 +192,7 @@ class DataManager:
                         order_data.get("payment_method_type", ""),
                         order_data.get("timestamp"),
                         order_data.get("timestamp_enddate", None),
-                        order_data.get("DateAdded", datetime.datetime.now())
+                        order_data.get("dateadded", datetime.datetime.now())
                     ))
                     order_id = cur.fetchone()['id']
 
@@ -414,7 +414,7 @@ class DataManager:
                             id, merchant_details_id, customer_id,
                             business_type_id, address, status, total_amount,
                             payment_reference, payment_method_type, timestamp,
-                            timestamp_enddate, DateAdded
+                            timestamp_enddate, dateadded
                         FROM whatsapp_orders
                         WHERE payment_reference = %s
                     """
