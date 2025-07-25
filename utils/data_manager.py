@@ -178,8 +178,13 @@ class DataManager:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """
-                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', None)
+                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', 'Lola1')  # Use 'Lola1' as fallback
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', None)
+
+                    # Validate merchant_details_id
+                    if merchant_details_id is None:
+                        logger.error("MERCHANT_ID is not set in config and no default provided.")
+                        raise ValueError("MERCHANT_ID is required but was not provided.")
 
                     cur.execute(order_query, (
                         merchant_details_id,
@@ -223,7 +228,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error while saving order {order_data.get('order_id', 'unknown')}: {e}", exc_info=True)
             raise
-
+        
     def update_order_status(self, order_id: str, status: str, payment_data: Optional[Dict] = None) -> bool:
         """Update order status in the whatsapp_orders table."""
         try:
