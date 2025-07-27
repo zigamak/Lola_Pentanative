@@ -1,298 +1,285 @@
-from .base_handler import BaseHandler
+import json
+import os
+import datetime
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Any
+from .base_handler import BaseHandler
 
 logger = logging.getLogger(__name__)
 
-class GreetingHandler(BaseHandler):
-    """Handles greeting and main menu interactions, including new user onboarding and customized menus for paid users."""
-    
-    def handle_greeting_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict[str, Any]:
-        """
-        Handle greeting state messages based on user's main menu selection.
-        Also dispatches to new user onboarding states.
-        """
-        self.logger.info(f"GreetingHandler: Handling message '{message}' in greeting state for session {session_id}.")
+class FeedbackHandler(BaseHandler):
+    """Handles post-order feedback collection and management."""
 
-        # Handle new user onboarding flow
-        if state.get("current_state") == "collect_preferred_name":
-            return self.handle_collect_preferred_name_state(state, message, session_id)
-        elif state.get("current_state") == "collect_delivery_address":
-            return self.handle_collect_delivery_address_state(state, message, session_id)
+    def __init__(self, config, session_manager, data_manager, whatsapp_service):
+        super().__init__(config, session_manager, data_manager, whatsapp_service)
+        self.feedback_file = "data/feedback.json"
+        self._ensure_feedback_file_exists()
+        logger.info("FeedbackHandler initialized.")
 
-        # Check if user has made a payment
-        if self._has_user_made_payment(session_id):
-            # Handle paid user options
-            if message == "track_order":
-                return self._handle_track_order(state, session_id)
-            elif message == "order_again":
-                return self._handle_order_again(state, session_id)
-            elif message == "enquiry":
-                return self._handle_enquiry_request(state, session_id)
-            elif message == "complain":
-                return self._handle_complaint_request(state, session_id)
-            else:
-                # Handle invalid options for paid users
-                return self._handle_invalid_option_paid(state, session_id, message)
-        else:
-            # Existing main menu handling for non-paid users
-            if message == "ai_bulk_order_direct":
-                return self._handle_ai_bulk_order_direct(state, session_id)
-            elif message == "enquiry":
-                return self._handle_enquiry_request(state, session_id)
-            elif message == "complain":
-                return self._handle_complaint_request(state, session_id)
-            else:
-                # Handle invalid options for non-paid users
-                return self._handle_invalid_option(state, session_id, message)
-    
-    def _has_user_made_payment(self, session_id: str) -> bool:
+    def _ensure_feedback_file_exists(self):
+        """Ensure feedback JSON file exists."""
+        if not os.path.exists(self.feedback_file):
+            os.makedirs(os.path.dirname(self.feedback_file), exist_ok=True)
+            with open(self.feedback_file, 'w') as f:
+                json.dump([], f, indent=2)
+            logger.info(f"Created feedback file: {self.feedback_file}")
+
+    def initiate_feedback_request(self, state: Dict, session_id: str, order_id: str) -> Dict[str, Any]:
         """
-        Check if the user has made a payment using SessionManager's paid status.
+        Initiate feedback collection after successful order completion.
+
+        Args:
+            state (Dict): Session state
+            session_id (str): User's session ID
+            order_id (str): Completed order ID
+
+        Returns:
+            Dict: WhatsApp message response
         """
         try:
-            is_paid = self.session_manager.is_paid_user_session(session_id)
-            if is_paid:
-                self.logger.info(f"Session {session_id}: User has an active paid session.")
-            return is_paid
-        except Exception as e:
-            self.logger.error(f"Error checking payment status for session {session_id}: {e}")
-            return False
-    
-    def _handle_track_order(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle track order request."""
-        self.logger.info(f"Session {session_id} redirecting to TrackOrderHandler for order tracking.")
-        state["current_state"] = "track_order"
-        state["current_handler"] = "track_order_handler"
-        self.session_manager.update_session_state(session_id, state)
-        return {"redirect": "track_order_handler", "redirect_message": "start_track_order"}
-    
-    def _handle_order_again(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle order again request by redirecting to AI Bulk Order."""
-        self.logger.info(f"Session {session_id} redirecting to AIHandler for Order Again.")
-        state["current_state"] = "ai_bulk_order"
-        state["current_handler"] = "ai_handler"
-        self.session_manager.update_session_state(session_id, state)
-        return {"redirect": "ai_handler", "redirect_message": "start_ai_bulk_order"}
-    
-    def _handle_ai_bulk_order_direct(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle direct AI Bulk Order entry from main menu (Let Lola Order)."""
-        self.logger.info(f"Session {session_id} redirecting to AIHandler for AI Bulk Order (Let Lola Order).")
-        state["current_state"] = "ai_bulk_order"
-        state["current_handler"] = "ai_handler"
-        self.session_manager.update_session_state(session_id, state)
-        return {"redirect": "ai_handler", "redirect_message": "start_ai_bulk_order"}
-    
-    def _handle_enquiry_request(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle enquiry request with FAQ options."""
-        state["current_state"] = "enquiry_menu"
-        state["current_handler"] = "enquiry_handler"
-        self.session_manager.update_session_state(session_id, state)
-        self.logger.info(f"Session {session_id} redirecting to EnquiryHandler for enquiry menu.")
-        return {"redirect": "enquiry_handler", "redirect_message": "show_enquiry_menu"}
-    
-    def _handle_complaint_request(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle complaint request."""
-        state["current_state"] = "complain"
-        state["current_handler"] = "complaint_handler"
-        self.session_manager.update_session_state(session_id, state)
-        self.logger.info(f"Session {session_id} entering complaint state.")
-        return self.whatsapp_service.create_text_message(
-            session_id, 
-            "We're sorry to hear you're having an issue. Please tell us about your complaint and we'll address it promptly."
-        )
-    
-    def _handle_invalid_option(self, state: Dict, session_id: str, message_received: str) -> Dict[str, Any]:
-        """Handle invalid option selection for non-paid users."""
-        user_data = self.data_manager.get_user_data(session_id)
-        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
-        self.logger.warning(f"Session {session_id}: Invalid option '{message_received}' in greeting state for non-paid user.")
-        return self.send_main_menu(
-            session_id, 
-            user_name, 
-            f"Invalid option, {user_name}. Please choose from the options below:"
-        )
-    
-    def _handle_invalid_option_paid(self, state: Dict, session_id: str, message_received: str) -> Dict[str, Any]:
-        """Handle invalid option selection for paid users."""
-        user_data = self.data_manager.get_user_data(session_id)
-        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
-        self.logger.warning(f"Session {session_id}: Invalid option '{message_received}' in greeting state for paid user.")
-        return self.send_main_menu_paid(
-            session_id, 
-            user_name, 
-            f"Invalid option, {user_name}. Please choose from the options below:"
-        )
-    
-    def generate_initial_greeting(self, state: Dict, session_id: str, user_name: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Generate initial greeting message and set initial state.
-        For new users, asks for preferred name and delivery address.
-        For paid users, shows customized menu.
-        """
-        user_data = self.data_manager.get_user_data(session_id)
-        
-        if not user_data or not user_data.get("user_perferred_name") or not user_data.get("address"):
-            # New user or missing preferred name/address
-            username_display = user_data.get("name", "Guest") if user_data else "Guest"
-            self.logger.info(f"Session {session_id}: New user or missing details. Initiating onboarding.")
-            
-            # Set initial state for onboarding
-            state["current_state"] = "collect_preferred_name"
-            state["current_handler"] = "greeting_handler"
+            state["current_state"] = "feedback_rating"
+            state["current_handler"] = "feedback_handler"
+            state["feedback_order_id"] = order_id
+            state["feedback_started_at"] = datetime.datetime.now().isoformat()
             self.session_manager.update_session_state(session_id, state)
-            
-            # Prompt for preferred name
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                f"Hello {username_display}, welcome to Lola!\nPlease enter your preferred name."
+
+            logger.info(f"Initiated feedback collection for order {order_id}, session {session_id}")
+
+            # Rating buttons (WhatsApp limit: 3 buttons)
+            buttons = [
+                {"type": "reply", "reply": {"id": "excellent", "title": "🤩 Excellent"}},
+                {"type": "reply", "reply": {"id": "good", "title": "😊 Good"}},
+                {"type": "reply", "reply": {"id": "bad", "title": "😞 Bad"}}
+            ]
+
+            message = (
+                f"🎉 *Thank you for your order!*\n\n"
+                f"📋 Order ID: {order_id}\n\n"
+                f"💬 *How was your ordering experience?*\n"
+                f"Your feedback helps us improve our service!"
             )
-        else:
-            # Returning user with all details
-            username = user_data.get("display_name", "Guest")
-            state["user_name"] = username
-            state["delivery_address"] = user_data.get("address", "")
+
+            return self.whatsapp_service.create_button_message(session_id, message, buttons)
+
+        except Exception as e:
+            logger.error(f"Error initiating feedback for order {order_id}: {e}", exc_info=True)
+            # Fall back to greeting state without clearing session
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
-            self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
-            
-            # Check if user has made a payment
-            if self._has_user_made_payment(session_id):
-                return self.send_main_menu_paid(
-                    session_id, 
-                    username, 
-                    f"Welcome Back {username}\nWhat would you like to do?"
+            # Try to send a simple text message as fallback
+            try:
+                self.whatsapp_service.create_text_message(
+                    session_id,
+                    f"Thank you for your order #{order_id}! Your feedback helps us improve. How was your experience? Reply 'excellent', 'good', or 'bad'."
                 )
-            else:
-                return self.send_main_menu(
-                    session_id, 
-                    username, 
-                    f"Hello {username}, What would you like to do?"
-                )
+            except:
+                pass  # Silent fallback
+            return self.handle_back_to_main(state, session_id)
 
-    def handle_collect_preferred_name_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
-        """
-        Handles the user's preferred name input and then asks for the delivery address.
-        """
-        preferred_name = message.strip()
-        if not preferred_name:
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "It looks like you didn't enter a name. Please enter your preferred name."
-            )
-        
-        self.logger.info(f"Session {session_id}: Preferred name received: '{preferred_name}'.")
-        
-        # Get existing user data
-        user_data = self.data_manager.get_user_data(session_id) or {}
-        user_data["user_perferred_name"] = preferred_name
-        user_data["display_name"] = preferred_name 
-        
-        # Save the preferred name to the database
-        user_data["user_id"] = session_id
-        user_data["user_number"] = session_id
-        self.data_manager.save_user_details(session_id, user_data)
-        
-        state["user_name"] = preferred_name
-        state["current_state"] = "collect_delivery_address"
-        state["current_handler"] = "greeting_handler"
+    def handle_feedback_rating_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
+        """Handle initial feedback rating selection."""
+        logger.debug(f"Handling feedback rating for session {session_id}, message: {message}")
+
+        if message == "excellent":
+            return self._handle_positive_rating(state, message, session_id)
+        elif message == "good":
+            return self._handle_positive_rating(state, message, session_id)
+        elif message == "bad":
+            return self._handle_negative_rating(state, message, session_id)
+        elif message == "skip_feedback":
+            return self._handle_skip_feedback(state, session_id)
+        else:
+            # Invalid input, show options again
+            return self._show_invalid_rating_message(state, session_id)
+
+    def handle_feedback_comment_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
+        """Handle optional feedback comment."""
+        logger.debug(f"Handling feedback comment for session {session_id}")
+
+        if message.lower() == "skip":
+            return self._save_feedback_and_complete(state, session_id, "")
+        else:
+            return self._save_feedback_and_complete(state, session_id, message)
+
+    def _handle_positive_rating(self, state: Dict, rating: str, session_id: str) -> Dict[str, Any]:
+        """Handle positive ratings (excellent, good)."""
+        state["feedback_rating"] = rating
+        state["current_state"] = "feedback_comment"
         self.session_manager.update_session_state(session_id, state)
-        
+
+        emoji = "🤩" if rating == "excellent" else "👍"
+
         return self.whatsapp_service.create_text_message(
             session_id,
-            f"Thanks, {preferred_name}! Now, please enter your delivery address."
+            f"{emoji} *Thank you for the {rating} rating!*\n\n"
+            f"💬 Would you like to share any specific comments about your experience?\n\n"
+            f"Type your message or 'skip' to finish."
         )
 
-    def handle_collect_delivery_address_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
-        """
-        Handles the user's delivery address input and then sends the main menu.
-        """
-        delivery_address = message.strip()
-        if not delivery_address:
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "It looks like you didn't enter an address. Please enter your delivery address."
-            )
-        
-        self.logger.info(f"Session {session_id}: Delivery address received: '{delivery_address}'.")
-        
-        # Get existing user data
-        user_data = self.data_manager.get_user_data(session_id) or {}
-        user_data["address"] = delivery_address
-        
-        # Save the delivery address to the database
-        user_data["user_id"] = session_id
-        user_data["user_number"] = session_id
-        self.data_manager.save_user_details(session_id, user_data)
-        
-        state["delivery_address"] = delivery_address
-        state["current_state"] = "greeting"
-        state["current_handler"] = "greeting_handler"
+    def _handle_negative_rating(self, state: Dict, rating: str, session_id: str) -> Dict[str, Any]:
+        """Handle negative ratings (bad)."""
+        state["feedback_rating"] = rating
+        state["current_state"] = "feedback_comment"
         self.session_manager.update_session_state(session_id, state)
-        
-        username = state.get("user_name", "Guest")
-        self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
-        
-        # Check if user has made a payment
-        if self._has_user_made_payment(session_id):
-            return self.send_main_menu_paid(
-                session_id, 
-                username, 
-                f"Welcome Back {username}\nWhat would you like to do?"
-            )
-        else:
-            return self.send_main_menu(
-                session_id, 
-                username, 
-                f"Thank you! Hello {username}, What would you like to do?"
-            )
 
-    def send_main_menu(self, session_id: str, user_name: str, message: str = "How can I help you today?") -> Dict[str, Any]:
-        """Send main menu with buttons for non-paid users (max 3 buttons for WhatsApp)."""
-        greeting = f"{message}"
-        
-        # WhatsApp allows maximum 3 buttons
-        buttons = [
-            {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
-            {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-            {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
-        ]
-        
-        return self.whatsapp_service.create_button_message(session_id, greeting, buttons)
-    
-    def send_main_menu_paid(self, session_id: str, user_name: str, message: str = "How can I help you today?") -> Dict[str, Any]:
-        """Send main menu with buttons for paid users (max 3 buttons for WhatsApp)."""
-        greeting = f"{message}"
-        
-        # WhatsApp allows maximum 3 buttons
-        buttons = [
-            {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
-            {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
-            {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
-        ]
-        
-        return self.whatsapp_service.create_button_message(session_id, greeting, buttons)
-    
-    def handle_back_to_main(self, state: Dict, session_id: str, message: str = "Welcome back! How can I help you today?") -> Dict[str, Any]:
-        """Handle back to main menu navigation."""
-        user_data = self.data_manager.get_user_data(session_id)
-        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
-        state["current_state"] = "greeting"
-        state["current_handler"] = "greeting_handler"
-        # Clear any order-related data but keep user info
-        if "cart" in state:
-            state["cart"] = {}
-        if "selected_category" in state:
-            del state["selected_category"]
-        if "selected_item" in state:
-            del state["selected_item"]
-            
-        self.session_manager.update_session_state(session_id, state)
-        self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
-        
-        # Check if user has made a payment
-        if self._has_user_made_payment(session_id):
-            return self.send_main_menu_paid(session_id, user_name, f"Welcome Back {user_name}\nWhat would you like to do?")
-        else:
-            return self.send_main_menu(session_id, user_name, message)
+        return self.whatsapp_service.create_text_message(
+            session_id,
+            f"😞 *Thank you for your honest feedback.*\n\n"
+            f"💬 We'd really appreciate if you could tell us what went wrong so we can improve:\n\n"
+            f"Type your feedback or 'skip' to finish."
+        )
+
+    def _show_invalid_rating_message(self, state: Dict, session_id: str) -> Dict[str, Any]:
+        """Show message for invalid rating input."""
+        order_id = state.get("feedback_order_id", "N/A")
+        self.whatsapp_service.create_text_message(
+            session_id,
+            "❌ Please select a valid rating option using the buttons provided."
+        )
+        return self.initiate_feedback_request(state, session_id, order_id)
+
+    def _handle_skip_feedback(self, state: Dict, session_id: str) -> Dict[str, Any]:
+        """Handle when user skips feedback."""
+        logger.info(f"User {session_id} skipped feedback for order {state.get('feedback_order_id', 'N/A')}")
+
+        # Save as skipped feedback
+        feedback_data = {
+            "phone_number": session_id,
+            "user_name": state.get("user_name", "Guest"),
+            "order_id": state.get("feedback_order_id", "N/A"),
+            "rating": "skipped",
+            "comment": "",
+            "timestamp": datetime.datetime.now().isoformat(),
+            "session_duration": self._calculate_feedback_duration(state)
+        }
+
+        self._save_feedback_to_file(feedback_data)
+
+        # Return to main menu without clearing session
+        return self._complete_feedback_flow(state, session_id, "Thank you! We hope you enjoyed your order. 😊")
+
+    def _save_feedback_and_complete(self, state: Dict, session_id: str, comment: str) -> Dict[str, Any]:
+        """Save feedback and return to main menu."""
+        try:
+            feedback_data = {
+                "phone_number": session_id,
+                "user_name": state.get("user_name", "Guest"),
+                "order_id": state.get("feedback_order_id", "N/A"),
+                "rating": state.get("feedback_rating", "unknown"),
+                "comment": comment.strip(),
+                "timestamp": datetime.datetime.now().isoformat(),
+                "session_duration": self._calculate_feedback_duration(state)
+            }
+
+            self._save_feedback_to_file(feedback_data)
+
+            logger.info(f"Feedback saved for order {feedback_data['order_id']}: {feedback_data['rating']}")
+
+            # Thank you message and return to main menu
+            rating = state.get("feedback_rating", "").title()
+            thank_you_msg = f"🙏 *Thank you for your {rating} feedback!*\n\n"
+
+            return self._complete_feedback_flow(state, session_id, thank_you_msg)
+
+        except Exception as e:
+            logger.error(f"Error saving feedback for session {session_id}: {e}", exc_info=True)
+            # Return to main menu without clearing session
+            return self._complete_feedback_flow(state, session_id, "Thank you for your feedback!")
+
+    def _save_feedback_to_file(self, feedback_data: Dict) -> None:
+        """Save feedback data to JSON file."""
+        try:
+            # Load existing feedback
+            feedback_list = []
+            if os.path.exists(self.feedback_file):
+                with open(self.feedback_file, 'r') as f:
+                    feedback_list = json.load(f)
+
+            # Add new feedback
+            feedback_list.append(feedback_data)
+
+            # Save updated feedback
+            with open(self.feedback_file, 'w') as f:
+                json.dump(feedback_list, f, indent=2, default=str)
+
+            logger.info(f"Feedback saved to {self.feedback_file}")
+
+        except Exception as e:
+            logger.error(f"Error saving feedback to file: {e}", exc_info=True)
+
+    def _calculate_feedback_duration(self, state: Dict) -> float:
+        """Calculate how long the feedback session took."""
+        try:
+            start_time_str = state.get("feedback_started_at")
+            if start_time_str:
+                start_time = datetime.datetime.fromisoformat(start_time_str)
+                duration = (datetime.datetime.now() - start_time).total_seconds()
+                return round(duration, 2)
+        except Exception as e:
+            logger.error(f"Error calculating feedback duration: {e}")
+        return 0.0
+
+    def _complete_feedback_flow(self, state: Dict, session_id: str, message: str) -> Dict[str, Any]:
+        """Complete feedback flow and return to main menu."""
+        # Clean up feedback-related state
+        feedback_keys = ["feedback_order_id", "feedback_rating", "feedback_started_at"]
+        for key in feedback_keys:
+            if key in state:
+                del state[key]
+
+        # Return to main menu
+        return self.handle_back_to_main(state, session_id, message)
+
+    def get_feedback_analytics(self) -> Dict[str, Any]:
+        """Get feedback analytics summary."""
+        try:
+            if not os.path.exists(self.feedback_file):
+                return {"total_feedback": 0, "message": "No feedback data available"}
+
+            with open(self.feedback_file, 'r') as f:
+                feedback_list = json.load(f)
+
+            if not feedback_list:
+                return {"total_feedback": 0, "message": "No feedback data available"}
+
+            total_feedback = len(feedback_list)
+            rating_counts = {}
+            total_comments = 0
+            recent_feedback = []
+
+            for feedback in feedback_list:
+                rating = feedback.get("rating", "unknown")
+                rating_counts[rating] = rating_counts.get(rating, 0) + 1
+
+                if feedback.get("comment", "").strip():
+                    total_comments += 1
+
+                # Get recent feedback (last 10)
+                if len(recent_feedback) < 10:
+                    recent_feedback.append({
+                        "order_id": feedback.get("order_id", "N/A"),
+                        "rating": rating,
+                        "comment": feedback.get("comment", "")[:100] + "..." if len(feedback.get("comment", "")) > 100 else feedback.get("comment", ""),
+                        "timestamp": feedback.get("timestamp", "N/A")
+                    })
+
+            # Calculate percentages
+            rating_percentages = {
+                rating: round((count / total_feedback) * 100, 1)
+                for rating, count in rating_counts.items()
+            }
+
+            return {
+                "total_feedback": total_feedback,
+                "rating_counts": rating_counts,
+                "rating_percentages": rating_percentages,
+                "total_comments": total_comments,
+                "comment_percentage": round((total_comments / total_feedback) * 100, 1),
+                "recent_feedback": recent_feedback,
+                "last_updated": datetime.datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting feedback analytics: {e}", exc_info=True)
+            return {"error": "Failed to load feedback analytics"}
