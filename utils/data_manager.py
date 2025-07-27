@@ -179,7 +179,7 @@ class DataManager:
                         RETURNING id
                     """
                     # Provide a default for MERCHANT_ID and BUSINESS_TYPE_ID if they are not set in config
-                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', '16')
+                    merchant_details_id = getattr(self.config, 'MERCHANT_ID', '18')
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', '1')
 
                     # Validate merchant_details_id (this check helps prevent foreign key errors)
