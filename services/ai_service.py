@@ -4,7 +4,7 @@ import json
 import re
 from typing import Dict, List, Any
 from dataclasses import dataclass
-from .base_handler import BaseHandler
+from handlers.base_handler import BaseHandler
 from services.ai_service import AIService 
 
 logger = logging.getLogger(__name__)

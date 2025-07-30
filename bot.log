@@ -2643,3 +2643,4 @@ LINE 3:                             product_variant_id,
 2025-07-24 22:48:46,121 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:8000
 2025-07-24 22:48:46,121 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-07-30 21:17:02,673 - __main__ - ERROR - Environment check failed. Please fix the issues above.
