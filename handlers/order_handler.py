@@ -337,6 +337,7 @@ class OrderHandler(BaseHandler):
         elif message_lower == "change_all_details":
             logger.info(f"User opted to change details for session {session_id}.")
             state["current_state"] = "get_new_name_address"
+            state["update_context"] = "change_all_details"  # Track context for full update
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -547,7 +548,7 @@ class OrderHandler(BaseHandler):
         elif message_lower == "update_address":
             logger.info(f"User chose to update address for session {session_id}")
             state["current_state"] = "get_new_name_address"
-            state["current_handler"] = "order_handler"
+            state["update_context"] = "update_address"  # Track context for address-only update
             self.session_manager.update_session_state(session_id, state)
             
             return self.whatsapp_service.create_text_message(
@@ -569,105 +570,99 @@ class OrderHandler(BaseHandler):
             return self._show_order_confirmation(state, session_id)
 
     def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
-        """Handle user providing new name and address."""
+        """Handle user providing new name and address or just address based on context."""
         logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
         
         try:
-            if "," in message:
-                parts = [part.strip() for part in message.split(",", 1)]
-                if len(parts) == 2:
-                    new_name, new_address = parts
-                    state["user_name"] = new_name
-                    state["address"] = new_address
-                    user_data = {
-                        "name": new_name,
-                        "phone_number": session_id,
-                        "address": new_address,
-                        "user_perferred_name": new_name,
-                        "address2": "",
-                        "address3": ""
-                    }
-                else:
-                    new_address = parts[0]
-                    state["address"] = new_address
-                    user_data = {
-                        "name": state.get("user_name", "Guest"),
-                        "phone_number": session_id,
-                        "address": new_address,
-                        "user_perferred_name": state.get("user_name", "Guest"),
-                        "address2": "",
-                        "address3": ""
-                    }
-                try:
-                    self.data_manager.save_user_details(session_id, user_data)
-                except Exception as e:
-                    logger.error(f"Failed to save user details for session {session_id}: {e}")
-                    return self.whatsapp_service.create_text_message(
-                        session_id,
-                        "❌ Sorry, there was an error saving your details. Please try again."
-                    )
-                state["current_state"] = "confirm_details"
-                self.session_manager.update_session_state(session_id, state)
-                
-                logger.info(f"Updated details for session {session_id}: Name={state.get('user_name', 'Guest')}, Address={new_address}")
-                
-                buttons = [
-                    {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
-                    {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
-                ]
-                
-                return self.whatsapp_service.create_button_message(
-                    session_id,
-                    f"📋 **Updated Delivery Details:**\n\n"
-                    f"👤 **Name:** {state.get('user_name', 'Guest')}\n"
-                    f"📱 **Phone:** {state.get('phone_number', session_id)}\n"
-                    f"📍 **Address:** {new_address}\n\n"
-                    f"Is this information correct?",
-                    buttons
-                )
-            else:
+            update_context = state.get("update_context", "change_all_details")
+            user_data = self.data_manager.get_user_data(session_id)
+            current_name = state.get("user_name", user_data.get("display_name", "Guest") if user_data else "Guest")
+            current_phone = state.get("phone_number", user_data.get("phone_number", session_id) if user_data else session_id)
+
+            if update_context == "update_address":
+                # Only update the address, keep the existing name
                 new_address = message.strip()
                 state["address"] = new_address
-                user_data = {
-                    "name": state.get("user_name", "Guest"),
-                    "phone_number": session_id,
+                user_data_to_save = {
+                    "name": current_name,
+                    "phone_number": current_phone,
                     "address": new_address,
-                    "user_perferred_name": state.get("user_name", "Guest"),
-                    "address2": "",
-                    "address3": ""
+                    "user_perferred_name": current_name,
+                    "address2": user_data.get("address2", "") if user_data else "",
+                    "address3": user_data.get("address3", "") if user_data else ""
                 }
-                try:
-                    self.data_manager.save_user_details(session_id, user_data)
-                except Exception as e:
-                    logger.error(f"Failed to save user details for session {session_id}: {e}")
-                    return self.whatsapp_service.create_text_message(
-                        session_id,
-                        "❌ Sorry, there was an error saving your details. Please try again."
-                    )
-                state["current_state"] = "confirm_details"
-                self.session_manager.update_session_state(session_id, state)
-                
-                logger.info(f"Updated address for session {session_id}: Address={new_address}")
-                
-                buttons = [
-                    {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
-                    {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
-                ]
-                
-                return self.whatsapp_service.create_button_message(
+            else:
+                # Update both name and address (for 'change_all_details' context)
+                if "," in message:
+                    parts = [part.strip() for part in message.split(",", 1)]
+                    if len(parts) == 2:
+                        new_name, new_address = parts
+                        state["user_name"] = new_name
+                        state["address"] = new_address
+                        user_data_to_save = {
+                            "name": new_name,
+                            "phone_number": current_phone,
+                            "address": new_address,
+                            "user_perferred_name": new_name,
+                            "address2": user_data.get("address2", "") if user_data else "",
+                            "address3": user_data.get("address3", "") if user_data else ""
+                        }
+                    else:
+                        new_address = parts[0]
+                        state["address"] = new_address
+                        user_data_to_save = {
+                            "name": current_name,
+                            "phone_number": current_phone,
+                            "address": new_address,
+                            "user_perferred_name": current_name,
+                            "address2": user_data.get("address2", "") if user_data else "",
+                            "address3": user_data.get("address3", "") if user_data else ""
+                        }
+                else:
+                    new_address = message.strip()
+                    state["address"] = new_address
+                    user_data_to_save = {
+                        "name": current_name,
+                        "phone_number": current_phone,
+                        "address": new_address,
+                        "user_perferred_name": current_name,
+                        "address2": user_data.get("address2", "") if user_data else "",
+                        "address3": user_data.get("address3", "") if user_data else ""
+                    }
+
+            try:
+                self.data_manager.save_user_details(session_id, user_data_to_save)
+                logger.info(f"Updated details for session {session_id}: Name={user_data_to_save['name']}, Address={new_address}")
+            except Exception as e:
+                logger.error(f"Failed to save user details for session {session_id}: {e}")
+                return self.whatsapp_service.create_text_message(
                     session_id,
-                    f"📋 **Updated Delivery Details:**\n\n"
-                    f"👤 **Name:** {state.get('user_name', 'Guest')}\n"
-                    f"📱 **Phone:** {state.get('phone_number', session_id)}\n"
-                    f"📍 **Address:** {new_address}\n\n"
-                    f"Is this information correct?",
-                    buttons
+                    "❌ Sorry, there was an error saving your details. Please try again."
                 )
+
+            state["current_state"] = "confirm_details"
+            state.pop("update_context", None)  # Clear context after processing
+            self.session_manager.update_session_state(session_id, state)
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
+                {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
+            ]
+            
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                f"📋 **Updated Delivery Details:**\n\n"
+                f"👤 **Name:** {state.get('user_name', current_name)}\n"
+                f"📱 **Phone:** {current_phone}\n"
+                f"📍 **Address:** {new_address}\n\n"
+                f"Is this information correct?",
+                buttons
+            )
         except Exception as e:
             logger.error(f"Error handling new address for session {session_id}: {e}", exc_info=True)
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "There was an error updating your address. Please try again with format: Address or Name, Address"
+                "There was an error updating your details. Please try again with format: Address or Name, Address"
             )
 
     def handle_payment_pending_state(self, state: Dict, message: str, session_id: str) -> Dict:

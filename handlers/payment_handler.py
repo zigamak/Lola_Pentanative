@@ -60,15 +60,21 @@ class PaymentHandler(BaseHandler):
                     "⚠️ No order found. Please try checking out again."
                 )
             
-            # Generate payment reference
-            payment_reference = f"PAY-{order_id}"
-            state["payment_reference"] = payment_reference
+            # Fetch order data from database to get total_amount
+            order_data = self.data_manager.get_order_by_id(order_id)
+            if not order_data:
+                self.logger.error(f"Order {order_id} not found in database for session {session_id}")
+                state["current_state"] = "order_summary"
+                state["current_handler"] = "order_handler"
+                self.session_manager.update_session_state(session_id, state)
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ Order not found. Please try checking out again."
+                )
             
-            # Calculate total amount in kobo
-            total_amount = self.payment_service.calculate_cart_total(state["cart"])
-            
-            if total_amount <= 0:
-                self.logger.warning(f"Invalid total amount {total_amount} for session {session_id}")
+            total_amount_ngn = order_data.get("total_amount", 0)
+            if total_amount_ngn <= 0:
+                self.logger.warning(f"Invalid total amount {total_amount_ngn} for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -76,6 +82,13 @@ class PaymentHandler(BaseHandler):
                     session_id,
                     "⚠️ Invalid order total. Please check your cart and try again."
                 )
+            
+            # Generate payment reference
+            payment_reference = f"PAY-{order_id}"
+            state["payment_reference"] = payment_reference
+            
+            # Convert total_amount to kobo for Paystack
+            total_amount_kobo = int(total_amount_ngn * 100)  # Assuming database stores amount in NGN
             
             # Update order with payment reference and pending_payment status
             payment_data = {
@@ -100,7 +113,7 @@ class PaymentHandler(BaseHandler):
             )
             
             payment_url = self.payment_service.create_payment_link(
-                amount=total_amount,
+                amount=total_amount_kobo,
                 email=customer_email,
                 reference=payment_reference,
                 customer_name=state.get("user_name", "Guest"),
@@ -129,7 +142,7 @@ class PaymentHandler(BaseHandler):
                     session_id,
                     f"🛒 *Order Created Successfully!*\n\n"
                     f"📋 *Order ID:* {order_id}\n"
-                    f"💰 *Total:* ₦{total_amount // 100:,}\n"
+                    f"💰 *Total:* ₦{total_amount_ngn:,}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
                     f"✅ We'll automatically confirm your order once payment is received!\n"
@@ -177,16 +190,16 @@ class PaymentHandler(BaseHandler):
             return []
     
     def _format_order_items(self, items: List[Dict]) -> str:
-  
+        """Format order items for display, assuming database amounts are in NGN."""
         if not items:
             return "No items found."
         formatted = "\n"
         for item in items:
             item_name = item.get("item_name", "Unknown Item")
             quantity = item.get("quantity", 0)
-            unit_price = item.get("unit_price", 0.0)
-            subtotal = item.get("subtotal", 0.0)
-            formatted += f"- {item_name} (x{quantity}): ₦{int(subtotal) // 100:,}\n"
+            unit_price = item.get("unit_price", 0.0)  # Already in NGN
+            subtotal = item.get("subtotal", 0.0)      # Already in NGN
+            formatted += f"- {item_name} (x{quantity}): ₦{int(subtotal):,}\n"
         return formatted
     
     def start_payment_monitoring(self, session_id, payment_reference, order_id):
@@ -315,7 +328,7 @@ class PaymentHandler(BaseHandler):
             success_message = (
                 f"🎉 *Payment Automatically Confirmed!*\n\n"
                 f"📋 *Order ID:* {order_id}\n"
-                f"💰 *Amount Paid:* ₦{payment_data.get('amount', 0) // 100:,}\n"
+                f"💰 *Amount Paid:* ₦{order_data.get('total_amount', 0):,}\n"
                 f"🛒 *Items:* {formatted_items}\n"
                 f"🚚 *Delivery to:* {state.get('address', 'Not provided')}{maps_info}\n\n"
                 f"✅ Your order has been received and is being processed!\n"
@@ -343,14 +356,14 @@ class PaymentHandler(BaseHandler):
                 self.logger.error(f"Order data not found for reminder for order {order_id}.")
                 return
             
-            total_amount = order_data["total_amount"]
+            total_amount = order_data["total_amount"]  # Already in NGN
             customer_email = self.payment_service.generate_customer_email(
                 state.get("phone_number", session_id), 
                 state.get("user_name", "Guest")
             )
             
             payment_url = self.payment_service.create_payment_link(
-                amount=total_amount,
+                amount=int(total_amount * 100),  # Convert to kobo for Paystack
                 email=customer_email,
                 reference=payment_reference,  # Use same reference
                 customer_name=state.get("user_name", "Guest"),
@@ -370,7 +383,7 @@ class PaymentHandler(BaseHandler):
                 reminder_message = (
                     f"⏰ *Payment Reminder*\n\n"
                     f"We notice your payment for Order #{order_id} hasn't been completed yet.\n\n"
-                    f"💰 *Total Amount:* ₦{total_amount // 100:,}\n"
+                    f"💰 *Total Amount:* ₦{total_amount:,}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
                     f"🔄 We're still monitoring for your payment automatically.\n"
@@ -510,7 +523,7 @@ class PaymentHandler(BaseHandler):
                 success_message = (
                     f"🎉 *Payment Confirmed!*\n\n"
                     f"📋 *Order ID:* {order_data['order_id']}\n"
-                    f"💰 *Amount Paid:* ₦{payment_data.get('amount', 0) // 100:,}\n"
+                    f"💰 *Amount Paid:* ₦{order_data.get('total_amount', 0):,}\n"
                     f"🛒 *Items:* {formatted_items}\n"
                     f"🚚 *Delivery to:* {state.get('address', 'Not provided')}{maps_info}\n\n"
                     f"✅ Your order is confirmed and being processed!\n"
@@ -537,8 +550,8 @@ class PaymentHandler(BaseHandler):
                     f"⏳ *Payment Not Yet Received*\n\n"
                     f"📋 *Order ID:* {order_data['order_id'] if order_data else 'N/A'}\n"
                     f"🛒 *Items:* {formatted_items}\n"
-                    f"💰 *Total:* ₦{order_data['total_amount'] // 100:, if order_data else 0}\n\n"
-                    f"Please:\n"
+                    f"💰 *Total:* ₦{order_data['total_amount'] if order_data else 0:,}\n\n"
+                    f"💳 Please:\n"
                     f"1️⃣ Complete the payment using the link provided\n"
                     f"2️⃣ Wait a moment for processing\n"
                     f"3️⃣ Try sending 'paid' again\n\n"
@@ -753,7 +766,7 @@ class PaymentHandler(BaseHandler):
                     message = (
                         f"🎉 *Payment Successful!*\n\n"
                         f"📋 *Order ID:* {order_data['order_id']}\n"
-                        f"💰 *Amount:* ₦{webhook_data['data']['amount'] // 100:,}\n"
+                        f"💰 *Amount:* ₦{order_data['total_amount']:,}\n"
                         f"🛒 *Items:* {formatted_items}\n"
                         f"🚚 *Delivery to:* {order_data['address']}{maps_info}\n\n"
                         f"✅ Thank you for your purchase!\n"
