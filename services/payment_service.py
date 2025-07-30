@@ -40,7 +40,7 @@ class PaymentService:
         clean_first_name = ''.join(c.lower() for c in first_name if c.isalnum())
         clean_phone = phone_number.replace('+', '').replace('-', '').replace(' ', '')[-4:]
         
-        return f"{clean_first_name}{clean_phone}@foodorder.com"
+        return f"{clean_first_name}{clean_phone}@lola.com"
     
     def create_payment_link(self, amount, email, reference, customer_name, customer_phone, metadata=None):
         """Create a Paystack payment link."""
