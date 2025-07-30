@@ -128,7 +128,9 @@ class AIHandler(BaseHandler):
             )
         
         try:
-            parsed_order = self.ai_service.parse_order_with_llm(original_message)
+            # Check if there is a previous order to modify
+            previous_order = state.get("temp_parsed_order", state.get("parsed_order", None))
+            parsed_order = self.ai_service.parse_order_with_llm(original_message, previous_order=previous_order)
             
             if not parsed_order.get("success"):
                 error_message = (

@@ -1,11 +1,11 @@
 import logging
+import os
 import json
 import re
-import os
 from typing import Dict, List, Any
 from dataclasses import dataclass
-from openai import AzureOpenAI
-from openai import APIConnectionError, RateLimitError, OpenAIError
+from .base_handler import BaseHandler
+from services.ai_service import AIService 
 
 logger = logging.getLogger(__name__)
 
@@ -17,276 +17,469 @@ class OrderItem:
     variations: Dict[str, str]
     price: float
 
-class AIService:
-    """
-    Handles AI-powered interactions, including chatbot responses and order parsing,
-    by interfacing with the Azure OpenAI API.
-    """
-
-    def __init__(self, config, data_manager):
-        """
-        Initializes the AIService with configuration and data manager.
-
-        Args:
-            config: A configuration object or dictionary containing Azure OpenAI settings.
-            data_manager: An instance of DataManager to access menu data.
-        """
-        self.data_manager = data_manager
-
-        if isinstance(config, dict):
-            self.azure_api_key = config.get("azure_api_key")
-            self.azure_endpoint = config.get("azure_endpoint")
-            self.deployment_name = config.get("azure_deployment_name", "gpt-35-turbo")
-            self.api_version = config.get("api_version", "2024-02-15")
-            self.ai_enabled = bool(self.azure_api_key)
-        else:
-            self.azure_api_key = getattr(config, 'AZURE_API_KEY', None)
-            self.azure_endpoint = getattr(config, 'AZURE_ENDPOINT', None)
-            self.deployment_name = getattr(config, 'AZURE_DEPLOYMENT_NAME', "gpt-35-turbo")
-            self.api_version = getattr(config, 'AZURE_API_VERSION', "2024-02-15")
-            
-            if hasattr(config, 'is_ai_enabled'):
-                self.ai_enabled = config.is_ai_enabled()
-            else:
-                self.ai_enabled = bool(self.azure_api_key and self.azure_endpoint)
-
-        self.azure_client = None
-        if self.ai_enabled and self.azure_api_key and self.azure_endpoint:
-            try:
-                self.azure_client = AzureOpenAI(
-                    api_key=self.azure_api_key,
-                    api_version=self.api_version,
-                    azure_endpoint=self.azure_endpoint,
-                )
-                logger.info("Azure OpenAI client initialized successfully in AIService.")
-            except Exception as e:
-                logger.error(f"Failed to initialize Azure OpenAI client in AIService: {e}", exc_info=True)
-                self.ai_enabled = False
-        else:
-            logger.warning("AI features disabled in AIService - missing Azure OpenAI configuration or client initialization failed.")
-            self.ai_enabled = False
-
-    def generate_lola_response(self, user_message: str) -> str:
-        """
-        Generates an AI response for the Lola chatbot using Azure OpenAI.
-
-        Args:
-            user_message (str): The message from the user.
-
-        Returns:
-            str: The AI-generated response.
-        """
-        if not self.ai_enabled or not self.azure_client:
-            return "🤖 Sorry, I'm currently offline. Please try the regular menu options!"
-            
-        system_prompt = """You are Lola, a friendly AI assistant for Chicken Republic, a popular Nigerian fast food restaurant. 
-
-Your personality:
-- Warm, friendly, and helpful
-- Use Nigerian expressions occasionally (like "How far?", "No wahala", etc.)
-- Be enthusiastic about food
-- Keep responses conversational but informative
-
-You can help with:
-- Menu recommendations
-- Nutritional information
-- Order suggestions
-- General questions about food
-- Cooking tips
-
-Keep responses concise (max 200 words) and engaging. If asked about ordering, remind users they can use the regular menu or AI bulk order feature.
-"""
-
-        try:
-            response = self.azure_client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                max_tokens=300,
-                temperature=0.7
-            )
-            
-            ai_response = response.choices[0].message.content.strip()
-            
-            ai_response += "\n\n_Type 'menu' to return to main menu_ 🤖"
-            
-            return ai_response
-        
-        except (APIConnectionError, RateLimitError, OpenAIError) as e:
-            logger.error(f"Azure OpenAI API error in Lola response generation: {e}", exc_info=True)
-            return "🤖 Sorry, I'm having trouble connecting to my brain right now. Please try again!"
-        except Exception as e:
-            logger.error(f"Unexpected error generating Lola response: {e}", exc_info=True)
-            return "Sorry, I'm having trouble right now. Please try again! 🤖"
-
-    def parse_order_with_llm(self, user_message: str, previous_order: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Parses a user's bulk order request using the LLM and returns structured JSON.
-
-        Args:
-            user_message (str): The user's message containing the order.
-            previous_order (Dict[str, Any], optional): The previous order to be modified. Defaults to None.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing parsed order details,
-                             recognized, ambiguous, and unrecognized items.
-        """
-        if not self.ai_enabled or not self.azure_client:
-            return {
-                "success": False, 
-                "error": "AI order processing is currently unavailable. Please use the regular menu."
-            }
-        
-        menu_context = self._create_menu_context()
-        
-        # Craft the system prompt to handle modifications if a previous order is provided
-        if previous_order:
-            previous_order_str = json.dumps(previous_order, indent=2)
-            system_prompt = f"""You are an order parsing assistant for Chicken Republic. Your task is to update a customer's existing order based on their new request.
-
-Current menu items:
-{menu_context}
-
-The customer's current order is:
-{previous_order_str}
-
-The user's new message is a request to modify this order. You need to combine the previous order with the new request. If the user adds a new item, add it to the recognized_items list. If they ask to remove or change an item's quantity, update the recognized_items list accordingly.
-
-After processing the modification, return a new JSON response with the same structure as below. Ensure all prices are numbers (float or int). Recalculate the order_total. If an item has variations, try to capture them. If a quantity is not specified, assume 1.
-{{
-    "success": true/false,
-    "recognized_items": [
-        {{
-            "item_id": "menu_item_id_from_context",
-            "name": "item name",
-            "quantity": number,
-            "variations": {{}},
-            "price": price_per_item,
-            "total_price": quantity * price
-        }}
-    ],
-    "ambiguous_items": [
-        {{
-            "input": "user input for ambiguous item",
-            "clarification_needed": "what needs clarification (e.g., Which 'burger' did you mean?)",
-            "possible_matches": ["Full Item Name 1", "Full Item Name 2", "Full Item Name 3"],
-            "quantity": number_if_known
-        }}
-    ],
-    "unrecognized_items": [
-        {{
-            "input": "user input for unrecognized item",
-            "message": "explanation why not found"
-        }}
-    ],
-    "order_total": total_price_of_recognized_items,
-    "error": "error message if any"
-}}
-
-If an item mentioned by the user is not found, or is ambiguous, populate the respective lists. Do not include items that have been removed.
-"""
-        else:
-            system_prompt = f"""You are an order parsing assistant for Chicken Republic. 
-            
-Available menu items:
-{menu_context}
-
-Parse the user's order and return a JSON response with this structure. Ensure all prices are numbers (float or int). If an item has variations, try to capture them. If a quantity is not specified, assume 1.
-{{
-    "success": true/false,
-    "recognized_items": [
-        {{
-            "item_id": "menu_item_id_from_context",
-            "name": "item name",
-            "quantity": number,
-            "variations": {{}},
-            "price": price_per_item,
-            "total_price": quantity * price
-        }}
-    ],
-    "ambiguous_items": [
-        {{
-            "input": "user input for ambiguous item",
-            "clarification_needed": "what needs clarification (e.g., Which 'burger' did you mean?)",
-            "possible_matches": ["Full Item Name 1", "Full Item Name 2", "Full Item Name 3"],
-            "quantity": number_if_known
-        }}
-    ],
-    "unrecognized_items": [
-        {{
-            "input": "user input for unrecognized item",
-            "message": "explanation why not found"
-        }}
-    ],
-    "order_total": total_price_of_recognized_items,
-    "error": "error message if any"
-}}
-
-If an item mentioned by the user is not found, or is ambiguous, populate the respective lists.
-Be generous with matching - if user says "burger" and you have "Chief Burger", that's a match.
-For quantities without specification, assume 1.
-"""
-
-        try:
-            response = self.azure_client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Parse this order: {user_message}"}
-                ],
-                max_tokens=800,
-                temperature=0.3,
-            )
-            
-            ai_response_content = response.choices[0].message.content.strip()
-            
-            json_match = re.search(r'\{.*\}', ai_response_content, re.DOTALL)
-            if json_match:
-                parsed_json = json.loads(json_match.group())
-                
-                if not isinstance(parsed_json.get("recognized_items"), list):
-                    parsed_json["recognized_items"] = []
-                if not isinstance(parsed_json.get("ambiguous_items"), list):
-                    parsed_json["ambiguous_items"] = []
-                if not isinstance(parsed_json.get("unrecognized_items"), list):
-                    parsed_json["unrecognized_items"] = []
-                parsed_json["order_total"] = float(parsed_json.get("order_total", 0.0))
-                return parsed_json
-            else:
-                logger.error(f"No JSON found in AI response: {ai_response_content}")
-                return {"success": False, "error": "Could not parse AI response (no JSON found)", "recognized_items": [], "ambiguous_items": [], "unrecognized_items": [], "order_total": 0.0}
-            
-        except json.JSONDecodeError as jde:
-            logger.error(f"JSON decoding error from LLM response: {jde} - Response: {ai_response_content}")
-            return {"success": False, "error": "Invalid AI response format", "recognized_items": [], "ambiguous_items": [], "unrecognized_items": [], "order_total": 0.0}
-        except (APIConnectionError, RateLimitError, OpenAIError) as e:
-            logger.error(f"Azure OpenAI API error parsing order: {e}", exc_info=True)
-            return {"success": False, "error": "AI processing temporarily unavailable. Please try again.", "recognized_items": [], "ambiguous_items": [], "unrecognized_items": [], "order_total": 0.0}
-        except Exception as e:
-            logger.error(f"Unexpected error parsing order with LLM: {e}", exc_info=True)
-            return {"success": False, "error": "AI processing error", "recognized_items": [], "ambiguous_items": [], "unrecognized_items": [], "order_total": 0.0}
+class AIHandler(BaseHandler):
+    """Handles AI-powered order processing and chatbot interactions."""
     
-    def _create_menu_context(self) -> str:
-        """
-        Creates a formatted string representation of the menu data for AI context.
-        """
-        if not self.data_manager.menu_data:
-            logger.warning("Menu data not available in DataManager for AI context.")
-            return "Menu data not available."
+    def __init__(self, config, session_manager, data_manager, whatsapp_service):
+        super().__init__(config, session_manager, data_manager, whatsapp_service)
         
-        context = ""
-        for category, items in self.data_manager.menu_data.items():
-            context += f"\n*{category.upper()}*:\n"
-            if isinstance(items, dict):
-                for item_name, price in items.items():
-                    context += f"- {item_name}: ₦{price:,}\n"
-            elif isinstance(items, list):
-                for item_dict in items:
-                    if isinstance(item_dict, dict):
-                        name = item_dict.get('name', 'Unknown')
-                        price = item_dict.get('price', 0)
-                        item_id = item_dict.get('id', '')
-                        context += f"- {name} (ID: {item_id}): ₦{price:,}\n"
-        return context
+        self.ai_service = AIService(config, data_manager) 
+        self.ai_enabled = self.ai_service.ai_enabled 
+        self.menu_image_url = "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg"
+        
+        if not self.ai_enabled:
+            logger.warning("AIHandler: AI features disabled as AIService could not be initialized.")
+        else:
+            logger.info("AIHandler: AIService successfully initialized.")
+
+    def handle_ai_menu_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
+        """Handle AI menu selection state."""
+        self.logger.info(f"AIHandler: Handling message '{message}' in AI menu state for session {session_id}. Original: '{original_message}'")
+
+        if message == "lola_chatbot":
+            return self._handle_lola_chatbot(state, session_id)
+        elif message == "ai_bulk_order":
+            return self._handle_ai_bulk_order(state, session_id)
+        elif message == "back_to_main":
+            return self.handle_back_to_main(state, session_id)
+        elif message == "initial_entry" or message not in ["lola_chatbot", "ai_bulk_order", "back_to_main"]:
+            return self._show_ai_menu_options(state, session_id, "Please select an AI option:")
+        else:
+            return self._show_ai_menu_options(state, session_id, "Please select a valid option:")
+    
+    def _handle_lola_chatbot(self, state: Dict, session_id: str) -> Dict:
+        """Handle Lola chatbot interaction, setting state and sending welcome message."""
+        state["current_state"] = "lola_chat"
+        state["ai_mode"] = "chatbot"
+        state["current_handler"] = "ai_handler"
+        self.session_manager.update_session_state(session_id, state)
+        
+        self.whatsapp_service.send_image_message(session_id, self.menu_image_url, caption="Our Delicious Menu!")
+
+        welcome_message = (
+            "🤖 *Hi! I'm Lola, your AI assistant!*\n\n"
+            "I can help you with:\n"
+            "• Menu recommendations\n"
+            "• Order assistance\n"
+            "• General questions about our food\n"
+            "• Nutritional information\n\n"
+            "What would you like to know? Just ask me anything! 😊\n\n"
+            "_Type 'menu' to go back to the main menu_"
+        )
+        return self.whatsapp_service.create_text_message(session_id, welcome_message)
+    
+    def _handle_ai_bulk_order(self, state: Dict, session_id: str) -> Dict:
+        """Handle AI bulk order processing, setting state and sending welcome message."""
+        state["current_state"] = "ai_bulk_order"
+        state["ai_mode"] = "bulk_order"
+        state["current_handler"] = "ai_handler"
+        self.session_manager.update_session_state(session_id, state)
+        
+        self.whatsapp_service.send_image_message(session_id, self.menu_image_url, caption="Our Delicious Menu!")
+
+        bulk_order_message = (
+            "Hi, I'm Lola from Ganador \n\n"
+            "Take a look at the menu and type in your order\n\n"
+        )
+        return self.whatsapp_service.create_text_message(session_id, bulk_order_message)
+    
+    def handle_lola_chat_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
+        """Handle Lola chatbot conversation state."""
+        self.logger.info(f"AIHandler: Handling message '{message}' in Lola chat state for session {session_id}. Original: '{original_message}'")
+        
+        if message == "start_lola_chat":
+            return self._handle_lola_chatbot(state, session_id)
+        
+        if message and message.lower() == "menu":
+            return self.handle_back_to_main(state, session_id)
+        
+        if not self.ai_service.ai_enabled:
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "🤖 Sorry, the AI assistant is currently unavailable. Please try the regular menu options.\n\nType 'menu' to return to the main menu."
+            )
+        
+        try:
+            ai_response = self.ai_service.generate_lola_response(original_message)
+            return self.whatsapp_service.create_text_message(session_id, ai_response)
+        
+        except Exception as e:
+            logger.error(f"Error in Lola chat for session {session_id} when calling AIService: {e}", exc_info=True)
+            error_message = (
+                "🤖 Sorry, I'm having trouble processing that right now. "
+                "Please try again or type 'menu' to return to the main menu."
+            )
+            return self.whatsapp_service.create_text_message(session_id, error_message)
+    
+    def handle_ai_bulk_order_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
+        """Handle AI bulk order processing state."""
+        self.logger.info(f"AIHandler: Handling message '{message}' in AI bulk order state for session {session_id}. Original: '{original_message}'")
+
+        if message == "start_ai_bulk_order":
+            return self._handle_ai_bulk_order(state, session_id)
+
+        if message and message.lower() == "menu":
+            return self.handle_back_to_main(state, session_id)
+        
+        if not self.ai_service.ai_enabled:
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "🤖 Sorry, the AI bulk order feature is currently unavailable. Please use the regular order menu.\n\nType 'menu' to return to the main menu."
+            )
+        
+        try:
+            # Check if there is a previous order to modify
+            previous_order = state.get("temp_parsed_order", state.get("parsed_order", None))
+            parsed_order = self.ai_service.parse_order_with_llm(original_message, previous_order=previous_order)
+            
+            if not parsed_order.get("success"):
+                error_message = (
+                    f"❌ {parsed_order.get('error', 'Could not process your order')}\n\n"
+                    "Please try rephrasing your order or type 'menu' to return to main menu."
+                )
+                return self.whatsapp_service.create_text_message(session_id, error_message)
+            
+            # If any items are unrecognized, prioritize this message and ask user to rephrase.
+            if parsed_order.get("unrecognized_items"):
+                summary_with_unrecognized = self._create_order_summary(parsed_order)
+                
+                response_message = (
+                    f"{summary_with_unrecognized}\n\n"
+                    "🚫 *Some items in your order were not found in our menu (Unrecognized Items above).*\n"
+                    "Please ensure you are selecting from our *existing products* only. "
+                    "You can rephrase your order, or type 'menu' to go back to the main menu."
+                )
+                
+                # Keep the user in the 'ai_bulk_order' state to allow them to retry or go back
+                state["current_state"] = "ai_bulk_order" 
+                state["current_handler"] = "ai_handler"
+                self.session_manager.update_session_state(session_id, state)
+                
+                return self.whatsapp_service.create_text_message(session_id, response_message)
+
+            # If no unrecognized items, proceed with existing logic for ambiguous or recognized items
+            state["parsed_order"] = parsed_order
+            state["current_handler"] = "ai_handler" # Keep handler consistent
+            
+            if parsed_order.get("ambiguous_items"):
+                state["current_state"] = "ai_order_clarification"
+                self.session_manager.update_session_state(session_id, state)
+                
+                clarification_buttons = self._create_clarification_buttons(parsed_order["ambiguous_items"])
+                
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    self._create_order_summary(parsed_order) + "\n\nPlease help me clarify:",
+                    clarification_buttons
+                )
+            
+            elif parsed_order.get("recognized_items"):
+                state["current_state"] = "ai_order_confirmation"
+                self.session_manager.update_session_state(session_id, state)
+                
+                summary = self._create_order_summary(parsed_order)
+                
+                buttons = [
+                    {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
+                    {"type": "reply", "reply": {"id": "modify_ai_order", "title": "✏️ Modify Order"}},
+                    {"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel"}}
+                ]
+                
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    summary + "\n\nWould you like to proceed with this order?",
+                    buttons
+                )
+            
+            else: # Fallback for cases where no items are recognized, ambiguous, or unrecognized
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "I couldn't find any items to add to your order. Would you like to try again or see our menu?"
+                )
+        
+        except Exception as e:
+            logger.error(f"Error in AI bulk order processing for session {session_id} when calling AIService: {e}", exc_info=True)
+            error_message = (
+                "🤖 Sorry, I'm having trouble processing your order right now. "
+                "Please try again or type 'menu' to return to the main menu."
+            )
+            return self.whatsapp_service.create_text_message(session_id, error_message)
+    
+    def handle_ai_order_confirmation_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
+        """Handle AI order confirmation state."""
+        self.logger.debug(f"Handling AI order confirmation state for session {session_id}, message: {message}. Original: '{original_message}'")
+        
+        if message == "confirm_ai_order":
+            parsed_order = state.get("parsed_order", {})
+            cart = self._convert_parsed_order_to_cart(parsed_order)
+            
+            if cart:
+                state["cart"] = cart
+                state["total_price"] = parsed_order.get("order_total", 0.0) 
+                state["current_state"] = "confirm_details"
+                state["current_handler"] = "order_handler"
+                self.session_manager.update_session_state(session_id, state)
+                self.logger.info(f"AI order confirmed. Cart: {state['cart']}. Redirecting to order handler.")
+                
+                return {"redirect": "order_handler", "redirect_message": "process_final_order"}
+            else:
+                self.logger.warning(f"Attempted to confirm empty or invalid AI order for session {session_id}.")
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "❌ Error processing your order. It seems your cart is empty or invalid. Please try again."
+                )
+        
+        elif message == "modify_ai_order":
+            # Save the current parsed order to a temporary key for reference
+            state["temp_parsed_order"] = state.get("parsed_order", {})
+            state["current_state"] = "ai_bulk_order"
+            state["current_handler"] = "ai_handler"
+            self.session_manager.update_session_state(session_id, state)
+            self.logger.info(f"User chose to modify AI order for session {session_id}.")
+            
+            # Create a summary of the current order for the user
+            current_order_summary = self._create_order_summary(state["temp_parsed_order"])
+            
+            modification_instructions = (
+                "✏️ *Modify Your Order*\n\n"
+                "You can now modify your order. Please rephrase your entire order, including any changes you want to make.\n\n"
+                "*For example:*\n"
+                "• To add an item: 'Add 2x Chicken Burgers to my order.'\n"
+                "• To remove an item: 'Remove the Veggie Wrap.'\n"
+                "• To update a quantity: 'Change the quantity of Spaghetti Bolognese to 3.'\n"
+                "• To replace an item: 'Replace the Chicken Burger with a Beef Burger.'\n\n"
+                f"Your current order is:\n{current_order_summary}\n\n"
+                "Please type your full updated order below:"
+            )
+            
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                modification_instructions
+            )
+        
+        elif message == "cancel_ai_order":
+            self.logger.info(f"User cancelled AI order for session {session_id}.")
+            if "parsed_order" in state:
+                del state["parsed_order"]
+            if "temp_parsed_order" in state:
+                del state["temp_parsed_order"]
+            self.session_manager.update_session_state(session_id, state)
+            return self.handle_back_to_main(state, session_id, "Order cancelled. How can I help you?")
+        
+        else:
+            self.logger.debug(f"Invalid input '{message}' in AI order confirmation state for session {session_id}.")
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "Please choose from the available options."
+            )
+    
+    def handle_ai_order_clarification_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
+        """Handle AI order clarification state."""
+        self.logger.debug(f"Handling AI order clarification state for session {session_id}, message: {message}. Original: '{original_message}'")
+
+        parsed_order = state.get("parsed_order", {})
+        ambiguous_items = parsed_order.get("ambiguous_items", [])
+        
+        if not ambiguous_items:
+            self.logger.warning(f"No ambiguous items found for clarification in session {session_id}.")
+            state["current_state"] = "ai_order_confirmation"
+            state["current_handler"] = "ai_handler"
+            self.session_manager.update_session_state(session_id, state)
+            buttons = [
+                {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
+                {"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                "No further clarification needed. Ready to confirm?",
+                buttons
+            )
+        
+        first_ambiguous = ambiguous_items[0]
+        possible_matches = first_ambiguous.get("possible_matches", [])
+        
+        selected_item_name = None
+        for match_name in possible_matches:
+            # Use original message for matching if needed, or stick to processed 'message'
+            # Assuming 'message' is already cleaned for button IDs
+            if message.lower().strip() == match_name.lower().replace(" ", "_").replace("-", "_"):
+                selected_item_name = match_name
+                break
+        
+        if selected_item_name:
+            item_price = 0.0
+            item_id = None
+            found_item_data = None
+
+            # Iterate through menu_data to find the selected item's full details
+            for category, items_data in self.data_manager.menu_data.items():
+                if isinstance(items_data, dict): # Old format, likely not used with product_inventory sync
+                    if selected_item_name in items_data:
+                        item_price = items_data[selected_item_name]
+                        item_id = f"{category.lower().replace(' ', '_')}_{selected_item_name.lower().replace(' ', '_')}"
+                        found_item_data = {"name": selected_item_name, "price": item_price, "id": item_id}
+                        break
+                elif isinstance(items_data, list): # Expected format from product_inventory sync
+                    for item_dict in items_data:
+                        if isinstance(item_dict, dict) and item_dict.get("name") == selected_item_name:
+                            item_price = item_dict.get("price", 0.0)
+                            item_id = item_dict.get("id", f"{category.lower().replace(' ', '_')}_{selected_item_name.lower().replace(' ', '_')}")
+                            found_item_data = item_dict
+                            break
+                if found_item_data:
+                    break
+
+            if found_item_data:
+                original_qty = first_ambiguous.get("quantity", 1) 
+
+                recognized_item = {
+                    "item_id": item_id,
+                    "name": selected_item_name,
+                    "quantity": original_qty, 
+                    "variations": found_item_data.get("variations", {}), # Use variations from found_item_data
+                    "price": item_price,
+                    "total_price": original_qty * item_price
+                }
+                
+                if "recognized_items" not in parsed_order:
+                    parsed_order["recognized_items"] = []
+                parsed_order["recognized_items"].append(recognized_item)
+                
+                parsed_order["order_total"] = parsed_order.get("order_total", 0.0) + recognized_item["total_price"]
+
+                ambiguous_items.pop(0) # Remove the clarified item
+
+                state["parsed_order"] = parsed_order
+                self.session_manager.update_session_state(session_id, state)
+                
+                if ambiguous_items:
+                    state["current_state"] = "ai_order_clarification"
+                    state["current_handler"] = "ai_handler"
+                    self.session_manager.update_session_state(session_id, state)
+                    
+                    next_ambiguous = ambiguous_items[0]
+                    clarification_buttons = self._create_clarification_buttons([next_ambiguous])
+                    
+                    return self.whatsapp_service.create_button_message(
+                        session_id,
+                        f"Okay, understood! Now, for the next one:\n\n{self._create_order_summary(parsed_order)}\n\nPlease help me clarify: *{next_ambiguous['clarification_needed']}*",
+                        clarification_buttons
+                    )
+                else:
+                    # All ambiguous items clarified, move to confirmation
+                    state["current_state"] = "ai_order_confirmation"
+                    state["current_handler"] = "ai_handler"
+                    self.session_manager.update_session_state(session_id, state)
+                    
+                    buttons = [
+                        {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
+                        {"type": "reply", "reply": {"id": "modify_ai_order", "title": "✏️ Modify Order"}},
+                        {"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel"}}
+                    ]
+                    
+                    return self.whatsapp_service.create_button_message(
+                        session_id,
+                        self._create_order_summary(parsed_order) + "\n\nAll items clarified! Would you like to proceed with this order?",
+                        buttons
+                    )
+            else:
+                self.logger.error(f"Selected item '{selected_item_name}' not found in menu data during clarification for session {session_id}.")
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "Sorry, I couldn't find details for that item in our menu. Please try again or type 'menu' to go back."
+                )
+        else:
+            first_ambiguous = ambiguous_items[0]
+            clarification_buttons = self._create_clarification_buttons([first_ambiguous])
+            
+            self.logger.debug(f"Invalid clarification input '{message}' for session {session_id}. Expected one of {first_ambiguous.get('possible_matches', [])}")
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                "Please choose one of the *exact* options for clarification or type 'menu' to go back to the main menu:",
+                clarification_buttons
+            )
+
+    def _show_ai_menu_options(self, state: Dict, session_id: str, message: str = "Choose an AI option:") -> Dict:
+        """Show AI menu options."""
+        if not self.ai_service.ai_enabled:
+            fallback_message = (
+                "🤖 *AI Assistant Currently Unavailable*\n\n"
+                "Our AI features are temporarily offline. Please use our regular menu options instead.\n\n"
+                "You can still:\n"
+                "📱 Browse our full menu\n"
+                "❓ Check our FAQ\n"
+                "📝 Send us your feedback"
+            )
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "order", "title": "📱 Order Menu"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back to Main"}}
+            ]
+            
+            return self.whatsapp_service.create_button_message(session_id, fallback_message, buttons)
+        
+        buttons = [
+            {"type": "reply", "reply": {"id": "lola_chatbot", "title": "🤖 Lola Chatbot"}},
+            {"type": "reply", "reply": {"id": "ai_bulk_order", "title": "🛒 AI Bulk Order"}},
+            {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back to Main"}}
+        ]
+        
+        full_message = (
+            f"🤖 *AI Assistant Options*\n\n"
+            f"{message}"
+        )
+        
+        return self.whatsapp_service.create_button_message(session_id, full_message, buttons)
+    
+    def _create_order_summary(self, parsed_order: Dict[str, Any]) -> str:
+        """Create formatted order summary."""
+        if not parsed_order.get("success"):
+            return f"❌ Error: {parsed_order.get('error', 'Unknown error')}"
+            
+        summary = "🛒 *Order Summary:*\n\n"
+        
+        if parsed_order.get("recognized_items"):
+            for item in parsed_order["recognized_items"]:
+                summary += f"✅ {item['quantity']}x {item['name']} - ₦{item['total_price']:,}\n"
+        
+        if parsed_order.get("ambiguous_items"):
+            summary += "\n❓ *Need Clarification:*\n"
+            for item in parsed_order["ambiguous_items"]:
+                summary += f"⚠️ {item.get('quantity', 1)}x {item['input']} ({item['clarification_needed']})\n"
+        
+        if parsed_order.get("unrecognized_items"):
+            summary += "\n❌ *Unrecognized Items:*\n"
+            for item in parsed_order["unrecognized_items"]:
+                summary += f"🚫 {item['input']} ({item['message']})\n"
+                
+        summary += f"\n*Total: ₦{parsed_order.get('order_total', 0.0):,.2f}*"
+        
+        return summary
+
+    def _create_clarification_buttons(self, ambiguous_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Create buttons for clarifying an ambiguous item."""
+        buttons = []
+        if ambiguous_items:
+            ambiguous_item = ambiguous_items[0] # Only create buttons for the first ambiguous item
+            for i, match in enumerate(ambiguous_item.get("possible_matches", [])):
+                button_id = match.lower().replace(" ", "_").replace("-", "_") 
+                buttons.append({"type": "reply", "reply": {"id": button_id, "title": match}})
+            
+            buttons.append({"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel Order"}})
+            
+        return buttons
+
+    def _convert_parsed_order_to_cart(self, parsed_order: Dict[str, Any]) -> Dict[str, Any]:
+        """Converts the AI-parsed order into the standard cart format for the OrderHandler."""
+        cart_items = {}
+        if parsed_order and parsed_order.get("recognized_items"):
+            for item in parsed_order["recognized_items"]:
+                cart_items[item["name"]] = {
+                    "item_id": item["item_id"],
+                    "quantity": item["quantity"],
+                    "price": item["price"],
+                    "total_price": item["total_price"],
+                    "variations": item.get("variations", {})
+                }
+        return cart_items

@@ -3,14 +3,40 @@ import os
 import logging
 import datetime
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
+# Define a Lead data structure for clarity and type hinting
+class Lead:
+    def __init__(self, merchant_details_id, phone_number, user_name, user_id=None, source="whatsapp",
+                 first_contact=None, last_interaction=None, interaction_count=0,
+                 status="new_lead", has_added_to_cart=False, has_placed_order=False,
+                 total_cart_value=0.0, conversion_stage="initial_contact", final_order_value=0.0,
+                 converted_at=None):
+        self.merchant_details_id = merchant_details_id
+        self.user_id = user_id if user_id is not None else phone_number
+        self.user_name = user_name
+        self.phone_number = phone_number
+        self.source = source
+        self.first_contact = first_contact if first_contact else datetime.datetime.now(datetime.timezone.utc)
+        self.last_interaction = last_interaction if last_interaction else datetime.datetime.now(datetime.timezone.utc)
+        self.interaction_count = interaction_count
+        self.status = status
+        self.has_added_to_cart = has_added_to_cart
+        self.has_placed_order = has_placed_order
+        self.total_cart_value = total_cart_value
+        self.conversion_stage = conversion_stage
+        self.final_order_value = final_order_value
+        self.converted_at = converted_at
+
+    def to_dict(self):
+        return self.__dict__
+
 class DataManager:
-    """Handles data operations, including user details and orders from PostgreSQL and other data from JSON files."""
+    """Handles data operations, including user details, orders, and leads from PostgreSQL and other data from JSON files."""
 
     def __init__(self, config):
         self.config = config
@@ -480,3 +506,178 @@ class DataManager:
         """Placeholder for session state update."""
         logger.debug(f"DataManager: Session state update requested for {session_id} (Pass-through).")
         pass
+
+    # --- New Methods for Leads Management ---
+
+    def create_or_update_lead(self, lead_data: Union[Lead, Dict]) -> bool:
+        """
+        Creates a new lead or updates an existing one in the whatsapp_leads table.
+        This method uses ON CONFLICT to handle both creation and updates efficiently.
+        """
+        if isinstance(lead_data, Lead):
+            data = lead_data.to_dict()
+        else:
+            data = lead_data
+
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor() as cur:
+                    query = """
+                        INSERT INTO whatsapp_leads (
+                            merchant_details_id, user_id, user_name, phone_number,
+                            source, first_contact, last_interaction,
+                            interaction_count, status, has_added_to_cart,
+                            has_placed_order, total_cart_value, conversion_stage,
+                            final_order_value, converted_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (phone_number) DO UPDATE SET
+                            user_name = EXCLUDED.user_name,
+                            last_interaction = EXCLUDED.last_interaction,
+                            interaction_count = whatsapp_leads.interaction_count + 1,
+                            status = EXCLUDED.status,
+                            has_added_to_cart = EXCLUDED.has_added_to_cart,
+                            has_placed_order = EXCLUDED.has_placed_order,
+                            total_cart_value = EXCLUDED.total_cart_value,
+                            conversion_stage = EXCLUDED.conversion_stage,
+                            final_order_value = EXCLUDED.final_order_value,
+                            converted_at = EXCLUDED.converted_at
+                    """
+                    cur.execute(query, (
+                        data.get('merchant_details_id'),
+                        data.get('user_id'),
+                        data.get('user_name'),
+                        data.get('phone_number'),
+                        data.get('source'),
+                        data.get('first_contact'),
+                        data.get('last_interaction'),
+                        data.get('interaction_count'),
+                        data.get('status'),
+                        data.get('has_added_to_cart'),
+                        data.get('has_placed_order'),
+                        data.get('total_cart_value'),
+                        data.get('conversion_stage'),
+                        data.get('final_order_value'),
+                        data.get('converted_at')
+                    ))
+                    conn.commit()
+                    logger.info(f"Lead details for {data.get('phone_number')} saved/updated in database.")
+                    return True
+        except psycopg2.Error as e:
+            logger.error(f"Database error while saving/updating lead for {data.get('phone_number')}: {e}", exc_info=True)
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error while saving/updating lead for {data.get('phone_number')}: {e}", exc_info=True)
+            return False
+
+    def get_lead_by_phone_number(self, phone_number: str) -> Optional[Dict]:
+        """Retrieves lead data by phone number from the whatsapp_leads table."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT 
+                            merchant_details_id, user_id, user_name, phone_number,
+                            source, first_contact, last_interaction,
+                            interaction_count, status, has_added_to_cart,
+                            has_placed_order, total_cart_value, conversion_stage,
+                            final_order_value, converted_at
+                        FROM whatsapp_leads
+                        WHERE phone_number = %s
+                    """
+                    cur.execute(query, (phone_number,))
+                    result = cur.fetchone()
+                    if result:
+                        logger.debug(f"Found lead for phone number {phone_number}")
+                        # Convert Numeric types to float for consistency
+                        result['total_cart_value'] = float(result['total_cart_value'])
+                        result['final_order_value'] = float(result['final_order_value'])
+                        return dict(result)
+                    logger.debug(f"No lead found for phone number {phone_number}")
+                    return None
+        except psycopg2.Error as e:
+            logger.error(f"Database error while fetching lead for {phone_number}: {e}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching lead for {phone_number}: {e}", exc_info=True)
+            return None
+
+    def get_abandoned_carts(self, hours_ago: int = 24) -> List[Dict]:
+        """
+        Retrieves leads with abandoned carts from the whatsapp_leads table.
+        An abandoned cart is a lead that has 'has_added_to_cart' = TRUE,
+        'has_placed_order' = FALSE, and a last_interaction time older than 'hours_ago'.
+        """
+        abandoned_threshold = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours_ago)
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT
+                            merchant_details_id, user_id, user_name, phone_number,
+                            total_cart_value, last_interaction, conversion_stage
+                        FROM whatsapp_leads
+                        WHERE has_added_to_cart = TRUE
+                          AND has_placed_order = FALSE
+                          AND last_interaction < %s
+                    """
+                    cur.execute(query, (abandoned_threshold,))
+                    results = cur.fetchall()
+                    
+                    abandoned_carts = []
+                    for row in results:
+                        cart_data = dict(row)
+                        # Convert numeric types
+                        cart_data['total_cart_value'] = float(cart_data['total_cart_value'])
+                        abandoned_carts.append(cart_data)
+                        
+                    logger.info(f"Found {len(abandoned_carts)} abandoned carts older than {hours_ago} hours.")
+                    return abandoned_carts
+        except psycopg2.Error as e:
+            logger.error(f"Database error while fetching abandoned carts: {e}", exc_info=True)
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching abandoned carts: {e}", exc_info=True)
+            return []
+
+    def get_lead_analytics(self) -> Dict[str, Any]:
+        """
+        Retrieves a summary of lead analytics from the whatsapp_leads table.
+        """
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Total leads
+                    cur.execute("SELECT COUNT(*) AS total_leads FROM whatsapp_leads;")
+                    total_leads = cur.fetchone()['total_leads']
+
+                    # New leads (status = 'new_lead')
+                    cur.execute("SELECT COUNT(*) AS new_leads FROM whatsapp_leads WHERE status = 'new_lead';")
+                    new_leads = cur.fetchone()['new_leads']
+
+                    # Converted leads (status = 'converted')
+                    cur.execute("SELECT COUNT(*) AS converted_leads FROM whatsapp_leads WHERE has_placed_order = TRUE;")
+                    converted_leads = cur.fetchone()['converted_leads']
+
+                    # Abandoned carts
+                    cur.execute("SELECT COUNT(*) AS abandoned_carts FROM whatsapp_leads WHERE has_added_to_cart = TRUE AND has_placed_order = FALSE;")
+                    abandoned_carts = cur.fetchone()['abandoned_carts']
+                    
+                    # Total conversion value
+                    cur.execute("SELECT SUM(final_order_value) AS total_revenue FROM whatsapp_leads WHERE has_placed_order = TRUE;")
+                    total_revenue_result = cur.fetchone()['total_revenue']
+                    total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
+
+                    return {
+                        'total_leads': total_leads,
+                        'new_leads': new_leads,
+                        'converted_leads': converted_leads,
+                        'abandoned_carts': abandoned_carts,
+                        'total_revenue': total_revenue
+                    }
+        except psycopg2.Error as e:
+            logger.error(f"Database error while fetching lead analytics: {e}", exc_info=True)
+            return {}
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching lead analytics: {e}", exc_info=True)
+            return {}
