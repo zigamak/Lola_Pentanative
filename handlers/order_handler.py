@@ -121,15 +121,15 @@ class OrderHandler(BaseHandler):
         message_lower = message.lower()
 
         if message_lower == "order_more":
-            state["current_state"] = "menu"
-            state["current_handler"] = "menu_handler"
+            state["current_state"] = "ai_bulk_order"
+            state["current_handler"] = "ai_bulk_handler"
             self.session_manager.update_session_state(session_id, state)
-            logger.info(f"User selected 'Order More' for session {session_id}.")
+            logger.info(f"User selected 'Order More' for session {session_id}, redirecting to AI bulk handler.")
             
             cart_content = format_cart(state.get('cart', {}))
             return {
-                "redirect": "menu_handler",
-                "redirect_message": "show_menu",
+                "redirect": "ai_bulk_handler",
+                "redirect_message": "handle_ai_bulk_order",
                 "additional_message": f"Your current cart:\n{cart_content}\n\nYou can now add more items to your order."
             }
         
@@ -395,11 +395,11 @@ class OrderHandler(BaseHandler):
             order_details += f"📱 Phone: {phone_number}\n"
             order_details += f"🏠 Address: {address}\n"
             order_details += f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
-            order_details += "Please confirm to proceed with payment via Paystack."
+            order_details += "Please confirm to proceed with payment via Paystack or update your address."
             
             buttons = [
                 {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},
-                {"type": "reply", "reply": {"id": "edit_order", "title": "✏️ Edit Order"}},
+                {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},
                 {"type": "reply", "reply": {"id": "cancel_order", "title": "❌ Cancel Order"}}
             ]
             
@@ -544,16 +544,15 @@ class OrderHandler(BaseHandler):
                     f"⚠️ Payment service is currently unavailable. Please try again later or contact support."
                 )
         
-        elif message_lower == "edit_order":
-            logger.info(f"User chose to edit order for session {session_id}")
-            state["current_state"] = "order_summary"
+        elif message_lower == "update_address":
+            logger.info(f"User chose to update address for session {session_id}")
+            state["current_state"] = "get_new_name_address"
             state["current_handler"] = "order_handler"
             self.session_manager.update_session_state(session_id, state)
             
-            return self.whatsapp_service.create_button_message(
+            return self.whatsapp_service.create_text_message(
                 session_id,
-                self._get_order_summary_message_text(state),
-                self._get_order_summary_buttons()
+                "Please provide your new delivery address (e.g., 123 Main St, Lagos)."
             )
         
         elif message_lower == "cancel_order":
@@ -588,48 +587,87 @@ class OrderHandler(BaseHandler):
                         "address2": "",
                         "address3": ""
                     }
-                    try:
-                        self.data_manager.save_user_details(session_id, user_data)
-                    except Exception as e:
-                        logger.error(f"Failed to save user details for session {session_id}: {e}")
-                        return self.whatsapp_service.create_text_message(
-                            session_id,
-                            "❌ Sorry, there was an error saving your details. Please try again."
-                        )
-                    state["current_state"] = "confirm_details"
-                    self.session_manager.update_session_state(session_id, state)
-                    
-                    logger.info(f"Updated details for session {session_id}: Name={new_name}, Address={new_address}")
-                    
-                    buttons = [
-                        {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
-                        {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
-                    ]
-                    
-                    return self.whatsapp_service.create_button_message(
-                        session_id,
-                        f"📋 **Updated Delivery Details:**\n\n"
-                        f"👤 **Name:** {new_name}\n"
-                        f"📱 **Phone:** {state.get('phone_number', session_id)}\n"
-                        f"📍 **Address:** {new_address}\n\n"
-                        f"Is this information correct?",
-                        buttons
-                    )
                 else:
+                    new_address = parts[0]
+                    state["address"] = new_address
+                    user_data = {
+                        "name": state.get("user_name", "Guest"),
+                        "phone_number": session_id,
+                        "address": new_address,
+                        "user_perferred_name": state.get("user_name", "Guest"),
+                        "address2": "",
+                        "address3": ""
+                    }
+                try:
+                    self.data_manager.save_user_details(session_id, user_data)
+                except Exception as e:
+                    logger.error(f"Failed to save user details for session {session_id}: {e}")
                     return self.whatsapp_service.create_text_message(
                         session_id,
-                        "Please provide both name and address separated by a comma. Example: John Doe, 123 Main Street, Lagos"
+                        "❌ Sorry, there was an error saving your details. Please try again."
                     )
-            else:
-                return self.whatsapp_service.create_text_message(
+                state["current_state"] = "confirm_details"
+                self.session_manager.update_session_state(session_id, state)
+                
+                logger.info(f"Updated details for session {session_id}: Name={state.get('user_name', 'Guest')}, Address={new_address}")
+                
+                buttons = [
+                    {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
+                    {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
+                ]
+                
+                return self.whatsapp_service.create_button_message(
                     session_id,
-                    "Please provide your name and address separated by a comma. Example: John Doe, 123 Main Street, Lagos"
+                    f"📋 **Updated Delivery Details:**\n\n"
+                    f"👤 **Name:** {state.get('user_name', 'Guest')}\n"
+                    f"📱 **Phone:** {state.get('phone_number', session_id)}\n"
+                    f"📍 **Address:** {new_address}\n\n"
+                    f"Is this information correct?",
+                    buttons
+                )
+            else:
+                new_address = message.strip()
+                state["address"] = new_address
+                user_data = {
+                    "name": state.get("user_name", "Guest"),
+                    "phone_number": session_id,
+                    "address": new_address,
+                    "user_perferred_name": state.get("user_name", "Guest"),
+                    "address2": "",
+                    "address3": ""
+                }
+                try:
+                    self.data_manager.save_user_details(session_id, user_data)
+                except Exception as e:
+                    logger.error(f"Failed to save user details for session {session_id}: {e}")
+                    return self.whatsapp_service.create_text_message(
+                        session_id,
+                        "❌ Sorry, there was an error saving your details. Please try again."
+                    )
+                state["current_state"] = "confirm_details"
+                self.session_manager.update_session_state(session_id, state)
+                
+                logger.info(f"Updated address for session {session_id}: Address={new_address}")
+                
+                buttons = [
+                    {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
+                    {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
+                ]
+                
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    f"📋 **Updated Delivery Details:**\n\n"
+                    f"👤 **Name:** {state.get('user_name', 'Guest')}\n"
+                    f"📱 **Phone:** {state.get('phone_number', session_id)}\n"
+                    f"📍 **Address:** {new_address}\n\n"
+                    f"Is this information correct?",
+                    buttons
                 )
         except Exception as e:
-            logger.error(f"Error handling new name and address for session {session_id}: {e}", exc_info=True)
+            logger.error(f"Error handling new address for session {session_id}: {e}", exc_info=True)
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "There was an error updating your details. Please try again with format: Name, Address"
+                "There was an error updating your address. Please try again with format: Address or Name, Address"
             )
 
     def handle_payment_pending_state(self, state: Dict, message: str, session_id: str) -> Dict:

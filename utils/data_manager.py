@@ -182,16 +182,12 @@ class DataManager:
                     merchant_details_id = getattr(self.config, 'MERCHANT_ID', '18')
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', '1')
 
-                    # Validate merchant_details_id (this check helps prevent foreign key errors)
-                    if merchant_details_id is None: # Redundant with the getattr default, but good for clarity
+                    # Validate merchant_details_id
+                    if merchant_details_id is None:
                         logger.error("MERCHANT_ID is not set in config and no default provided.")
                         raise ValueError("MERCHANT_ID is required but was not provided.")
 
-                    # Ensure timestamp and timestamp_enddate are datetime objects
-                    # If they come from order_data as strings, you might need to parse them
-                    # Assuming they are already datetime objects or will be handled by psycopg2's type adaptation
                     order_timestamp = order_data.get("timestamp", datetime.datetime.now(datetime.timezone.utc))
-                    # Ensure timestamp_enddate is not None for NOT NULL constraint
                     order_timestamp_enddate = order_data.get("timestamp_enddate", datetime.datetime.now(datetime.timezone.utc))
                     order_dateadded = order_data.get("dateadded", datetime.datetime.now(datetime.timezone.utc))
 
@@ -225,15 +221,8 @@ class DataManager:
                         item_name = item.get("item_name")
                         quantity = item.get("quantity")
                         unit_price = float(item.get("unit_price", 0.0))
-                        
-                        # Calculate subtotal for the current item
                         item_subtotal = quantity * unit_price
-                        
-                        # For a single item, total_price is often the same as subtotal.
-                        # Adjust if your schema means something different for total_price at item level.
                         item_total_price = item_subtotal 
-                        
-                        # Get current timestamp for DateAdded
                         item_dateadded = datetime.datetime.now(datetime.timezone.utc)
 
                         cur.execute(order_details_query, (
@@ -287,19 +276,23 @@ class DataManager:
             logger.error(f"Unexpected error while updating order {order_id} status: {e}", exc_info=True)
             return False
 
-    def save_enquiry_to_db(self, enquiry_data: Dict):
-        """Save a new enquiry to the whatsapp_enquiry_details table."""
+    def save_enquiry_to_db(self, enquiry_data: Dict) -> Optional[int]:
+        """Save a new enquiry to the whatsapp_enquiry_details table and return the new refId."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor() as cur:
                     query = """
                         INSERT INTO whatsapp_enquiry_details (
-                            merchant_id, user_name, user_id, enquiry_categories, 
+                            merchant_details_id, user_name, user_id, enquiry_categories, 
                             enquiry_text, timestamp, channel
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING "refId"
                     """
                     merchant_id = getattr(self.config, 'MERCHANT_ID', None)
+                    if not merchant_id:
+                        logger.error("MERCHANT_ID is not set in config, cannot save enquiry.")
+                        return None
                     
                     cur.execute(query, (
                         merchant_id,
@@ -310,50 +303,64 @@ class DataManager:
                         enquiry_data.get("timestamp"),
                         enquiry_data.get("channel", "whatsapp")
                     ))
+                    enquiry_id = cur.fetchone()[0]
                     conn.commit()
-                    logger.info(f"Enquiry {enquiry_data.get('enquiry_id', 'unknown')} saved to database")
+                    logger.info(f"Enquiry {enquiry_id} saved to database")
+                    return enquiry_id
         except psycopg2.Error as e:
-            logger.error(f"Database error while saving enquiry {enquiry_data.get('enquiry_id', 'unknown')}: {e}", exc_info=True)
+            logger.error(f"Database error while saving enquiry: {e}", exc_info=True)
         except Exception as e:
-            logger.error(f"Unexpected error while saving enquiry {enquiry_data.get('enquiry_id', 'unknown')}: {e}", exc_info=True)
+            logger.error(f"Unexpected error while saving enquiry: {e}", exc_info=True)
+        return None
 
-    def save_enquiry(self, enquiry_data: Dict):
-        """Save enquiry. Delegates to database save."""
-        self.save_enquiry_to_db(enquiry_data)
+    def save_enquiry(self, enquiry_data: Dict) -> Optional[int]:
+        """Save enquiry. Delegates to database save and returns the new enquiry ID."""
+        return self.save_enquiry_to_db(enquiry_data)
         
-    def save_complaint_to_db(self, complaint_data: Dict):
-        """Save a new complaint to the whatsapp_complaint_details table."""
+    def save_complaint_to_db(self, complaint_data: Dict) -> Optional[int]:
+        """Save a new complaint to the whatsapp_complaint_details table and return the new ref_id."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor() as cur:
                     query = """
                         INSERT INTO whatsapp_complaint_details (
-                            complaint_id, merchant_id, user_name, user_id, 
-                            complaint_categories, complaint_text, timestamp
+                            merchant_details_id, complaint_categories, complaint_text, 
+                            timestamp, channel, user_name, user_id
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING ref_id
                     """
                     merchant_id = getattr(self.config, 'MERCHANT_ID', None)
+                    if not merchant_id:
+                        logger.error("MERCHANT_ID is not set in config, cannot save complaint.")
+                        return None
                     
+                    # Ensure timestamp and channel are in the data dictionary if they aren't
+                    complaint_data.setdefault("timestamp", datetime.datetime.now(datetime.timezone.utc))
+                    complaint_data.setdefault("channel", "whatsapp")
+
                     cur.execute(query, (
-                        complaint_data.get("complaint_id"),
                         merchant_id,
-                        complaint_data.get("user_name"),
-                        complaint_data.get("user_id"),
                         complaint_data.get("complaint_categories", ""),
                         complaint_data.get("complaint_text"),
-                        complaint_data.get("timestamp")
+                        complaint_data.get("timestamp"),
+                        complaint_data.get("channel"),
+                        complaint_data.get("user_name"),
+                        complaint_data.get("user_id")
                     ))
+                    complaint_ref_id = cur.fetchone()[0]
                     conn.commit()
-                    logger.info(f"Complaint {complaint_data.get('complaint_id', 'unknown')} saved to database")
+                    logger.info(f"Complaint {complaint_ref_id} saved to database")
+                    return complaint_ref_id
         except psycopg2.Error as e:
-            logger.error(f"Database error while saving complaint {complaint_data.get('complaint_id', 'unknown')}: {e}", exc_info=True)
+            logger.error(f"Database error while saving complaint: {e}", exc_info=True)
         except Exception as e:
-            logger.error(f"Unexpected error while saving complaint {complaint_data.get('complaint_id', 'unknown')}: {e}", exc_info=True)
+            logger.error(f"Unexpected error while saving complaint: {e}", exc_info=True)
+        return None
 
-    def save_complaint(self, complaint_data: Dict):
-        """Save complaint. Delegates to database save."""
-        self.save_complaint_to_db(complaint_data)
+    def save_complaint(self, complaint_data: Dict) -> Optional[int]:
+        """Save complaint. Delegates to database save and returns the new complaint ID."""
+        return self.save_complaint_to_db(complaint_data)
 
     def _save_to_file(self, filename: str, data: Dict, data_type: str):
         """Generic method to save data (like enquiry/complaint if not using DB) to JSON file."""

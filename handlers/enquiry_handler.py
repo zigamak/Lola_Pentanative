@@ -20,14 +20,18 @@ class EnquiryHandler(BaseHandler):
         
         if message == "show_enquiry_menu":
             return self.show_enquiry_menu(state, session_id)
+        elif message == "faq":
+            return self.show_faq_list(state, session_id)
         elif current_state == "enquiry_menu":
             return self.handle_enquiry_menu_state(state, message, session_id)
         elif current_state == "enquiry":
             return self.handle_enquiry_state(state, original_message, session_id)
+        elif message == "back_to_main":
+            return self.handle_back_to_main(state, session_id)
         else:
             self.logger.warning(f"Session {session_id}: Unhandled state '{current_state}' with message '{message}'.")
             return self._handle_invalid_state(state, session_id)
-    
+
     def show_enquiry_menu(self, state: Dict, session_id: str) -> Dict[str, Any]:
         """Display the enquiry menu with FAQ and Ask Question options."""
         self.logger.info(f"Session {session_id}: Displaying enquiry menu.")
@@ -48,16 +52,44 @@ class EnquiryHandler(BaseHandler):
             buttons
         )
 
+    def show_faq_list(self, state: Dict, session_id: str) -> Dict[str, Any]:
+        """Display a list of 5 sample FAQs."""
+        self.logger.info(f"Session {session_id}: Displaying FAQ list.")
+
+        faq_text = (
+            "Here are some frequently asked questions:\n\n"
+            "1️⃣ *How do I place an order?*\n"
+            "   You can place an order by selecting '🛒 Order Again' from the main menu or by chatting with Lola to create a bulk order.\n\n"
+            "2️⃣ *How can I track my order?*\n"
+            "   Use the '📍 Track Order' option from the main menu to get the latest status of your order.\n\n"
+            "3️⃣ *What are your business hours?*\n"
+            "   We are open from 8:00 AM to 6:00 PM, Monday to Saturday.\n\n"
+            "4️⃣ *Do you deliver?*\n"
+            "   Yes, we offer delivery services. Delivery fees may vary based on your location.\n\n"
+            "5️⃣ *How can I make a complaint?*\n"
+            "   If you have a complaint, please use the '📝 Complain' option from the main menu to submit it, and our team will follow up."
+        )
+
+        buttons = [
+            {"type": "reply", "reply": {"id": "ask_question", "title": "❓ Ask Another Question"}},
+            {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back to Main Menu"}}
+        ]
+
+        state["current_state"] = "enquiry_menu"
+        self.session_manager.update_session_state(session_id, state)
+
+        return self.whatsapp_service.create_button_message(
+            session_id,
+            faq_text,
+            buttons
+        )
+
     def handle_enquiry_menu_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """Handle user inputs in the enquiry menu state."""
         self.logger.info(f"Session {session_id}: Processing enquiry menu option '{message}'.")
         
         if message == "faq":
-            state["current_state"] = "faq_categories"
-            state["current_handler"] = "faq_handler"
-            self.session_manager.update_session_state(session_id, state)
-            self.logger.info(f"Session {session_id}: Redirecting to FAQHandler.")
-            return {"redirect": "faq_handler", "redirect_message": "show_faq_categories"}
+            return self.show_faq_list(state, session_id)
         elif message == "ask_question":
             state["current_state"] = "enquiry"
             state["current_handler"] = "enquiry_handler"
@@ -88,39 +120,32 @@ class EnquiryHandler(BaseHandler):
                     "It looks like you didn't enter a question. Please type your question or select 'Back' to return to the main menu."
                 )
             
-            enquiry_id = str(uuid.uuid4())
             enquiry_data = {
-                "enquiry_id": enquiry_id,
                 "user_name": state.get("user_name", "Guest"),
-                "phone_number": state.get("phone_number", session_id),
+                "user_id": session_id,
                 "enquiry_text": enquiry_text,
-                "timestamp": datetime.datetime.now().isoformat(),
-                "status": "pending",
-                "priority": self._assess_enquiry_priority(enquiry_text)
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "enquiry_categories": self._assess_enquiry_priority(enquiry_text), # Using priority as category
+                "channel": "whatsapp"
             }
             
-            success = self.data_manager.save_enquiry(enquiry_data)
-            if not success:
-                self.logger.error(f"Session {session_id}: Failed to save enquiry {enquiry_id} to database.")
+            # The data_manager.save_enquiry method returns the refId on success, or None on failure.
+            enquiry_id = self.data_manager.save_enquiry(enquiry_data)
+            
+            if enquiry_id is None:
+                self.logger.error(f"Session {session_id}: Failed to save enquiry to database.")
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     "⚠️ Sorry, there was an issue saving your enquiry. Please try again or contact support."
                 )
             
-            self.logger.info(f"Session {session_id}: Enquiry {enquiry_id} saved successfully.")
+            self.logger.info(f"Session {session_id}: Enquiry with ID {enquiry_id} saved successfully.")
             
             # Reset session state to greeting
             user_data = self.data_manager.get_user_data(session_id)
             user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
-            # Clear order-related data but preserve user info
-            state["cart"] = {}
-            if "selected_category" in state:
-                del state["selected_category"]
-            if "selected_item" in state:
-                del state["selected_item"]
-            self.session_manager.update_session_state(session_id, state)
             
             # Prepare confirmation message
             confirmation_message = (
@@ -132,31 +157,7 @@ class EnquiryHandler(BaseHandler):
                 f"What would you like to do next?"
             )
             
-            # Check if user is paid to show appropriate menu
-            if self.session_manager.is_paid_user_session(session_id):
-                self.logger.info(f"Session {session_id}: Returning to paid user main menu after enquiry submission.")
-                buttons = [
-                    {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
-                    {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
-                    {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
-                ]
-                return self.whatsapp_service.create_button_message(
-                    session_id,
-                    f"Welcome Back {user_name}\n{confirmation_message}",
-                    buttons
-                )
-            else:
-                self.logger.info(f"Session {session_id}: Returning to non-paid user main menu after enquiry submission.")
-                buttons = [
-                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
-                    {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-                    {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
-                ]
-                return self.whatsapp_service.create_button_message(
-                    session_id,
-                    f"Hi {user_name}, {confirmation_message}",
-                    buttons
-                )
+            return self.handle_back_to_main(state, session_id, confirmation_message)
         
         except Exception as e:
             self.logger.error(f"Session {session_id}: Error handling enquiry submission: {e}", exc_info=True)
@@ -185,12 +186,7 @@ class EnquiryHandler(BaseHandler):
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
         state["current_state"] = "greeting"
         state["current_handler"] = "greeting_handler"
-        # Clear order-related data
-        state["cart"] = {}
-        if "selected_category" in state:
-            del state["selected_category"]
-        if "selected_item" in state:
-            del state["selected_item"]
+        
         self.session_manager.update_session_state(session_id, state)
         
         message = (
@@ -230,15 +226,12 @@ class EnquiryHandler(BaseHandler):
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
         state["current_state"] = "greeting"
         state["current_handler"] = "greeting_handler"
-        # Clear order-related data but preserve user info
-        state["cart"] = {}
-        if "selected_category" in state:
-            del state["selected_category"]
-        if "selected_item" in state:
-            del state["selected_item"]
         
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id}: Returned to main menu from enquiry handler.")
+        
+        if message is None:
+            message = "What would you like to do?"
         
         # Check if user is paid to show appropriate menu
         if self.session_manager.is_paid_user_session(session_id):
@@ -249,7 +242,7 @@ class EnquiryHandler(BaseHandler):
             ]
             return self.whatsapp_service.create_button_message(
                 session_id,
-                f"Welcome Back {user_name}\nWhat would you like to do?",
+                f"Welcome Back {user_name}\n{message}",
                 buttons
             )
         else:
@@ -260,6 +253,6 @@ class EnquiryHandler(BaseHandler):
             ]
             return self.whatsapp_service.create_button_message(
                 session_id,
-                f"Hi {user_name}, What would you like to do?",
+                f"Hi {user_name}, {message}",
                 buttons
             )
