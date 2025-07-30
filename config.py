@@ -58,6 +58,10 @@ class Config:
         # Session configuration
         self.SESSION_TIMEOUT = int(os.getenv('SESSION_TIMEOUT', 1800))  # 30 minutes default
 
+        # Merchant ID - Added this line
+        self.MERCHANT_ID = os.getenv('MERCHANT_ID', '18')
+
+
 # Define the configure_logging function
 def configure_logging():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
