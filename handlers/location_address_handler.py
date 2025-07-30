@@ -202,7 +202,7 @@ class LocationAddressHandler:
             state["location_coordinates"] = {"latitude": latitude, "longitude": longitude}
 
             # Save the address to data_manager's user_details for persistence
-            self._save_address_to_user_details(state, readable_address)
+            self._save_address_to_user_details(state, readable_address, session_id)
 
             # Prepare confirmation message with location details and maps link
             location_info = self.location_service.format_location_info(latitude, longitude, readable_address)
@@ -382,7 +382,7 @@ class LocationAddressHandler:
             state.pop("location_coordinates", None) # Ensure coordinates are cleared if not found
 
         # Save to data_manager's user_details for persistence
-        self._save_address_to_user_details(state, address)
+        self._save_address_to_user_details(state, address, session_id)
 
         # Generate maps info (only if location service is enabled and API key is valid)
         maps_info = ""
@@ -400,7 +400,9 @@ class LocationAddressHandler:
         logger.debug(f"Handling confirm detected location for {session_id}, message: {message}")
         if message == "confirm_location":
             # Address and coordinates should already be in state from handle_live_location
-            # Proceed to order confirmation
+            # Save to data_manager's user_details for persistence
+            self._save_address_to_user_details(state, state["address"], session_id)
+
             maps_info = ""
             if state.get("location_coordinates") and state.get("address") and \
                self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
@@ -443,7 +445,7 @@ class LocationAddressHandler:
             state["location_coordinates"] = state["temp_coordinates"]
 
             # Save to data_manager's user_details for persistence
-            self._save_address_to_user_details(state, state["address"])
+            self._save_address_to_user_details(state, state["address"], session_id)
 
             # Clean up temporary data
             state.pop("temp_address", None)
@@ -498,7 +500,7 @@ class LocationAddressHandler:
             state["location_coordinates"] = coords # Store the coordinates
 
             # Save to data_manager's user_details for persistence
-            self._save_address_to_user_details(state, address_fallback)
+            self._save_address_to_user_details(state, address_fallback, session_id)
 
             # Clean up temporary data
             state.pop("temp_coordinates", None)
@@ -553,26 +555,25 @@ class LocationAddressHandler:
         # This allows MessageProcessor to route it differently or ignore it.
         return None
 
-    def _save_address_to_user_details(self, state: dict, address: str):
+    def _save_address_to_user_details(self, state: dict, address: str, session_id: str):
         """
         Helper method to save the determined address to the data_manager's
-        user_details for long-term persistence across sessions.
+        user_details for long-term persistence across sessions, preserving existing name.
         """
-        logger.debug(f"Saving address '{address}' for {state.get('phone_number')} to user details.")
-        # Ensure user_details entry exists for the phone_number before setting sub-keys
-        if state["phone_number"] not in self.data_manager.user_details:
-            self.data_manager.user_details[state["phone_number"]] = {}
-
-        self.data_manager.user_details[state["phone_number"]]["name"] = state.get("user_name", "Guest")
-        self.data_manager.user_details[state["phone_number"]]["address"] = address
-        
-        # Call data_manager.save_user_details() here to ensure persistence after every address update.
-        # This is important because MessageProcessor's update_session_state might not trigger
-        # data_manager.save_user_details if the DataManager isn't aware of the specific
-        # user_details dictionary update.
-        self.data_manager.save_user_details()
-        logger.info(f"Address for {state.get('phone_number')} saved to user details.")
-
+        logger.debug(f"Saving address '{address}' for {session_id} to user details.")
+        user_data = {
+            "name": state.get("user_name", "Guest"),
+            "phone_number": session_id,
+            "address": address,
+            "user_perferred_name": state.get("user_name", "Guest"),
+            "address2": "",
+            "address3": ""
+        }
+        try:
+            self.data_manager.save_user_details(session_id, user_data)
+            logger.info(f"Address '{address}' saved for {session_id}.")
+        except Exception as e:
+            logger.error(f"Failed to save user details for {session_id}: {e}")
 
     def _proceed_to_order_confirmation(self, state: dict, session_id: str, address: str, maps_info: str = ""):
         """
@@ -593,7 +594,6 @@ class LocationAddressHandler:
             # Redirect to menu or a start state for the user to add items
             state["current_state"] = "greeting" # Redirect to greeting/main menu
             # Signal MessageProcessor to redirect to menu_handler if it has such a mechanism.
-            # Otherwise, just return a message and MessageProcessor will handle the state persistence.
             return {"redirect": "menu_handler"} # Assuming MessageProcessor can handle this redirect
 
         buttons = [

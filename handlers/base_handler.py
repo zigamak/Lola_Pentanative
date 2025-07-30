@@ -13,35 +13,41 @@ class BaseHandler:
         self.whatsapp_service = whatsapp_service
         self.logger = logger
 
-    def create_main_menu_buttons(self) -> List[Dict[str, Any]]:
+    def create_main_menu_buttons(self, is_paid_user: bool) -> List[Dict[str, Any]]:
         """
-        Create standard main menu buttons with updated options,
+        Create standard main menu buttons based on user type,
         ensuring all button titles comply with WhatsApp's 20-character limit.
         """
-        buttons = [
-            # Option 1: Standard menu Browse
-            {"type": "reply", "reply": {"id": "order_menu_categories", "title": "🍔 Order Menu"}},
-            # Option 2: AI-powered bulk ordering (direct to bulk order)
-            {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
-            # Option 3: Other options (enquiries, complaints, etc.)
-            {"type": "reply", "reply": {"id": "others_menu", "title": "❓ Others"}}
-        ]
+        if is_paid_user:
+            buttons = [
+                # Paid user menu
+                {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}}
+            ]
+        else:
+            buttons = [
+                # Non-paid (guest) user menu
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            ]
         return buttons
 
     def send_main_menu(self, session_id: str, user_name: str = "Guest", message: str = "How can I help you today?") -> Dict:
         """
         Sends the main menu to the user.
-        The greeting logic is now handled upstream by GreetingHandler.generate_initial_greeting
-        which calls this method with the appropriate message.
+        The menu buttons are dynamically generated based on the user's paid status.
         """
-        buttons = self.create_main_menu_buttons()
+        is_paid_user = self.session_manager.is_paid_user_session(session_id)
+        buttons = self.create_main_menu_buttons(is_paid_user)
 
         # The 'message' parameter now fully contains the greeting
         # (e.g., "Hello [User Name]! 👋\n\nHow can I help you today?")
         # or the "Invalid option..." message.
         return self.whatsapp_service.create_button_message(
             session_id,
-            message, # Use the passed message directly, which includes the greeting
+            message,
             buttons
         )
 
@@ -64,7 +70,8 @@ class BaseHandler:
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
         
         # When returning to main, use the user's known name if available, otherwise "Guest"
-        user_name = state.get("user_name", "Guest") 
+        user_data = self.data_manager.get_user_data(session_id)
+        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
         
         # The message already includes the greeting for returning users.
         return self.send_main_menu(session_id, user_name, message=message)
