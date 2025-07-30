@@ -2644,3 +2644,67 @@ LINE 3:                             product_variant_id,
  * Running on http://127.0.0.1:8000
 2025-07-24 22:48:46,121 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
 2025-07-30 21:17:02,673 - __main__ - ERROR - Environment check failed. Please fix the issues above.
+2025-07-30 23:08:44,104 - __main__ - INFO - Starting WhatsApp bot server...
+2025-07-30 23:08:46,264 - __main__ - ERROR - Import error: cannot import name 'LeadTrackingHandler' from 'handlers.lead_tracking_handler' (C:\Users\zigam\Documents\Pentanative\Lola Main\handlers\lead_tracking_handler.py)
+2025-07-30 23:12:44,278 - __main__ - INFO - Starting WhatsApp bot server...
+2025-07-30 23:12:45,160 - __main__ - ERROR - Import error: cannot import name 'AIService' from partially initialized module 'services.ai_service' (most likely due to a circular import) (C:\Users\zigam\Documents\Pentanative\Lola Main\services\ai_service.py)
+2025-07-30 23:19:28,923 - __main__ - INFO - Starting WhatsApp bot server...
+2025-07-30 23:19:29,654 - __main__ - ERROR - Import error: cannot import name 'OrderItem' from 'utils' (C:\Users\zigam\Documents\Pentanative\Lola Main\utils\__init__.py)
+2025-07-30 23:20:52,720 - __main__ - INFO - Starting WhatsApp bot server...
+2025-07-30 23:20:54,949 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=600s, Paid=6000s
+2025-07-30 23:20:57,388 - utils.data_manager - INFO - Successfully loaded 11 user details from database
+2025-07-30 23:20:57,584 - services.payment_service - INFO - PaymentService initialized
+2025-07-30 23:20:59,146 - handlers.product_sync_handler - INFO - Successfully synced 15 products to data\products.json
+2025-07-30 23:20:59,332 - app - INFO - Initial product sync successful on startup
+2025-07-30 23:20:59,333 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=600s, Paid=6000s
+2025-07-30 23:21:00,872 - utils.data_manager - INFO - Successfully loaded 11 user details from database
+2025-07-30 23:21:01,062 - services.payment_service - INFO - PaymentService initialized
+2025-07-30 23:21:01,074 - services.lead_tracker - INFO - Created lead tracking file: data/leads.json
+2025-07-30 23:21:01,075 - services.lead_tracker - INFO - LeadTracker initialized
+2025-07-30 23:21:01,075 - __main__ - ERROR - Unexpected error: LeadTrackingHandler.__init__() takes 3 positional arguments but 6 were given
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Pentanative\Lola Main\run.py", line 151, in main
+    from app import app
+  File "C:\Users\zigam\Documents\Pentanative\Lola Main\app.py", line 55, in <module>
+    webhook_handler = WebhookHandler(config)
+  File "C:\Users\zigam\Documents\Pentanative\Lola Main\handlers\webhook_handler.py", line 22, in __init__
+    self.message_processor = MessageProcessor(
+                             ~~~~~~~~~~~~~~~~^
+        config,
+        ^^^^^^^
+    ...<4 lines>...
+        self.location_service
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\zigam\Documents\Pentanative\Lola Main\handlers\message_processor.py", line 31, in __init__
+    self.lead_tracking_handler = LeadTrackingHandler(
+                                 ~~~~~~~~~~~~~~~~~~~^
+        config, session_manager, data_manager, whatsapp_service, self.lead_tracker
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: LeadTrackingHandler.__init__() takes 3 positional arguments but 6 were given
+2025-07-30 23:21:20,203 - __main__ - INFO - Starting WhatsApp bot server...
+2025-07-30 23:21:21,640 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=600s, Paid=6000s
+2025-07-30 23:21:23,743 - utils.data_manager - INFO - Successfully loaded 11 user details from database
+2025-07-30 23:21:23,932 - services.payment_service - INFO - PaymentService initialized
+2025-07-30 23:21:25,524 - handlers.product_sync_handler - INFO - Successfully synced 15 products to data\products.json
+2025-07-30 23:21:25,713 - app - INFO - Initial product sync successful on startup
+2025-07-30 23:21:25,713 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=600s, Paid=6000s
+2025-07-30 23:21:27,290 - utils.data_manager - INFO - Successfully loaded 11 user details from database
+2025-07-30 23:21:27,485 - services.payment_service - INFO - PaymentService initialized
+2025-07-30 23:21:27,486 - services.lead_tracker - INFO - LeadTracker initialized
+2025-07-30 23:21:27,486 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-07-30 23:21:27,498 - handlers.feedback_handler - INFO - Created feedback file: data/feedback.json
+2025-07-30 23:21:27,499 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-07-30 23:21:27,499 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-07-30 23:21:27,499 - handlers.base_handler - INFO - PaymentHandler initialized with dual verification system
+2025-07-30 23:21:27,499 - handlers.location_address_handler - INFO - LocationAddressHandler initialized.
+2025-07-30 23:21:27,998 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-07-30 23:21:27,999 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-07-30 23:21:27,999 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-07-30 23:21:27,999 - handlers.base_handler - INFO - PaymentHandler initialized with dual verification system
+2025-07-30 23:21:28,034 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-07-30 23:21:28,035 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
