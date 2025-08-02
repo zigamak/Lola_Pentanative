@@ -128,9 +128,7 @@ class AIHandler(BaseHandler):
             )
         
         try:
-            # Check if there is a previous order to modify
-            previous_order = state.get("temp_parsed_order", state.get("parsed_order", None))
-            parsed_order = self.ai_service.parse_order_with_llm(original_message, previous_order=previous_order)
+            parsed_order = self.ai_service.parse_order_with_llm(original_message)
             
             if not parsed_order.get("success"):
                 error_message = (
@@ -139,7 +137,9 @@ class AIHandler(BaseHandler):
                 )
                 return self.whatsapp_service.create_text_message(session_id, error_message)
             
+            # --- NEW LOGIC START ---
             # If any items are unrecognized, prioritize this message and ask user to rephrase.
+            # This prevents entering clarification for ambiguous items if there are clear unrecognized ones.
             if parsed_order.get("unrecognized_items"):
                 summary_with_unrecognized = self._create_order_summary(parsed_order)
                 
@@ -156,6 +156,7 @@ class AIHandler(BaseHandler):
                 self.session_manager.update_session_state(session_id, state)
                 
                 return self.whatsapp_service.create_text_message(session_id, response_message)
+            # --- NEW LOGIC END ---
 
             # If no unrecognized items, proceed with existing logic for ambiguous or recognized items
             state["parsed_order"] = parsed_order
@@ -208,7 +209,6 @@ class AIHandler(BaseHandler):
     def handle_ai_order_confirmation_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
         """Handle AI order confirmation state."""
         self.logger.debug(f"Handling AI order confirmation state for session {session_id}, message: {message}. Original: '{original_message}'")
-        
         if message == "confirm_ai_order":
             parsed_order = state.get("parsed_order", {})
             cart = self._convert_parsed_order_to_cart(parsed_order)
@@ -230,40 +230,21 @@ class AIHandler(BaseHandler):
                 )
         
         elif message == "modify_ai_order":
-            # Save the current parsed order to a temporary key for reference
-            state["temp_parsed_order"] = state.get("parsed_order", {})
             state["current_state"] = "ai_bulk_order"
             state["current_handler"] = "ai_handler"
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"User chose to modify AI order for session {session_id}.")
             
-            # Create a summary of the current order for the user
-            current_order_summary = self._create_order_summary(state["temp_parsed_order"])
-            
-            modification_instructions = (
-                "✏️ *Modify Your Order*\n\n"
-                "You can now modify your order. Please rephrase your entire order, including any changes you want to make.\n\n"
-                "*For example:*\n"
-                "• To add an item: 'Add 2x Chicken Burgers to my order.'\n"
-                "• To remove an item: 'Remove the Veggie Wrap.'\n"
-                "• To update a quantity: 'Change the quantity of Spaghetti Bolognese to 3.'\n"
-                "• To replace an item: 'Replace the Chicken Burger with a Beef Burger.'\n\n"
-                f"Your current order is:\n{current_order_summary}\n\n"
-                "Please type your full updated order below:"
-            )
-            
             return self.whatsapp_service.create_text_message(
                 session_id,
-                modification_instructions
+                "Please tell me your updated order:"
             )
         
         elif message == "cancel_ai_order":
             self.logger.info(f"User cancelled AI order for session {session_id}.")
             if "parsed_order" in state:
                 del state["parsed_order"]
-            if "temp_parsed_order" in state:
-                del state["temp_parsed_order"]
-            self.session_manager.update_session_state(session_id, state)
+                self.session_manager.update_session_state(session_id, state)
             return self.handle_back_to_main(state, session_id, "Order cancelled. How can I help you?")
         
         else:
@@ -427,6 +408,8 @@ class AIHandler(BaseHandler):
         
         full_message = (
             f"🤖 *AI Assistant Options*\n\n"
+            f"🤖 *Lola Chatbot* - Chat with our AI assistant\n"
+            f"🛒 *AI Bulk Order* - Order multiple items at once\n\n"
             f"{message}"
         )
         
