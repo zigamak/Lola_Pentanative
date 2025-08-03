@@ -8,16 +8,18 @@ from utils.helpers import format_cart
 from .base_handler import BaseHandler
 
 class PaymentHandler(BaseHandler):
-    """Handles payment processing and order completion with dual verification."""
+    """Handles payment processing and order completion with dual verification and subaccount splitting."""
     
     def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
         self.payment_service = payment_service
         self.location_service = location_service
+        self.subaccount_code = getattr(config, 'SUBACCOUNT_CODE', None)  # e.g., 'SUB_XXXXXXXX'
+        self.subaccount_percentage = getattr(config, 'SUBACCOUNT_PERCENTAGE', 30)  # Default 30%
         
         # Dictionary to track payment monitoring timers
         self.payment_timers = {}
-        self.logger.info("PaymentHandler initialized with dual verification system")
+        self.logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%")
     
     def handle_payment_processing_state(self, state, message, session_id):
         """Handle payment processing state - entry point from order handler."""
@@ -33,7 +35,7 @@ class PaymentHandler(BaseHandler):
             )
     
     def create_payment_link(self, state, session_id):
-        """Create payment link for an existing order with automatic monitoring."""
+        """Create payment link for an existing order with subaccount splitting and automatic monitoring."""
         try:
             self.logger.info(f"Creating payment link for session {session_id}")
             
@@ -90,10 +92,14 @@ class PaymentHandler(BaseHandler):
             # Convert total_amount to kobo for Paystack
             total_amount_kobo = int(total_amount_ngn * 100)  # Assuming database stores amount in NGN
             
-            # Update order with payment reference and pending_payment status
+            # Update order with payment reference, payment method, and subaccount split
             payment_data = {
                 "payment_reference": payment_reference,
-                "payment_method_type": "paystack"
+                "payment_method_type": "paystack",
+                "subaccount_split": {
+                    "subaccount_code": self.subaccount_code,
+                    "percentage": self.subaccount_percentage
+                } if self.subaccount_code else None
             }
             success = self.data_manager.update_order_status(order_id, "pending_payment", payment_data)
             if not success:
@@ -106,7 +112,7 @@ class PaymentHandler(BaseHandler):
                     "⚠️ Error accessing order. Please try checking out again."
                 )
             
-            # Create Paystack payment link
+            # Create Paystack payment link with subaccount
             customer_email = self.payment_service.generate_customer_email(
                 state.get("phone_number", session_id), 
                 state.get("user_name", "Guest")
@@ -121,7 +127,9 @@ class PaymentHandler(BaseHandler):
                 metadata={
                     "order_id": order_id,
                     "delivery_address": state.get("address", "Not provided")
-                }
+                },
+                subaccount_code=self.subaccount_code,
+                split_percentage=self.subaccount_percentage
             )
             
             if payment_url:
@@ -132,7 +140,7 @@ class PaymentHandler(BaseHandler):
                 state["current_handler"] = "payment_handler"
                 self.session_manager.update_session_state(session_id, state)
                 
-                self.logger.info(f"Payment link created successfully for order {order_id}")
+                self.logger.info(f"Payment link created successfully for order {order_id} with subaccount {self.subaccount_code}")
                 
                 # Fetch order items from database for display
                 order_items = self._get_order_items_from_db(order_id)
@@ -172,7 +180,7 @@ class PaymentHandler(BaseHandler):
     def _get_order_items_from_db(self, order_id: str) -> List[Dict]:
         """Fetch order items from whatsapp_order_details table."""
         try:
-            with psycopg2.connect(**self.data_manager.db_params) as conn:
+            with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
                         SELECT item_name, quantity, unit_price, subtotal
@@ -273,7 +281,11 @@ class PaymentHandler(BaseHandler):
                     "confirmed",
                     {
                         "payment_reference": payment_reference,
-                        "payment_method_type": payment_data.get("payment_method_type", "paystack")
+                        "payment_method_type": payment_data.get("payment_method_type", "paystack"),
+                        "subaccount_split": {
+                            "subaccount_code": self.subaccount_code,
+                            "percentage": self.subaccount_percentage
+                        } if self.subaccount_code else None
                     }
                 )
                 if not success:
@@ -372,7 +384,9 @@ class PaymentHandler(BaseHandler):
                     "order_id": order_id,
                     "delivery_address": state.get("address", "Not provided"),
                     "reminder": True
-                }
+                },
+                subaccount_code=self.subaccount_code,
+                split_percentage=self.subaccount_percentage
             )
             
             if payment_url:
@@ -490,7 +504,11 @@ class PaymentHandler(BaseHandler):
                     "confirmed",
                     {
                         "payment_reference": payment_reference,
-                        "payment_method_type": payment_data.get("payment_method_type", "paystack")
+                        "payment_method_type": payment_data.get("payment_method_type", "paystack"),
+                        "subaccount_split": {
+                            "subaccount_code": self.subaccount_code,
+                            "percentage": self.subaccount_percentage
+                        } if self.subaccount_code else None
                     }
                 )
                 if not success:
@@ -735,7 +753,11 @@ class PaymentHandler(BaseHandler):
                         "confirmed",
                         {
                             "payment_reference": payment_reference,
-                            "payment_method_type": webhook_data["data"].get("payment_method_type", "paystack")
+                            "payment_method_type": webhook_data["data"].get("payment_method_type", "paystack"),
+                            "subaccount_split": {
+                                "subaccount_code": self.subaccount_code,
+                                "percentage": self.subaccount_percentage
+                            } if self.subaccount_code else None
                         }
                     )
                     if not success:

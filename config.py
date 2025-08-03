@@ -26,12 +26,15 @@ class Config:
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
 
+        self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"  # Replace with your subaccount code
+        self.SUBACCOUNT_PERCENTAGE = 95
         # Other services
         self.Maps_API_KEY = os.getenv('Maps_API_KEY')
         self.AZURE_API_KEY = os.getenv('AZURE_API_KEY')
         self.AZURE_ENDPOINT = os.getenv('AZURE_ENDPOINT')
         self.AZURE_DEPLOYMENT_NAME = os.getenv('AZURE_DEPLOYMENT_NAME')
         self.AZURE_API_VERSION = os.getenv('AZURE_API_VERSION')
+        
 
         # Feature flags
         self.ENABLE_AI_FEATURES = os.getenv('ENABLE_AI_FEATURES', 'false').lower() == 'true'
