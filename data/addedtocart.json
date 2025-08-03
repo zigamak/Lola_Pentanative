@@ -4,23 +4,26 @@
     "user_name": "Ziga",
     "cart_items": [
       {
-        "name": "Fried Rice",
-        "item_id": 100,
+        "name": "Jollof Rice",
+        "item_id": "99",
         "quantity": 1,
-        "price": 1700.0,
-        "total_price": 1700.0,
+        "price": 1500.0,
+        "total_price": 1500.0,
         "variations": {}
       }
     ],
-    "total_value": 1700.0,
+    "total_value": 1500.0,
     "cart_created": "2025-06-11T05:14:13.012038",
-    "last_updated": "2025-08-03T15:43:13.582444",
-    "status": "active",
+    "last_updated": "2025-08-03T17:00:02.238276",
+    "status": "converted",
     "reminder_sent": false,
     "conversion_probability": 0.5,
     "items_count": 1,
-    "most_expensive_item": 1700.0,
-    "cart_sessions": 120
+    "most_expensive_item": 1500.0,
+    "cart_sessions": 132,
+    "converted_at": "2025-08-03T17:01:06.417462",
+    "order_id": "71",
+    "final_order_value": 1500.0
   },
   {
     "phone_number": "2349030918492",

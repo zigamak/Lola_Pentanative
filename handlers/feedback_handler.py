@@ -45,7 +45,6 @@ class FeedbackHandler(BaseHandler):
             
             logger.info(f"Initiated feedback collection for order {order_id}, session {session_id}")
             
-            # Rating buttons (WhatsApp limit: 3 buttons)
             buttons = [
                 {"type": "reply", "reply": {"id": "excellent", "title": "🤩 Excellent"}},
                 {"type": "reply", "reply": {"id": "good", "title": "😊 Good"}},
@@ -81,12 +80,8 @@ class FeedbackHandler(BaseHandler):
         """Handle initial feedback rating selection."""
         logger.debug(f"Handling feedback rating for session {session_id}, message: {message}")
         
-        if message == "excellent":
-            return self._handle_positive_rating(state, message, session_id)
-        elif message == "good":
-            return self._handle_positive_rating(state, message, session_id)
-        elif message == "bad":
-            return self._handle_negative_rating(state, message, session_id)
+        if message in ["excellent", "good", "bad"]:
+            return self._handle_any_rating(state, message, session_id)
         elif message == "skip_feedback":
             return self._handle_skip_feedback(state, session_id)
         else:
@@ -102,32 +97,15 @@ class FeedbackHandler(BaseHandler):
         else:
             return self._save_feedback_and_complete(state, session_id, message)
     
-    def _handle_positive_rating(self, state: Dict, rating: str, session_id: str) -> Dict[str, Any]:
-        """Handle positive ratings (excellent, good)."""
-        state["feedback_rating"] = rating
-        state["current_state"] = "feedback_comment"
-        self.session_manager.update_session_state(session_id, state)
-        
-        emoji = "🤩" if rating == "excellent" else "👍"
-        
-        return self.whatsapp_service.create_text_message(
-            session_id,
-            f"{emoji} *Thank you for the {rating} rating!*\n\n"
-            f"💬 Would you like to share any specific comments about your experience?\n\n"
-            f"Type your message or 'skip' to finish."
-        )
-    
-    def _handle_negative_rating(self, state: Dict, rating: str, session_id: str) -> Dict[str, Any]:
-        """Handle negative ratings (bad)."""
+    def _handle_any_rating(self, state: Dict, rating: str, session_id: str) -> Dict[str, Any]:
+        """Handles any rating and prompts for a comment."""
         state["feedback_rating"] = rating
         state["current_state"] = "feedback_comment"
         self.session_manager.update_session_state(session_id, state)
         
         return self.whatsapp_service.create_text_message(
             session_id,
-            f"😞 *Thank you for your honest feedback.*\n\n"
-            f"💬 We'd really appreciate if you could tell us what went wrong so we can improve:\n\n"
-            f"Type your feedback or 'skip' to finish."
+            f"Thank you for your feedback! Please tell us more about your experience.\n\nType your message or 'skip' to finish."
         )
     
     def _show_invalid_rating_message(self, state: Dict, session_id: str) -> Dict[str, Any]:
@@ -157,7 +135,7 @@ class FeedbackHandler(BaseHandler):
         self._save_feedback_to_file(feedback_data)
         
         # End session with thank you message
-        thank_you_msg = "Thank you! We hope you enjoyed your order. 😊"
+        thank_you_msg = "Thank you for your feedback!"
         self.session_manager.clear_full_session(session_id)
         return self.whatsapp_service.create_text_message(session_id, thank_you_msg)
     
@@ -179,8 +157,7 @@ class FeedbackHandler(BaseHandler):
             logger.info(f"Feedback saved for order {feedback_data['order_id']}: {feedback_data['rating']}")
             
             # Thank you message and end session
-            rating = state.get("feedback_rating", "").title()
-            thank_you_msg = f"🙏 *Thank you for your {rating} feedback!*\n\n"
+            thank_you_msg = f"Thank you for your feedback!"
             
             # Clear feedback-related state and end session
             feedback_keys = ["feedback_order_id", "feedback_rating", "feedback_started_at"]

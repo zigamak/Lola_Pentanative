@@ -20,8 +20,6 @@ class EnquiryHandler(BaseHandler):
         
         if message == "show_enquiry_menu":
             return self.show_enquiry_menu(state, session_id)
-        elif message == "faq":
-            return self.show_faq_list(state, session_id)
         elif current_state == "enquiry_menu":
             return self.handle_enquiry_menu_state(state, message, session_id)
         elif current_state == "enquiry":
@@ -33,7 +31,7 @@ class EnquiryHandler(BaseHandler):
             return self._handle_invalid_state(state, session_id)
 
     def show_enquiry_menu(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Display the enquiry menu with FAQ and Ask Question options."""
+        """Display the enquiry menu with Ask Question option."""
         self.logger.info(f"Session {session_id}: Displaying enquiry menu.")
         
         state["current_state"] = "enquiry_menu"
@@ -41,46 +39,13 @@ class EnquiryHandler(BaseHandler):
         self.session_manager.update_session_state(session_id, state)
         
         buttons = [
-            {"type": "reply", "reply": {"id": "faq", "title": "📚 FAQ"}},
             {"type": "reply", "reply": {"id": "ask_question", "title": "❓ Ask Question"}},
             {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back"}}
         ]
         
         return self.whatsapp_service.create_button_message(
             session_id,
-            "How can we help you today?\n\n📚 *FAQ* - Get instant answers to common questions\n❓ *Ask Question* - Send us your specific question",
-            buttons
-        )
-
-    def show_faq_list(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Display a list of 5 sample FAQs."""
-        self.logger.info(f"Session {session_id}: Displaying FAQ list.")
-
-        faq_text = (
-            "Here are some frequently asked questions:\n\n"
-            "1️⃣ *How do I place an order?*\n"
-            "   You can place an order by selecting '🛒 Order Again' from the main menu or by chatting with Lola to create a bulk order.\n\n"
-            "2️⃣ *How can I track my order?*\n"
-            "   Use the '📍 Track Order' option from the main menu to get the latest status of your order.\n\n"
-            "3️⃣ *What are your business hours?*\n"
-            "   We are open from 8:00 AM to 6:00 PM, Monday to Saturday.\n\n"
-            "4️⃣ *Do you deliver?*\n"
-            "   Yes, we offer delivery services. Delivery fees may vary based on your location.\n\n"
-            "5️⃣ *How can I make a complaint?*\n"
-            "   If you have a complaint, please use the '📝 Complain' option from the main menu to submit it, and our team will follow up."
-        )
-
-        buttons = [
-            {"type": "reply", "reply": {"id": "ask_question", "title": "❓ Ask Another Question"}},
-            {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back to Main Menu"}}
-        ]
-
-        state["current_state"] = "enquiry_menu"
-        self.session_manager.update_session_state(session_id, state)
-
-        return self.whatsapp_service.create_button_message(
-            session_id,
-            faq_text,
+            "How can we help you today?\n\n❓ *Ask Question* - Send us your specific question",
             buttons
         )
 
@@ -88,9 +53,7 @@ class EnquiryHandler(BaseHandler):
         """Handle user inputs in the enquiry menu state."""
         self.logger.info(f"Session {session_id}: Processing enquiry menu option '{message}'.")
         
-        if message == "faq":
-            return self.show_faq_list(state, session_id)
-        elif message == "ask_question":
+        if message == "ask_question":
             state["current_state"] = "enquiry"
             state["current_handler"] = "enquiry_handler"
             self.session_manager.update_session_state(session_id, state)

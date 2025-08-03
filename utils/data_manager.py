@@ -344,45 +344,62 @@ class DataManager:
         return self.save_enquiry_to_db(enquiry_data)
         
     def save_complaint_to_db(self, complaint_data: Dict) -> Optional[int]:
-        """Save a new complaint to the whatsapp_complaint_details table and return the new ref_id."""
+        """Save a new complaint to the whatsapp_complaint_details table and return the new complaint_id."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     query = """
                         INSERT INTO whatsapp_complaint_details (
-                            merchant_details_id, complaint_categories, complaint_text, 
-                            timestamp, channel, user_name, user_id
+                            merchant_details_id, user_name, user_id, phone_number,
+                            complaint_categories, complaint_text, timestamp, channel,
+                            status, priority
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        RETURNING ref_id
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING complaint_id
                     """
                     merchant_id = getattr(self.config, 'MERCHANT_ID', None)
                     if not merchant_id:
                         logger.error("MERCHANT_ID is not set in config, cannot save complaint.")
                         return None
                     
-                    # Ensure timestamp and channel are in the data dictionary if they aren't
-                    complaint_data.setdefault("timestamp", datetime.datetime.now(datetime.timezone.utc))
-                    complaint_data.setdefault("channel", "whatsapp")
+                    # Extract the required fields from complaint_data, providing defaults
+                    complaint_categories = complaint_data.get("complaint_categories", json.dumps(["General"]))
+                    complaint_text = complaint_data.get("complaint_text")
+                    timestamp = complaint_data.get("timestamp", datetime.datetime.now(datetime.timezone.utc))
+                    channel = complaint_data.get("channel", "whatsapp")
+                    user_name = complaint_data.get("user_name", "Guest")
+                    user_id = complaint_data.get("user_id", None)
+                    phone_number = complaint_data.get("phone_number", None)
+                    status = complaint_data.get("status", "open")
+                    priority = complaint_data.get("priority", "medium")
 
                     cur.execute(query, (
                         merchant_id,
-                        complaint_data.get("complaint_categories", ""),
-                        complaint_data.get("complaint_text"),
-                        complaint_data.get("timestamp"),
-                        complaint_data.get("channel"),
-                        complaint_data.get("user_name"),
-                        complaint_data.get("user_id")
+                        user_name,
+                        user_id,
+                        phone_number,
+                        complaint_categories,
+                        complaint_text,
+                        timestamp,
+                        channel,
+                        status,
+                        priority
                     ))
-                    complaint_ref_id = cur.fetchone()[0]
+                    result = cur.fetchone()
+                    if result is None:
+                        logger.error("No complaint_id returned after insert.")
+                        return None
+                    complaint_id = result['complaint_id']
                     conn.commit()
-                    logger.info(f"Complaint {complaint_ref_id} saved to database")
-                    return complaint_ref_id
+                    logger.info(f"Complaint {complaint_id} saved to database")
+                    return complaint_id
         except psycopg2.Error as e:
             logger.error(f"Database error while saving complaint: {e}", exc_info=True)
+            return None
         except Exception as e:
             logger.error(f"Unexpected error while saving complaint: {e}", exc_info=True)
-        return None
+            return None
+
 
     def save_complaint(self, complaint_data: Dict) -> Optional[int]:
         """Save complaint. Delegates to database save and returns the new complaint ID."""
