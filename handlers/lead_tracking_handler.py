@@ -1,173 +1,191 @@
-import json
-import os
-import datetime
 import logging
-from typing import Dict, List, Optional, Any, Union
-
-from .base_handler import BaseHandler
-from services.lead_tracker import LeadTracker
+from typing import Dict, List, Any, Union
+from .data_manager import DataManager, Lead
+import datetime
 
 logger = logging.getLogger(__name__)
 
-class LeadTrackingHandler(BaseHandler):
-    """Handles lead tracking integration with message processing."""
-    
-    def __init__(self, config, session_manager, data_manager, whatsapp_service, lead_tracker=None):
-        super().__init__(config, session_manager, data_manager, whatsapp_service)
-        # Initialize LeadTracker, allowing an external instance to be passed for testing/dependency injection
-        self.lead_tracker = lead_tracker or LeadTracker(config)
-        logger.info("LeadTrackingHandler initialized.")
-    
-    def track_user_interaction(self, phone_number: str, user_name: str, is_new_session: bool = False) -> None:
+class LeadTracker:
+    """Handles lead tracking and management using DataManager for database operations."""
+
+    def __init__(self, config):
+        self.config = config
+        self.data_manager = DataManager(config)
+        logger.info("LeadTracker initialized.")
+
+    def track_new_lead(self, phone_number: str, user_name: str) -> bool:
         """
-        Track user interaction for lead generation.
-        This method checks if it's a new session or an existing customer interaction,
-        and updates lead data accordingly.
+        Tracks a new lead if it doesn't exist in the database.
         
         Args:
             phone_number (str): The user's phone number.
             user_name (str): The user's name.
-            is_new_session (bool): True if this is the start of a new session.
-        """
-        try:
-            if is_new_session:
-                # Determine if the user is an existing customer based on data_manager
-                is_existing_customer = phone_number in self.data_manager.user_details # Assuming user_details holds known customers
-                
-                if not is_existing_customer:
-                    # If not an existing customer, attempt to track as a new lead
-                    is_new_lead = self.lead_tracker.track_new_lead(phone_number, user_name)
-                    if is_new_lead:
-                        logger.info(f"🆕 New lead detected: {phone_number} ({user_name})")
-                    else:
-                        # If not a new lead (i.e., already tracked), just update their interaction
-                        self.lead_tracker.update_lead_interaction(phone_number)
-                else:
-                    # Existing customer - just update their interaction timestamp and count
-                    self.lead_tracker.update_lead_interaction(phone_number)
-            else:
-                # For ongoing interactions within a session, simply update interaction
-                self.lead_tracker.update_lead_interaction(phone_number)
-                
-        except Exception as e:
-            logger.error(f"Error tracking user interaction for {phone_number}: {e}", exc_info=True)
-    
-    def track_cart_activity(self, phone_number: str, user_name: str, cart: Union[List[Dict[str, Any]], Dict[str, Any]]) -> None:
-        """
-        Track when a user adds items to cart or modifies their cart.
-        This method handles both list of dictionaries and dictionary formats for cart.
-        
-        Args:
-            phone_number (str): The user's phone number.
-            user_name (str): The user's name.
-            cart (Union[List[Dict[str, Any]], Dict[str, Any]]): The current cart contents.
-        """
-        try:
-            if cart:  # Only track if cart has items
-                # Convert cart to list format if it's a dictionary
-                cart_items = self._normalize_cart_format(cart)
-                
-                if cart_items:  # Only proceed if we have valid cart items
-                    # Calculate total cart value from the list of dictionaries
-                    total_value = sum(item.get("price", 0.0) * item.get("quantity", 0) for item in cart_items)
-                    
-                    # Track cart addition (or update) using the LeadTracker service
-                    self.lead_tracker.track_cart_addition(phone_number, user_name, cart_items, total_value)
-                    
-                    logger.info(f"🛒 Cart activity tracked: {phone_number} - ₦{total_value:,.2f}")
-                else:
-                    logger.debug(f"No valid items in cart for tracking for {phone_number}. Skipping cart activity track.")
-            else:
-                logger.debug(f"No items in cart for tracking for {phone_number}. Skipping cart activity track.")
-                
-        except Exception as e:
-            logger.error(f"Error tracking cart activity for {phone_number}: {e}", exc_info=True)
-    
-    def _normalize_cart_format(self, cart: Union[List[Dict[str, Any]], Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Normalize cart format to ensure it's a list of dictionaries.
-        
-        Args:
-            cart: Cart in either list or dictionary format
             
         Returns:
-            List[Dict[str, Any]]: Normalized cart as list of item dictionaries
+            bool: True if a new lead was created, False if it already exists.
         """
         try:
-            # If cart is already a list, return as is
-            if isinstance(cart, list):
-                return cart
-            
-            # If cart is a dictionary, convert to list format
-            if isinstance(cart, dict):
-                cart_items = []
-                for item_name, item_data in cart.items():
-                    if isinstance(item_data, dict):
-                        # Extract item details from the nested dictionary
-                        cart_item = {
-                            "name": item_name,
-                            "item_id": item_data.get("item_id", item_name),
-                            "quantity": item_data.get("quantity", 0),
-                            "price": item_data.get("price", 0.0),
-                            "total_price": item_data.get("total_price", 0.0),
-                            "variations": item_data.get("variations", {})
-                        }
-                        cart_items.append(cart_item)
-                    else:
-                        # Handle case where item_data might be a simple value
-                        logger.warning(f"Unexpected cart item format for {item_name}: {item_data}")
-                
-                return cart_items
-            
-            # If cart is neither list nor dict, log warning and return empty list
-            logger.warning(f"Unexpected cart format: {type(cart)}. Expected list or dict.")
-            return []
-            
+            # Check if lead already exists
+            existing_lead = self.data_manager.get_lead_by_phone_number(phone_number)
+            if existing_lead:
+                logger.debug(f"Lead already exists for {phone_number}. Not creating a new lead.")
+                return False
+
+            # Create a new lead
+            lead = Lead(
+                merchant_details_id=getattr(self.config, 'MERCHANT_ID', '18'),
+                phone_number=phone_number,
+                user_name=user_name,
+                user_id=phone_number,  # Default to phone_number if no specific user_id
+                source="whatsapp",
+                status="new_lead",
+                first_contact=datetime.datetime.now(datetime.timezone.utc),
+                last_interaction=datetime.datetime.now(datetime.timezone.utc),
+                interaction_count=1
+            )
+            success = self.data_manager.create_or_update_lead(lead)
+            if success:
+                logger.info(f"New lead created for {phone_number} ({user_name}).")
+                return True
+            else:
+                logger.error(f"Failed to create new lead for {phone_number}.")
+                return False
         except Exception as e:
-            logger.error(f"Error normalizing cart format: {e}", exc_info=True)
-            return []
-    
-    def track_order_conversion(self, phone_number: str, order_id: str, order_value: float) -> None:
+            logger.error(f"Error tracking new lead for {phone_number}: {e}", exc_info=True)
+            return False
+
+    def update_lead_interaction(self, phone_number: str) -> None:
         """
-        Track successful order conversion.
+        Updates the interaction count and last interaction timestamp for a lead.
+        
+        Args:
+            phone_number (str): The user's phone number.
+        """
+        try:
+            lead_data = self.data_manager.get_lead_by_phone_number(phone_number)
+            if not lead_data:
+                logger.debug(f"No lead found for {phone_number}. Cannot update interaction.")
+                return
+
+            # Update interaction details
+            lead_data['last_interaction'] = datetime.datetime.now(datetime.timezone.utc)
+            lead_data['interaction_count'] = lead_data.get('interaction_count', 0) + 1
+            success = self.data_manager.create_or_update_lead(lead_data)
+            if success:
+                logger.debug(f"Updated interaction for lead {phone_number}.")
+            else:
+                logger.error(f"Failed to update interaction for lead {phone_number}.")
+        except Exception as e:
+            logger.error(f"Error updating lead interaction for {phone_number}: {e}", exc_info=True)
+
+    def track_cart_addition(self, phone_number: str, user_name: str, cart_items: List[Dict[str, Any]], total_value: float) -> None:
+        """
+        Tracks when a user adds items to their cart.
+        
+        Args:
+            phone_number (str): The user's phone number.
+            user_name (str): The user's name.
+            cart_items (List[Dict[str, Any]]): List of cart items.
+            total_value (float): Total value of the cart.
+        """
+        try:
+            lead_data = self.data_manager.get_lead_by_phone_number(phone_number)
+            if not lead_data:
+                # Create a new lead if it doesn't exist
+                lead = Lead(
+                    merchant_details_id=getattr(self.config, 'MERCHANT_ID', '18'),
+                    phone_number=phone_number,
+                    user_name=user_name,
+                    user_id=phone_number,
+                    source="whatsapp",
+                    status="new_lead",
+                    first_contact=datetime.datetime.now(datetime.timezone.utc),
+                    last_interaction=datetime.datetime.now(datetime.timezone.utc),
+                    interaction_count=1,
+                    has_added_to_cart=True,
+                    total_cart_value=total_value,
+                    conversion_stage="cart_added"
+                )
+                self.data_manager.create_or_update_lead(lead)
+                logger.info(f"Created new lead with cart activity for {phone_number}.")
+            else:
+                # Update existing lead with cart activity
+                lead_data['last_interaction'] = datetime.datetime.now(datetime.timezone.utc)
+                lead_data['interaction_count'] = lead_data.get('interaction_count', 0) + 1
+                lead_data['has_added_to_cart'] = True
+                lead_data['total_cart_value'] = total_value
+                lead_data['conversion_stage'] = "cart_added"
+                success = self.data_manager.create_or_update_lead(lead_data)
+                if success:
+                    logger.debug(f"Updated lead {phone_number} with cart activity: ₦{total_value:,.2f}.")
+                else:
+                    logger.error(f"Failed to update lead {phone_number} with cart activity.")
+        except Exception as e:
+            logger.error(f"Error tracking cart addition for {phone_number}: {e}", exc_info=True)
+
+    def track_order_completion(self, phone_number: str, order_id: str, order_value: float) -> None:
+        """
+        Tracks a successful order completion for a lead.
         
         Args:
             phone_number (str): The user's phone number.
             order_id (str): The unique ID of the completed order.
-            order_value (float): The total value of the completed order in naira.
+            order_value (float): The total value of the completed order.
         """
         try:
-            self.lead_tracker.track_order_completion(phone_number, order_id, order_value)
-            logger.info(f"💰 Conversion tracked: {phone_number} - {order_id} (₦{order_value:,})")
-            
+            lead_data = self.data_manager.get_lead_by_phone_number(phone_number)
+            if not lead_data:
+                logger.warning(f"No lead found for {phone_number}. Creating new lead for order completion.")
+                lead = Lead(
+                    merchant_details_id=getattr(self.config, 'MERCHANT_ID', '18'),
+                    phone_number=phone_number,
+                    user_name="Unknown",
+                    user_id=phone_number,
+                    source="whatsapp",
+                    status="converted",
+                    first_contact=datetime.datetime.now(datetime.timezone.utc),
+                    last_interaction=datetime.datetime.now(datetime.timezone.utc),
+                    interaction_count=1,
+                    has_placed_order=True,
+                    final_order_value=order_value,
+                    conversion_stage="order_completed",
+                    converted_at=datetime.datetime.now(datetime.timezone.utc)
+                )
+                self.data_manager.create_or_update_lead(lead)
+                logger.info(f"Created new lead with order completion for {phone_number}: {order_id} (₦{order_value:,.2f}).")
+            else:
+                lead_data['last_interaction'] = datetime.datetime.now(datetime.timezone.utc)
+                lead_data['interaction_count'] = lead_data.get('interaction_count', 0) + 1
+                lead_data['has_placed_order'] = True
+                lead_data['final_order_value'] = order_value
+                lead_data['status'] = "converted"
+                lead_data['conversion_stage'] = "order_completed"
+                lead_data['converted_at'] = datetime.datetime.now(datetime.timezone.utc)
+                success = self.data_manager.create_or_update_lead(lead_data)
+                if success:
+                    logger.debug(f"Updated lead {phone_number} with order completion: {order_id} (₦{order_value:,.2f}).")
+                else:
+                    logger.error(f"Failed to update lead {phone_number} with order completion.")
         except Exception as e:
-            logger.error(f"Error tracking order conversion for {phone_number}: {e}", exc_info=True)
-    
-    def get_analytics_summary(self) -> Dict[str, Any]:
+            logger.error(f"Error tracking order completion for {phone_number}: {e}", exc_info=True)
+
+    def get_lead_analytics(self) -> Dict[str, Any]:
         """
-        Get lead tracking analytics summary from the LeadTracker service.
+        Retrieves lead analytics summary from DataManager.
         
         Returns:
-            Dict[str, Any]: A dictionary containing various lead analytics metrics.
+            Dict[str, Any]: Analytics metrics for leads.
         """
-        try:
-            return self.lead_tracker.get_lead_analytics()
-        except Exception as e:
-            logger.error(f"Error getting analytics summary: {e}", exc_info=True)
-            return {}
-    
-    def get_abandoned_carts_for_remarketing(self, hours_ago: int = 24) -> List[Dict]:
+        return self.data_manager.get_lead_analytics()
+
+    def get_abandoned_carts(self, hours_ago: int = 24) -> List[Dict]:
         """
-        Get abandoned carts for remarketing campaigns from the LeadTracker service.
+        Retrieves abandoned carts for remarketing from DataManager.
         
         Args:
             hours_ago (int): The number of hours ago to consider for abandonment.
             
         Returns:
-            List[Dict]: A list of dictionaries, each representing an abandoned cart.
+            List[Dict]: List of abandoned cart details.
         """
-        try:
-            return self.lead_tracker.get_abandoned_carts(hours_ago)
-        except Exception as e:
-            logger.error(f"Error getting abandoned carts for remarketing: {e}", exc_info=True)
-            return []
+        return self.data_manager.get_abandoned_carts(hours_ago)
