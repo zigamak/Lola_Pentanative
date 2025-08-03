@@ -42,8 +42,8 @@ class PaymentService:
         
         return f"{clean_first_name}{clean_phone}@lola.com"
     
-    def create_payment_link(self, amount, email, reference, customer_name, customer_phone, metadata=None):
-        """Create a Paystack payment link."""
+    def create_payment_link(self, amount, email, reference, customer_name, customer_phone, metadata=None, subaccount_code=None, split_percentage=None):
+        """Create a Paystack payment link with optional subaccount splitting."""
         url = "https://api.paystack.co/transaction/initialize"
         headers = {
             "Authorization": f"Bearer {self.paystack_secret_key}",
@@ -53,6 +53,7 @@ class PaymentService:
         # Parse customer name
         first_name, last_name = parse_name(customer_name)
         
+        # Base data for the Paystack API request
         data = {
             "amount": amount,  # Amount in kobo
             "email": email,
@@ -73,10 +74,17 @@ class PaymentService:
             }
         }
         
+        # Add subaccount splitting if provided
+        if subaccount_code and split_percentage:
+            data["subaccount"] = subaccount_code
+            data["transaction_charge"] = int(amount * (split_percentage / 100))  # Calculate subaccount share in kobo
+            data["bearer"] = "account"  # Main account bears Paystack fees unless specified otherwise
+            logger.info(f"Adding subaccount split: code={subaccount_code}, percentage={split_percentage}%")
+        
         try:
             logger.info(f"Attempting to create payment link for reference: {reference} with amount: {amount}, email: {email}")
             response = requests.post(url, json=data, headers=headers)
-            response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
             result = response.json()
             logger.debug(f"Paystack initialize response for {reference}: {result}")
             
@@ -91,7 +99,6 @@ class PaymentService:
             logger.error(f"HTTP error creating Paystack payment link for {reference}: {http_err}. Response: {http_err.response.text}", exc_info=True)
             return None
         except requests.RequestException as e:
-            # THIS WAS THE INCOMPLETE LINE. It now logs the full error.
             logger.error(f"Network or connection error creating Paystack payment link for {reference}: {e}", exc_info=True)
             return None
         except Exception as e:
@@ -100,8 +107,6 @@ class PaymentService:
     
     def verify_payment(self, reference):
         """Simple payment verification - returns status string."""
-        # This method is now redundant since verify_payment_detailed returns a boolean directly
-        # and detailed data. The PaymentHandler now uses verify_payment_detailed directly.
         verified, _ = self.verify_payment_detailed(reference)
         return "success" if verified else "failed"
     
@@ -116,7 +121,7 @@ class PaymentService:
         try:
             logger.info(f"Attempting to verify payment for reference: {reference}")
             response = requests.get(url, headers=headers)
-            response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
             result = response.json()
             logger.debug(f"Paystack verification response for {reference}: {result}")
             
@@ -134,15 +139,14 @@ class PaymentService:
                     "customer": result["data"].get("customer", {}),
                     "transaction_date": result["data"].get("transaction_date"),
                     "verification_timestamp": datetime.datetime.now().isoformat(),
-                    "full_response": result # Include full response for deeper debugging if needed
+                    "full_response": result  # Include full response for deeper debugging if needed
                 }
                 logger.info(f"Payment verified successfully for reference {reference}. Status: {result['data']['status']}")
                 return True, payment_data
             else:
-                # Log why it's not successful (e.g., pending, failed, abandoned)
                 current_paystack_status = result["data"]["status"] if "data" in result else "API_ERROR_NO_DATA"
                 logger.warning(f"Payment not successful for reference {reference}. Paystack status: {current_paystack_status}. Response: {result}")
-                return False, result.get("data", {}) # Return data even if not successful for more context
+                return False, result.get("data", {})
                 
         except requests.exceptions.HTTPError as http_err:
             logger.error(f"HTTP error verifying Paystack payment for {reference}: {http_err}. Response: {http_err.response.text}", exc_info=True)
