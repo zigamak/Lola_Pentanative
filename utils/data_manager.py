@@ -468,7 +468,39 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error while fetching address for {phone_number}: {e}", exc_info=True)
             return None
-
+    def get_order_by_id(self, order_id: str) -> Optional[Dict]:
+        """Get order data by order ID from whatsapp_orders."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT 
+                            id, merchant_details_id, customer_id,
+                            business_type_id, address, status, total_amount,
+                            payment_reference, payment_method_type, timestamp,
+                            timestamp_enddate, dateadded
+                        FROM whatsapp_orders
+                        WHERE id = %s
+                    """
+                    cur.execute(query, (order_id,))
+                    result = cur.fetchone()
+                    if result:
+                        order_data = dict(result)
+                        order_data['total_amount'] = float(order_data['total_amount'])
+                        order_data['order_id'] = str(order_data.pop('id'))  # Map id to order_id
+                        order_data['user_id'] = order_data.pop('customer_id')
+                        order_data['merchant_id'] = order_data.pop('merchant_details_id')
+                        logger.debug(f"Found order for ID {order_id}: {order_data}")
+                        return order_data
+                    logger.debug(f"No order found for ID {order_id}")
+                    return None
+        except psycopg2.Error as e:
+            logger.error(f"Database error while fetching order by ID {order_id}: {e}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching order by ID {order_id}: {e}", exc_info=True)
+            return None
+        
     def get_order_by_payment_reference(self, payment_reference: str) -> Optional[Dict]:
         """Get order data by payment reference from whatsapp_orders."""
         try:
