@@ -26,8 +26,8 @@ class Config:
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
 
-        self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"  # Replace with your subaccount code
-        self.SUBACCOUNT_PERCENTAGE = 95
+        self.SUBACCOUNT_CODE = "ACCT_939kju7zdvsk76y"  # Replace with your subaccount code
+        self.SUBACCOUNT_PERCENTAGE = 1
         # Other services
         self.Maps_API_KEY = os.getenv('Maps_API_KEY')
         self.AZURE_API_KEY = os.getenv('AZURE_API_KEY')
