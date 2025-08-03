@@ -20,13 +20,13 @@ class Config:
         self.WHATSAPP_ACCESS_TOKEN = os.getenv('WHATSAPP_ACCESS_TOKEN')
         self.WHATSAPP_PHONE_NUMBER_ID = os.getenv('WHATSAPP_PHONE_NUMBER_ID')
         self.VERIFY_TOKEN = os.getenv('VERIFY_TOKEN')
-        self.APP_SECRET = os.getenv('APP_SECRET') # <-- THIS LINE WAS ADDED/FIXED
+        self.APP_SECRET = os.getenv('APP_SECRET') 
 
         # Payment configuration
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
 
-        self.SUBACCOUNT_CODE = "ACCT_939kju7zdvsk76y"  # Replace with your subaccount code
+        self.SUBACCOUNT_CODE = "ACCT_939kju7zdvsk76y" 
         self.SUBACCOUNT_PERCENTAGE = 1
         # Other services
         self.Maps_API_KEY = os.getenv('Maps_API_KEY')

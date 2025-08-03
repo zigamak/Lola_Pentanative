@@ -58,7 +58,7 @@ class PaymentService:
             "amount": amount,  # Amount in kobo
             "email": email,
             "reference": reference,
-            "callback_url": f"{self.callback_base_url}/payment-callback",
+            "callback_url": f"{self.callback_base_url}",
             "customer": {
                 "email": email,
                 "first_name": first_name,
