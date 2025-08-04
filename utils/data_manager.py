@@ -400,7 +400,6 @@ class DataManager:
             logger.error(f"Unexpected error while saving complaint: {e}", exc_info=True)
             return None
 
-
     def save_complaint(self, complaint_data: Dict) -> Optional[int]:
         """Save complaint. Delegates to database save and returns the new complaint ID."""
         return self.save_complaint_to_db(complaint_data)
@@ -485,6 +484,32 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error while fetching address for {phone_number}: {e}", exc_info=True)
             return None
+
+    def get_order_items(self, order_id: str) -> List[Dict]:
+        """Retrieve order items for a given order_id from whatsapp_order_details."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT item_name, quantity, unit_price, subtotal, total_price
+                        FROM whatsapp_order_details
+                        WHERE order_id = %s
+                    """
+                    cur.execute(query, (order_id,))
+                    items = cur.fetchall()
+                    for item in items:
+                        item['unit_price'] = float(item['unit_price'] or 0.0)
+                        item['subtotal'] = float(item['subtotal'] or 0.0)
+                        item['total_price'] = float(item['total_price'] or 0.0)
+                    logger.debug(f"Retrieved {len(items)} items for order {order_id}")
+                    return [dict(item) for item in items]
+        except psycopg2.Error as e:
+            logger.error(f"Database error while fetching order items for {order_id}: {e}", exc_info=True)
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching order items for {order_id}: {e}", exc_info=True)
+            return []
+        
     def get_order_by_id(self, order_id: str) -> Optional[Dict]:
         """Get order data by order ID from whatsapp_orders."""
         try:
@@ -503,7 +528,7 @@ class DataManager:
                     result = cur.fetchone()
                     if result:
                         order_data = dict(result)
-                        order_data['total_amount'] = float(order_data['total_amount'])
+                        order_data['total_amount'] = float(order_data['total_amount']) if order_data['total_amount'] is not None else 0.0
                         order_data['order_id'] = str(order_data.pop('id'))  # Map id to order_id
                         order_data['user_id'] = order_data.pop('customer_id')
                         order_data['merchant_id'] = order_data.pop('merchant_details_id')
@@ -536,7 +561,7 @@ class DataManager:
                     result = cur.fetchone()
                     if result:
                         order_data = dict(result)
-                        order_data['total_amount'] = float(order_data['total_amount'])
+                        order_data['total_amount'] = float(order_data['total_amount']) if order_data['total_amount'] is not None else 0.0
                         order_data['order_id'] = str(order_data.pop('id'))  # Map id to order_id for compatibility
                         order_data['user_id'] = order_data.pop('customer_id')
                         order_data['merchant_id'] = order_data.pop('merchant_details_id')
@@ -583,7 +608,7 @@ class DataManager:
                         ON CONFLICT (phone_number) DO UPDATE SET
                             user_name = EXCLUDED.user_name,
                             last_interaction = EXCLUDED.last_interaction,
-                            interaction_count = whatsapp_leads.interaction_count + 1,
+                            interaction_count = EXCLUDED.interaction_count,
                             status = EXCLUDED.status,
                             has_added_to_cart = EXCLUDED.has_added_to_cart,
                             has_placed_order = EXCLUDED.has_placed_order,
@@ -600,13 +625,13 @@ class DataManager:
                         data.get('source'),
                         data.get('first_contact'),
                         data.get('last_interaction'),
-                        data.get('interaction_count'),
+                        data.get('interaction_count', 0),
                         data.get('status'),
                         data.get('has_added_to_cart'),
                         data.get('has_placed_order'),
-                        data.get('total_cart_value'),
+                        float(data.get('total_cart_value', 0.0)),
                         data.get('conversion_stage'),
-                        data.get('final_order_value'),
+                        float(data.get('final_order_value', 0.0)),
                         data.get('converted_at')
                     ))
                     conn.commit()
@@ -638,9 +663,9 @@ class DataManager:
                     result = cur.fetchone()
                     if result:
                         logger.debug(f"Found lead for phone number {phone_number}")
-                        # Convert Numeric types to float for consistency
-                        result['total_cart_value'] = float(result['total_cart_value'])
-                        result['final_order_value'] = float(result['final_order_value'])
+                        # Convert Numeric types to float for consistency, handling None values
+                        result['total_cart_value'] = float(result['total_cart_value'] or 0.0)
+                        result['final_order_value'] = float(result['final_order_value'] or 0.0)
                         return dict(result)
                     logger.debug(f"No lead found for phone number {phone_number}")
                     return None
@@ -677,7 +702,7 @@ class DataManager:
                     for row in results:
                         cart_data = dict(row)
                         # Convert numeric types
-                        cart_data['total_cart_value'] = float(cart_data['total_cart_value'])
+                        cart_data['total_cart_value'] = float(cart_data['total_cart_value'] or 0.0)
                         abandoned_carts.append(cart_data)
                         
                     logger.info(f"Found {len(abandoned_carts)} abandoned carts older than {hours_ago} hours.")
@@ -715,7 +740,7 @@ class DataManager:
                     # Total conversion value
                     cur.execute("SELECT SUM(final_order_value) AS total_revenue FROM whatsapp_leads WHERE has_placed_order = TRUE;")
                     total_revenue_result = cur.fetchone()['total_revenue']
-                    total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
+                    total_revenue = float(total_revenue_result or 0.0)
 
                     return {
                         'total_leads': total_leads,

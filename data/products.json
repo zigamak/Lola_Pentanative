@@ -11,18 +11,6 @@
       "quantity": 5
     }
   ],
-  "Efo riro": [
-    {
-      "id": "96",
-      "name": "The wives",
-      "variant": null,
-      "price": 9000.0,
-      "currency": null,
-      "availability_status": false,
-      "description": "",
-      "quantity": 1
-    }
-  ],
   "Rice": [
     {
       "id": "100",
@@ -30,7 +18,7 @@
       "variant": null,
       "price": 1700.0,
       "currency": null,
-      "availability_status": true,
+      "availability_status": false,
       "description": "Fried Rice with Vegetables",
       "quantity": 10
     },
@@ -53,6 +41,18 @@
       "availability_status": true,
       "description": "Red, Spicy, Smokey, fully flavored Nigerian Rice",
       "quantity": 13
+    }
+  ],
+  "Efo riro": [
+    {
+      "id": "96",
+      "name": "The wives",
+      "variant": null,
+      "price": 9000.0,
+      "currency": null,
+      "availability_status": false,
+      "description": "",
+      "quantity": 1
     }
   ],
   "Protein": [
