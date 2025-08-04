@@ -22,6 +22,7 @@ class OrderHandler(BaseHandler):
         return [
             {"type": "reply", "reply": {"id": "checkout", "title": "Checkout"}},
             {"type": "reply", "reply": {"id": "order_more", "title": "Order More"}},
+            {"type": "reply", "reply": {"id": "add_note", "title": "Add Note"}},
             {"type": "reply", "reply": {"id": "other_actions", "title": "Other Options"}}
         ]
 
@@ -32,6 +33,7 @@ class OrderHandler(BaseHandler):
             f"{cart_content}\n\nWhat would you like to do next?\n\n"
             f"Press 'Checkout' to finalize.\n"
             f"Press 'Order More' to add more items.\n"
+            f"Press 'Add Note' to add a note to your order.\n"
             f"Or, press 'Other Options' for cart management."
         )
 
@@ -118,9 +120,9 @@ class OrderHandler(BaseHandler):
     def handle_order_summary_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle order summary state."""
         logger.debug(f"Handling order summary state for session {session_id}, message: {message}")
-        message_lower = message.lower()
+        message_strip = message.strip()
 
-        if message_lower == "order_more":
+        if message_strip == "order_more":
             state["current_state"] = "ai_bulk_order"
             state["current_handler"] = "ai_bulk_handler"
             self.session_manager.update_session_state(session_id, state)
@@ -133,7 +135,7 @@ class OrderHandler(BaseHandler):
                 "additional_message": f"Your current cart:\n{cart_content}\n\nYou can now add more items to your order."
             }
         
-        elif message_lower == "checkout":
+        elif message_strip == "checkout":
             user_data = self.data_manager.get_user_data(session_id)
             state["user_name"] = user_data.get("display_name", "Guest") if user_data else "Guest"
             state["phone_number"] = user_data.get("phone_number", session_id) if user_data else session_id
@@ -156,15 +158,24 @@ class OrderHandler(BaseHandler):
                 f"Is this information correct?",
                 buttons
             )
-        elif message_lower == "other_actions":
+        elif message_strip == "add_note":
+            logger.info(f"User chose to add a note for session {session_id}.")
+            state["current_state"] = "add_note"
+            self.session_manager.update_session_state(session_id, state)
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to return to the order summary."
+            )
+        elif message_strip == "other_actions":
             logger.info(f"User selected 'Other Options' for session {session_id}.")
             return self.whatsapp_service.create_text_message(
                 session_id,
                 "You can:\n"
                 "- Type *'remove'* to remove an item from your cart.\n"
-                "- Type *'cancel'* to cancel your entire order."
+                "- Type *'cancel'* to cancel your entire order.\n"
+                "- Type *'note'* to add or update a note for your order."
             )
-        elif message_lower == "remove":
+        elif message_strip == "remove":
             logger.info(f"User typed 'remove' for session {session_id}.")
             if not state.get("cart"):
                 logger.debug(f"Cart is empty for session {session_id}, cannot remove items.")
@@ -185,7 +196,7 @@ class OrderHandler(BaseHandler):
                     session_id,
                     item_list_message
                 )
-        elif message_lower == "cancel":
+        elif message_strip == "cancel":
             logger.info(f"User typed 'cancel' to cancel order for session {session_id}.")
             state["cart"] = {}
             return self.handle_back_to_main(
@@ -193,19 +204,27 @@ class OrderHandler(BaseHandler):
                 session_id,
                 message="Your order has been cancelled. How can I help you today?"
             )
+        elif message_strip == "note":
+            logger.info(f"User typed 'note' to add a note for session {session_id}.")
+            state["current_state"] = "add_note"
+            self.session_manager.update_session_state(session_id, state)
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to return to the order summary."
+            )
         else:
             logger.debug(f"Invalid input '{message}' in order summary state for session {session_id}.")
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "Please select 'Checkout', 'Order More', 'Other Options', or type 'remove' or 'cancel'."
+                "Please select 'Checkout', 'Order More', 'Add Note', 'Other Options', or type 'remove', 'cancel', or 'note'."
             )
 
     def handle_remove_item_selection_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle user selection of item to remove by exact name."""
         logger.debug(f"Handling remove item selection state for session {session_id}, message: {message}")
-        message_strip_lower = message.strip().lower()
+        message_strip = message.strip()
 
-        if message_strip_lower == "back":
+        if message_strip == "back":
             state["current_state"] = "order_summary"
             self.session_manager.update_session_state(session_id, state)
             logger.info(f"User typed 'back' from remove item selection for session {session_id}.")
@@ -217,7 +236,7 @@ class OrderHandler(BaseHandler):
 
         matched_item = None
         for item_name_in_cart in state["cart"].keys():
-            if item_name_in_cart.lower() == message_strip_lower:
+            if item_name_in_cart == message_strip:
                 matched_item = item_name_in_cart
                 break
 
@@ -258,17 +277,55 @@ class OrderHandler(BaseHandler):
                 f"❌ '{message}' is not in your cart. Please type the *exact name* of an item from the list to remove it, or 'back' to return."
             )
 
+    def handle_add_note_state(self, state: Dict, message: str, session_id: str) -> Dict:
+        """Handle adding or updating a note for the order."""
+        logger.debug(f"Handling add note state for session {session_id}, message: {message}")
+        message_strip = message.strip()
+
+        if message_strip == "back":
+            # Check if coming from AI order to return to note prompt
+            if state.get("from_ai_order", False):
+                state["current_state"] = "prompt_add_note"
+                self.session_manager.update_session_state(session_id, state)
+                logger.info(f"User typed 'back' from add note state for AI order for session {session_id}.")
+                buttons = [
+                    {"type": "reply", "reply": {"id": "add_note", "title": "📝 Yes"}},
+                    {"type": "reply", "reply": {"id": "proceed_to_confirmation", "title": "❌ No"}}
+                ]
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    "Would you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
+                    buttons
+                )
+            else:
+                state["current_state"] = "order_summary"
+                self.session_manager.update_session_state(session_id, state)
+                logger.info(f"User typed 'back' from add note state for session {session_id}.")
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    self._get_order_summary_message_text(state),
+                    self._get_order_summary_buttons()
+                )
+
+        # Save the note to the state
+        state["order_note"] = message_strip
+        state["current_state"] = "confirm_order"
+        self.session_manager.update_session_state(session_id, state)
+        logger.info(f"Note '{message_strip}' added for session {session_id}.")
+
+        return self._show_order_confirmation(state, session_id)
+
     def handle_confirm_details_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle confirm details state."""
         logger.debug(f"Handling confirm details state for session {session_id}, message: {message}")
-        message_lower = message.lower()
+        message_strip = message.strip()
 
         user_data = self.data_manager.get_user_data(session_id)
         state.setdefault("user_name", user_data.get("display_name", "Guest") if user_data else "Guest")
         state.setdefault("phone_number", user_data.get("phone_number", session_id) if user_data else session_id)
         state.setdefault("address", user_data.get("address", "") if user_data else "")
 
-        if message_lower == "process_final_order":
+        if message_strip == "process_final_order":
             logger.info(f"AI initiated order processing for session {session_id}.")
             if not state.get("cart"):
                 logger.warning(f"Cart is empty during AI-initiated confirm_details state for session {session_id}. Redirecting to greeting.")
@@ -287,12 +344,21 @@ class OrderHandler(BaseHandler):
                 self.session_manager.update_session_state(session_id, state)
                 return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
             else:
-                state["current_state"] = "confirm_order"
+                state["from_ai_order"] = True  # Flag to indicate AI order
+                state["current_state"] = "prompt_add_note"
                 self.session_manager.update_session_state(session_id, state)
-                logger.info(f"Address set, proceeding to confirm order for AI-initiated session {session_id}.")
-                return self._show_order_confirmation(state, session_id)
+                logger.info(f"Prompting for note after AI order confirmation for session {session_id}.")
+                buttons = [
+                    {"type": "reply", "reply": {"id": "add_note", "title": "📝 Yes"}},
+                    {"type": "reply", "reply": {"id": "proceed_to_confirmation", "title": "❌ No"}}
+                ]
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    "🎉 *Order Confirmed!*\n\nWould you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
+                    buttons
+                )
 
-        elif message_lower == "details_correct":
+        elif message_strip == "details_correct":
             logger.info(f"User confirmed details are correct for session {session_id}.")
             if not state.get("cart"):
                 logger.warning(f"Cart is empty during manual confirm_details state for session {session_id}. Redirecting to greeting.")
@@ -334,10 +400,10 @@ class OrderHandler(BaseHandler):
                 logger.info(f"Address set, proceeding to confirm order for manual session {session_id}.")
                 return self._show_order_confirmation(state, session_id)
         
-        elif message_lower == "change_all_details":
+        elif message_strip == "change_all_details":
             logger.info(f"User opted to change details for session {session_id}.")
             state["current_state"] = "get_new_name_address"
-            state["update_context"] = "change_all_details"  # Track context for full update
+            state["update_context"] = "change_all_details"
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -357,6 +423,38 @@ class OrderHandler(BaseHandler):
                 f"📱 **Phone:** {state.get('phone_number', 'N/A')}\n"
                 f"📍 **Address:** {state.get('address', 'Not set')}\n\n"
                 f"Is this information correct?",
+                buttons
+            )
+
+    def handle_prompt_add_note_state(self, state: Dict, message: str, session_id: str) -> Dict:
+        """Handle the prompt to add a note after AI order confirmation."""
+        logger.debug(f"Handling prompt add note state for session {session_id}, message: {message}")
+        message_strip = message.strip()
+
+        if message_strip == "add_note":
+            logger.info(f"User chose to add a note after AI confirmation for session {session_id}.")
+            state["current_state"] = "add_note"
+            self.session_manager.update_session_state(session_id, state)
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to skip adding a note."
+            )
+        
+        elif message_strip == "proceed_to_confirmation":
+            logger.info(f"User chose to proceed to final confirmation without adding a note for session {session_id}.")
+            state["current_state"] = "confirm_order"
+            self.session_manager.update_session_state(session_id, state)
+            return self._show_order_confirmation(state, session_id)
+        
+        else:
+            logger.debug(f"Invalid input '{message}' in prompt add note state for session {session_id}.")
+            buttons = [
+                {"type": "reply", "reply": {"id": "add_note", "title": "📝 Yes"}},
+                {"type": "reply", "reply": {"id": "proceed_to_confirmation", "title": "❌ No"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                "I didn't understand that. Would you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
                 buttons
             )
 
@@ -395,6 +493,7 @@ class OrderHandler(BaseHandler):
             order_details += f"👤 Name: {user_name}\n"
             order_details += f"📱 Phone: {phone_number}\n"
             order_details += f"🏠 Address: {address}\n"
+            order_details += f"📝 Note: {state.get('order_note', 'None')}\n"
             order_details += f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
             order_details += "Please confirm to proceed with payment via Paystack or update your address."
             
@@ -422,9 +521,9 @@ class OrderHandler(BaseHandler):
     def handle_confirm_order_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle the final order confirmation state."""
         logger.debug(f"Handling confirm order state for session {session_id}, message: {message}")
-        message_lower = message.lower()
+        message_strip = message.strip()
         
-        if message_lower == "final_confirm":
+        if message_strip == "final_confirm":
             cart = state.get("cart", {})
             if not cart:
                 logger.warning(f"Cannot proceed to payment - cart is empty for session {session_id}")
@@ -467,7 +566,7 @@ class OrderHandler(BaseHandler):
             ]
             
             order_data = {
-                "customer_id": session_id,  # Use the user's phone number as customer_id
+                "customer_id": session_id,
                 "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "default_business"),
                 "address": address,
                 "status": "confirmed",
@@ -475,6 +574,7 @@ class OrderHandler(BaseHandler):
                 "payment_reference": "",
                 "payment_method_type": "paystack",
                 "timestamp": datetime.datetime.now(),
+                "customers_note": state.get("order_note", ""),
                 "items": items
             }
             
@@ -506,7 +606,7 @@ class OrderHandler(BaseHandler):
                     "❌ Sorry, there was an error saving your details. Please try again."
                 )
             
-            state["order_id"] = str(order_id)  # Convert to string for consistency
+            state["order_id"] = str(order_id)
             state["total_amount"] = total_amount
             state["order_status"] = "confirmed"
             state["order_timestamp"] = order_data["timestamp"].isoformat()
@@ -545,10 +645,10 @@ class OrderHandler(BaseHandler):
                     f"⚠️ Payment service is currently unavailable. Please try again later or contact support."
                 )
         
-        elif message_lower == "update_address":
+        elif message_strip == "update_address":
             logger.info(f"User chose to update address for session {session_id}")
             state["current_state"] = "get_new_name_address"
-            state["update_context"] = "update_address"  # Track context for address-only update
+            state["update_context"] = "update_address"
             self.session_manager.update_session_state(session_id, state)
             
             return self.whatsapp_service.create_text_message(
@@ -556,7 +656,7 @@ class OrderHandler(BaseHandler):
                 "Please provide your new delivery address (e.g., 123 Main St, Lagos)."
             )
         
-        elif message_lower == "cancel_order":
+        elif message_strip == "cancel_order":
             logger.info(f"User cancelled order for session {session_id}")
             state["cart"] = {}
             return self.handle_back_to_main(
@@ -669,10 +769,10 @@ class OrderHandler(BaseHandler):
         """Handle messages when payment is pending with Paystack."""
         logger.debug(f"Handling payment pending state for session {session_id}, message: {message}")
         
-        message_lower = message.lower()
+        message_strip = message.strip()
         order_id = state.get("order_id", "N/A")
         
-        if any(keyword in message_lower for keyword in ["paid", "payment", "transferred", "sent"]):
+        if any(keyword in message_strip for keyword in ["paid", "payment", "transferred", "sent"]):
             logger.info(f"User indicated payment completion for session {session_id}, order {order_id}")
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -680,7 +780,7 @@ class OrderHandler(BaseHandler):
                 f"💳 Your payment is being processed via Paystack. Please wait for confirmation.\n"
                 f"Type 'status' to check your order status or contact support if you encounter issues."
             )
-        elif "status" in message_lower or "order" in message_lower:
+        elif "status" in message_strip or "order" in message_strip:
             logger.debug(f"User requested order status for session {session_id}, order {order_id}")
             return self.whatsapp_service.create_text_message(
                 session_id,

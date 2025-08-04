@@ -13,8 +13,8 @@ class SessionManager:
     """Manages user sessions and their states."""
 
     # Default timeouts for different session types
-    SESSION_TIMEOUT_SECONDS = 600  # 10 minutes for unpaid/active sessions
-    PAID_SESSION_TIMEOUT_SECONDS = 6000
+    SESSION_TIMEOUT_SECONDS = 3000  # 10 minutes for unpaid/active sessions
+    PAID_SESSION_TIMEOUT_SECONDS = 12000
 
     # Define a short grace period for freshly reset sessions (e.g., 2 seconds)
     # This prevents the bot from immediately sending a menu message after a handler

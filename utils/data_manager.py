@@ -48,6 +48,7 @@ class DataManager:
             'port': self.config.DB_PORT
         }
         self._ensure_data_directory_exists()
+        self.add_customers_note_column()
         self.user_details = self.load_user_details()
         self.menu_data = self.load_products_data()
 
@@ -57,6 +58,31 @@ class DataManager:
         if data_dir and not os.path.exists(data_dir):
             os.makedirs(data_dir)
             logger.info(f"Created data directory: {data_dir}")
+
+    def add_customers_note_column(self):
+        """Add customers_note TEXT column to whatsapp_orders table if it doesn't exist."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'whatsapp_orders' 
+                        AND column_name = 'customers_note';
+                    """)
+                    if not cur.fetchone():
+                        cur.execute("""
+                            ALTER TABLE whatsapp_orders
+                            ADD COLUMN customers_note TEXT;
+                        """)
+                        conn.commit()
+                        logger.info("Added customers_note column to whatsapp_orders table.")
+                    else:
+                        logger.debug("customers_note column already exists in whatsapp_orders table.")
+        except psycopg2.Error as e:
+            logger.error(f"Database error while adding customers_note column: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Unexpected error while adding customers_note column: {e}", exc_info=True)
 
     def _load_json_data(self, file_path: str) -> Any:
         """Helper to load JSON data from a file."""
@@ -193,22 +219,19 @@ class DataManager:
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Insert into whatsapp_orders, letting the database generate the id
                     order_query = """
                         INSERT INTO whatsapp_orders (
                             merchant_details_id, customer_id, 
                             business_type_id, address, status, total_amount, 
                             payment_reference, payment_method_type, timestamp, 
-                            timestamp_enddate, dateadded
+                            timestamp_enddate, dateadded, customers_note
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id
                     """
-                    # Provide a default for MERCHANT_ID and BUSINESS_TYPE_ID if they are not set in config
                     merchant_details_id = getattr(self.config, 'MERCHANT_ID', '18')
                     business_type_id = getattr(self.config, 'BUSINESS_TYPE_ID', '1')
 
-                    # Validate merchant_details_id
                     if merchant_details_id is None:
                         logger.error("MERCHANT_ID is not set in config and no default provided.")
                         raise ValueError("MERCHANT_ID is required but was not provided.")
@@ -228,11 +251,11 @@ class DataManager:
                         order_data.get("payment_method_type", ""),
                         order_timestamp,
                         order_timestamp_enddate,
-                        order_dateadded
+                        order_dateadded,
+                        order_data.get("customers_note", "")
                     ))
                     order_id = cur.fetchone()['id']
 
-                    # Insert into whatsapp_order_details
                     order_details_query = """
                         INSERT INTO whatsapp_order_details (
                             order_id, item_name, quantity, unit_price, subtotal, total_price, dateadded
@@ -263,13 +286,13 @@ class DataManager:
 
                     conn.commit()
                     logger.info(f"Order {order_id} and its details saved to database")
-                    return order_id  # Return the generated id for use in OrderHandler
+                    return order_id
         except psycopg2.Error as e:
             logger.error(f"Database error while saving order {order_data.get('customer_id', 'unknown')}: {e}", exc_info=True)
-            raise # Re-raise the exception after logging
+            raise
         except Exception as e:
             logger.error(f"Unexpected error while saving order {order_data.get('customer_id', 'unknown')}: {e}", exc_info=True)
-            raise # Re-raise the exception after logging
+            raise
             
     def update_order_status(self, order_id: str, status: str, payment_data: Optional[Dict] = None) -> bool:
         """Update order status in the whatsapp_orders table."""
@@ -362,7 +385,6 @@ class DataManager:
                         logger.error("MERCHANT_ID is not set in config, cannot save complaint.")
                         return None
                     
-                    # Extract the required fields from complaint_data, providing defaults
                     complaint_categories = complaint_data.get("complaint_categories", json.dumps(["General"]))
                     complaint_text = complaint_data.get("complaint_text")
                     timestamp = complaint_data.get("timestamp", datetime.datetime.now(datetime.timezone.utc))
@@ -419,7 +441,6 @@ class DataManager:
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Query whatsapp_orders by customer_id
                     query = """
                         SELECT address, timestamp
                         FROM whatsapp_orders
@@ -433,7 +454,6 @@ class DataManager:
                         logger.debug(f"Found address '{result['address']}' for phone number {phone_number} in whatsapp_orders")
                         return result['address']
 
-                    # Fallback: Query whatsapp_user_details by user_number
                     logger.debug(f"No address found in whatsapp_orders for phone number {phone_number}. Trying whatsapp_user_details (user_number).")
                     query = """
                         SELECT address, address2, address3
@@ -454,7 +474,6 @@ class DataManager:
                             logger.debug(f"Found tertiary address '{result['address3']}' for phone number {phone_number} in whatsapp_user_details")
                             return result['address3']
 
-                    # Final fallback: Query whatsapp_user_details by user_id
                     logger.debug(f"No address found in whatsapp_user_details (user_number). Trying user_id.")
                     query = """
                         SELECT address, address2, address3
@@ -509,7 +528,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error while fetching order items for {order_id}: {e}", exc_info=True)
             return []
-        
+
     def get_order_by_id(self, order_id: str) -> Optional[Dict]:
         """Get order data by order ID from whatsapp_orders."""
         try:
@@ -520,7 +539,7 @@ class DataManager:
                             id, merchant_details_id, customer_id,
                             business_type_id, address, status, total_amount,
                             payment_reference, payment_method_type, timestamp,
-                            timestamp_enddate, dateadded
+                            timestamp_enddate, dateadded, customers_note
                         FROM whatsapp_orders
                         WHERE id = %s
                     """
@@ -529,7 +548,7 @@ class DataManager:
                     if result:
                         order_data = dict(result)
                         order_data['total_amount'] = float(order_data['total_amount']) if order_data['total_amount'] is not None else 0.0
-                        order_data['order_id'] = str(order_data.pop('id'))  # Map id to order_id
+                        order_data['order_id'] = str(order_data.pop('id'))
                         order_data['user_id'] = order_data.pop('customer_id')
                         order_data['merchant_id'] = order_data.pop('merchant_details_id')
                         logger.debug(f"Found order for ID {order_id}: {order_data}")
@@ -542,7 +561,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error while fetching order by ID {order_id}: {e}", exc_info=True)
             return None
-        
+
     def get_order_by_payment_reference(self, payment_reference: str) -> Optional[Dict]:
         """Get order data by payment reference from whatsapp_orders."""
         try:
@@ -553,7 +572,7 @@ class DataManager:
                             id, merchant_details_id, customer_id,
                             business_type_id, address, status, total_amount,
                             payment_reference, payment_method_type, timestamp,
-                            timestamp_enddate, dateadded
+                            timestamp_enddate, dateadded, customers_note
                         FROM whatsapp_orders
                         WHERE payment_reference = %s
                     """
@@ -562,7 +581,7 @@ class DataManager:
                     if result:
                         order_data = dict(result)
                         order_data['total_amount'] = float(order_data['total_amount']) if order_data['total_amount'] is not None else 0.0
-                        order_data['order_id'] = str(order_data.pop('id'))  # Map id to order_id for compatibility
+                        order_data['order_id'] = str(order_data.pop('id'))
                         order_data['user_id'] = order_data.pop('customer_id')
                         order_data['merchant_id'] = order_data.pop('merchant_details_id')
                         logger.debug(f"Found order for payment reference {payment_reference}: {order_data}")
@@ -576,17 +595,49 @@ class DataManager:
             logger.error(f"Unexpected error while fetching order by payment reference {payment_reference}: {e}", exc_info=True)
             return None
 
+    def get_latest_order_by_customer_id(self, customer_id: str) -> Optional[Dict]:
+        """Get the most recent order for a customer from whatsapp_orders."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT 
+                            id, merchant_details_id, customer_id,
+                            business_type_id, address, status, total_amount,
+                            payment_reference, payment_method_type, timestamp,
+                            timestamp_enddate, dateadded, customers_note
+                        FROM whatsapp_orders
+                        WHERE customer_id = %s
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    """
+                    cur.execute(query, (customer_id,))
+                    result = cur.fetchone()
+                    if result:
+                        order_data = dict(result)
+                        order_data['total_amount'] = float(order_data['total_amount']) if order_data['total_amount'] is not None else 0.0
+                        order_data['order_id'] = str(order_data.pop('id'))
+                        order_data['user_id'] = order_data.pop('customer_id')
+                        order_data['merchant_id'] = order_data.pop('merchant_details_id')
+                        logger.debug(f"Found latest order for customer {customer_id}: {order_data}")
+                        return order_data
+                    logger.debug(f"No orders found for customer {customer_id}")
+                    return None
+        except psycopg2.Error as e:
+            logger.error(f"Database error while fetching latest order for customer {customer_id}: {e}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching latest order for customer {customer_id}: {e}", exc_info=True)
+            return None
+
     def update_session_state(self, session_id: str, state: Dict):
         """Placeholder for session state update."""
         logger.debug(f"DataManager: Session state update requested for {session_id} (Pass-through).")
         pass
 
-    # --- New Methods for Leads Management ---
-
     def create_or_update_lead(self, lead_data: Union[Lead, Dict]) -> bool:
         """
         Creates a new lead or updates an existing one in the whatsapp_leads table.
-        This method uses ON CONFLICT to handle both creation and updates efficiently.
         """
         if isinstance(lead_data, Lead):
             data = lead_data.to_dict()
@@ -663,7 +714,6 @@ class DataManager:
                     result = cur.fetchone()
                     if result:
                         logger.debug(f"Found lead for phone number {phone_number}")
-                        # Convert Numeric types to float for consistency, handling None values
                         result['total_cart_value'] = float(result['total_cart_value'] or 0.0)
                         result['final_order_value'] = float(result['final_order_value'] or 0.0)
                         return dict(result)
@@ -679,8 +729,6 @@ class DataManager:
     def get_abandoned_carts(self, hours_ago: int = 24) -> List[Dict]:
         """
         Retrieves leads with abandoned carts from the whatsapp_leads table.
-        An abandoned cart is a lead that has 'has_added_to_cart' = TRUE,
-        'has_placed_order' = FALSE, and a last_interaction time older than 'hours_ago'.
         """
         abandoned_threshold = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours_ago)
         try:
@@ -701,7 +749,6 @@ class DataManager:
                     abandoned_carts = []
                     for row in results:
                         cart_data = dict(row)
-                        # Convert numeric types
                         cart_data['total_cart_value'] = float(cart_data['total_cart_value'] or 0.0)
                         abandoned_carts.append(cart_data)
                         
@@ -721,23 +768,18 @@ class DataManager:
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Total leads
                     cur.execute("SELECT COUNT(*) AS total_leads FROM whatsapp_leads;")
                     total_leads = cur.fetchone()['total_leads']
 
-                    # New leads (status = 'new_lead')
                     cur.execute("SELECT COUNT(*) AS new_leads FROM whatsapp_leads WHERE status = 'new_lead';")
                     new_leads = cur.fetchone()['new_leads']
 
-                    # Converted leads (status = 'converted')
                     cur.execute("SELECT COUNT(*) AS converted_leads FROM whatsapp_leads WHERE has_placed_order = TRUE;")
                     converted_leads = cur.fetchone()['converted_leads']
 
-                    # Abandoned carts
                     cur.execute("SELECT COUNT(*) AS abandoned_carts FROM whatsapp_leads WHERE has_added_to_cart = TRUE AND has_placed_order = FALSE;")
                     abandoned_carts = cur.fetchone()['abandoned_carts']
                     
-                    # Total conversion value
                     cur.execute("SELECT SUM(final_order_value) AS total_revenue FROM whatsapp_leads WHERE has_placed_order = TRUE;")
                     total_revenue_result = cur.fetchone()['total_revenue']
                     total_revenue = float(total_revenue_result or 0.0)

@@ -4,6 +4,8 @@ import json
 import re
 from typing import Dict, List, Any
 from dataclasses import dataclass
+from datetime import datetime # Import the datetime module
+
 from .base_handler import BaseHandler
 from services.ai_service import AIService 
 
@@ -25,12 +27,32 @@ class AIHandler(BaseHandler):
         
         self.ai_service = AIService(config, data_manager) 
         self.ai_enabled = self.ai_service.ai_enabled 
-        self.menu_image_url = "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg"
         
+        # Dictionary to map day names to their respective menu image URLs
+        self.menu_image_urls = {
+            "Monday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-monday.jpg",
+            "Tuesday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-tuesday.webp",
+            "Wednesday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-wednesday.jpg",
+            "Thursday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-thursday.jpg",
+            "Friday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-friday.jpg",
+            "Saturday": "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg", # Fallback for weekends
+            "Sunday": "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg" # Fallback for weekends
+        }
+
         if not self.ai_enabled:
             logger.warning("AIHandler: AI features disabled as AIService could not be initialized.")
         else:
             logger.info("AIHandler: AIService successfully initialized.")
+
+    def _get_daily_menu_url(self):
+        """
+        Helper method to get the menu image URL for the current day of the week.
+        It uses the datetime module to get the weekday name (e.g., "Monday").
+        If a day is not in the dictionary, it will return a default URL.
+        """
+        current_day = datetime.now().strftime("%A") # Returns the full weekday name
+        # Use .get() with a default fallback URL for safety
+        return self.menu_image_urls.get(current_day, "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg")
 
     def handle_ai_menu_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
         """Handle AI menu selection state."""
@@ -54,7 +76,9 @@ class AIHandler(BaseHandler):
         state["current_handler"] = "ai_handler"
         self.session_manager.update_session_state(session_id, state)
         
-        self.whatsapp_service.send_image_message(session_id, self.menu_image_url, caption="Our Delicious Menu!")
+        # Get the correct image URL for the day using the new helper method
+        image_url = self._get_daily_menu_url()
+        self.whatsapp_service.send_image_message(session_id, image_url, caption="Our Delicious Menu!")
 
         welcome_message = (
             "🤖 *Hi! I'm Lola, your AI assistant!*\n\n"
@@ -75,7 +99,9 @@ class AIHandler(BaseHandler):
         state["current_handler"] = "ai_handler"
         self.session_manager.update_session_state(session_id, state)
         
-        self.whatsapp_service.send_image_message(session_id, self.menu_image_url, caption="Our Delicious Menu!")
+        # Get the correct image URL for the day using the new helper method
+        image_url = self._get_daily_menu_url()
+        self.whatsapp_service.send_image_message(session_id, image_url, caption="Our Delicious Menu!")
 
         bulk_order_message = (
             "Hi, I'm Lola from Ganador \n\n"

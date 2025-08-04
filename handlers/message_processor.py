@@ -155,7 +155,7 @@ class MessageProcessor:
                         "name": state["user_name"],
                         "address": state["address"]
                     }
-                    self.data_manager.save_user_details(session_id, self.data_manager.user_details[session_id])  # Updated to call save_user_details with parameters
+                    self.data_manager.save_user_details(session_id, self.data_manager.user_details[session_id])
 
     def _route_to_handler(self, state, message, original_message, session_id, user_name):
         """Route messages to appropriate handlers based on current_handler and current_state."""
@@ -250,6 +250,10 @@ class MessageProcessor:
                     response = self.order_handler.handle_get_new_name_address_state(state, message, session_id)
                 elif current_state == "confirm_order":
                     response = self.order_handler.handle_confirm_order_state(state, message, session_id)
+                elif current_state == "prompt_add_note":
+                    response = self.order_handler.handle_prompt_add_note_state(state, message, session_id)
+                elif current_state == "add_note":
+                    response = self.order_handler.handle_add_note_state(state, message, session_id)
                 elif current_state == "payment_pending":
                     response = self.order_handler.handle_payment_pending_state(state, message, session_id)
                 else:
@@ -362,7 +366,7 @@ class MessageProcessor:
             self.data_manager.user_details.setdefault(state["phone_number"], {})
             self.data_manager.user_details[state["phone_number"]]["name"] = state.get("user_name", "Guest")
             self.data_manager.user_details[state["phone_number"]]["address"] = state["address"]
-            self.data_manager.save_user_details(state["phone_number"], self.data_manager.user_details[state["phone_number"]])  # Updated to call save_user_details with parameters
+            self.data_manager.save_user_details(state["phone_number"], self.data_manager.user_details[state["phone_number"]])
 
             state["current_state"] = "confirm_order"
             state["current_handler"] = "order_handler"
