@@ -6818,3 +6818,34 @@ AttributeError: 'DataManager' object has no attribute 'reduce_inventory_quantity
 2025-08-05 00:05:50,758 - werkzeug - INFO - 127.0.0.1 - - [05/Aug/2025 00:05:50] "POST /webhook HTTP/1.1" 200 -
 2025-08-05 00:05:51,170 - werkzeug - INFO - 127.0.0.1 - - [05/Aug/2025 00:05:51] "POST /webhook HTTP/1.1" 200 -
 2025-08-05 00:05:51,345 - werkzeug - INFO - 127.0.0.1 - - [05/Aug/2025 00:05:51] "POST /webhook HTTP/1.1" 200 -
+2025-08-05 00:11:38,192 - __main__ - INFO - Starting WhatsApp bot server...
+2025-08-05 00:11:39,515 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-05 00:11:43,861 - utils.data_manager - INFO - Successfully loaded 12 user details from database
+2025-08-05 00:11:44,039 - services.payment_service - INFO - PaymentService initialized
+2025-08-05 00:11:45,583 - handlers.product_sync_handler - INFO - Successfully synced 15 products to data\products.json
+2025-08-05 00:11:45,778 - app - INFO - Initial product sync successful on startup
+2025-08-05 00:11:45,779 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-05 00:11:49,006 - utils.data_manager - INFO - Successfully loaded 12 user details from database
+2025-08-05 00:11:49,198 - services.payment_service - INFO - PaymentService initialized
+2025-08-05 00:11:49,198 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-08-05 00:11:49,198 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-08-05 00:11:49,210 - __main__ - ERROR - Unexpected error: FeedbackHandler.__init__() missing 1 required positional argument: 'greeting_handler'
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Pentanative\Lola_Pentanative\run.py", line 151, in main
+    from app import app
+  File "C:\Users\zigam\Documents\Pentanative\Lola_Pentanative\app.py", line 55, in <module>
+    webhook_handler = WebhookHandler(config)
+  File "C:\Users\zigam\Documents\Pentanative\Lola_Pentanative\handlers\webhook_handler.py", line 22, in __init__
+    self.message_processor = MessageProcessor(
+                             ~~~~~~~~~~~~~~~~^
+        config,
+        ^^^^^^^
+    ...<4 lines>...
+        self.location_service
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\zigam\Documents\Pentanative\Lola_Pentanative\handlers\message_processor.py", line 42, in __init__
+    self.feedback_handler = FeedbackHandler(config, session_manager, data_manager, whatsapp_service)
+                            ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: FeedbackHandler.__init__() missing 1 required positional argument: 'greeting_handler'
