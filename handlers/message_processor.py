@@ -31,15 +31,19 @@ class MessageProcessor:
             config, session_manager, data_manager, whatsapp_service
         )
 
-        # Initialize all handlers with lead tracking where needed
+        # Initialize greeting handler first, as it's needed by feedback handler
         self.greeting_handler = GreetingHandler(config, session_manager, data_manager, whatsapp_service)
+
+        # Initialize feedback handler with greeting_handler
+        self.feedback_handler = FeedbackHandler(
+            config, session_manager, data_manager, whatsapp_service, self.greeting_handler
+        )
+
+        # Initialize other handlers
         self.enquiry_handler = EnquiryHandler(config, session_manager, data_manager, whatsapp_service)
         self.faq_handler = FAQHandler(config, session_manager, data_manager, whatsapp_service)
         self.complaint_handler = ComplaintHandler(config, session_manager, data_manager, whatsapp_service)
         self.menu_handler = MenuHandler(config, session_manager, data_manager, whatsapp_service)
-        
-        # Initialize feedback handler
-        self.feedback_handler = FeedbackHandler(config, session_manager, data_manager, whatsapp_service)
         
         # Initialize order handler with lead tracking
         self.order_handler = OrderHandler(
@@ -274,8 +278,8 @@ class MessageProcessor:
             elif current_handler_name == "feedback_handler":
                 if current_state == "feedback_rating":
                     response = self.feedback_handler.handle_feedback_rating_state(state, message, session_id)
-                elif current_state == "feedback_comment":
-                    response = self.feedback_handler.handle_feedback_comment_state(state, message, session_id)
+                elif current_state == "feedback_completed":  # Updated to handle feedback_completed state
+                    response = self.feedback_handler.handle_feedback_completed_state(state, message, session_id)
                 else:
                     logger.warning(f"Session {session_id}: Unhandled feedback_handler state '{current_state}'.")
                     response = self.feedback_handler.handle_back_to_main(state, session_id)

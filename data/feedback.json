@@ -7,5 +7,23 @@
     "comment": "hello",
     "timestamp": "2025-08-05T00:05:48.751165",
     "session_duration": 29.6
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "ziga",
+    "order_id": "88",
+    "rating": "good",
+    "comment": "",
+    "timestamp": "2025-08-05T00:27:57.864983",
+    "session_duration": 8.26
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "ziga",
+    "order_id": "89",
+    "rating": "good",
+    "comment": "",
+    "timestamp": "2025-08-05T00:37:42.693085",
+    "session_duration": 8.09
   }
 ]
