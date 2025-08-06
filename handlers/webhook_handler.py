@@ -1,16 +1,19 @@
 import json
 import logging
+import hmac
+import hashlib
 from utils.session_manager import SessionManager
 from utils.data_manager import DataManager
 from services.whatsapp_service import WhatsAppService
 from services.payment_service import PaymentService
 from services.location_service import LocationService
 from handlers.message_processor import MessageProcessor
+from handlers.payment_handler import PaymentHandler
 
 logger = logging.getLogger(__name__)
 
 class WebhookHandler:
-    """Handles WhatsApp webhook requests."""
+    """Handles WhatsApp and Paystack webhook requests."""
     
     def __init__(self, config):
         self.config = config
@@ -27,29 +30,43 @@ class WebhookHandler:
             self.payment_service,
             self.location_service
         )
+        self.payment_handler = PaymentHandler(
+            config,
+            self.session_manager,
+            self.data_manager,
+            self.whatsapp_service,
+            self.payment_service,
+            self.location_service
+        )
     
     def verify_webhook(self, request):
-        """Handle webhook verification."""
+        """Handle WhatsApp webhook verification."""
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
 
         if mode == "subscribe" and token == self.config.VERIFY_TOKEN:
-            logger.info("Webhook verified successfully!")
+            logger.info("WhatsApp webhook verified successfully!")
             return challenge, 200
         
-        logger.error("Webhook verification failed. Mismatched tokens or mode.")
+        logger.error("WhatsApp webhook verification failed. Mismatched tokens or mode.")
         return "Verification failed", 403
     
     def handle_webhook(self, request):
-        """Handle incoming webhook messages."""
+        """Handle incoming webhook messages (WhatsApp or Paystack)."""
         try:
+            # Check if this is a Paystack webhook based on the presence of the X-Paystack-Signature header
+            paystack_signature = request.headers.get('X-Paystack-Signature')
+            if paystack_signature:
+                return self._handle_paystack_webhook(request)
+            
+            # Handle WhatsApp webhook
             data = request.get_json()
             if not data:
                 logger.error("No JSON data received in webhook POST request.")
                 return {"status": "error", "message": "No data received"}, 400
 
-            logger.debug(f"Received webhook data: {json.dumps(data, indent=2)}")
+            logger.debug(f"Received WhatsApp webhook data: {json.dumps(data, indent=2)}")
 
             for entry in data.get("entry", []):
                 for change in entry.get("changes", []):
@@ -86,6 +103,45 @@ class WebhookHandler:
             return {"status": "success"}, 200
         except Exception as e:
             logger.error(f"Error processing webhook: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}, 500
+    
+    def _handle_paystack_webhook(self, request):
+        """Handle Paystack webhook requests."""
+        try:
+            # Verify Paystack signature
+            paystack_secret_key = self.config.PAYSTACK_SECRET_KEY
+            signature = request.headers.get('X-Paystack-Signature')
+            body = request.get_data()
+
+            # Compute HMAC SHA512 signature
+            computed_signature = hmac.new(
+                paystack_secret_key.encode('utf-8'),
+                body,
+                hashlib.sha512
+            ).hexdigest()
+
+            if not hmac.compare_digest(signature, computed_signature):
+                logger.error("Invalid Paystack webhook signature")
+                return {"status": "error", "message": "Invalid signature"}, 401
+
+            # Parse webhook data
+            webhook_data = request.get_json()
+            if not webhook_data:
+                logger.error("No JSON data received in Paystack webhook POST request.")
+                return {"status": "error", "message": "No data received"}, 400
+
+            logger.debug(f"Received Paystack webhook data: {json.dumps(webhook_data, indent=2)}")
+
+            # Pass the webhook data to PaymentHandler
+            self.payment_handler.handle_payment_webhook(
+                webhook_data=webhook_data,
+                session_manager=self.session_manager,
+                whatsapp_service=self.whatsapp_service
+            )
+
+            return {"status": "success"}, 200
+        except Exception as e:
+            logger.error(f"Error processing Paystack webhook: {e}", exc_info=True)
             return {"status": "error", "message": str(e)}, 500
     
     def _extract_message_data(self, message):

@@ -1,7 +1,13 @@
 import requests
 import logging
 
+# Configure logging with UTF-8 encoding
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+handler.stream.reconfigure(encoding='utf-8')  # Force UTF-8 encoding
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 class WhatsAppService:
     """Service for sending WhatsApp messages."""
@@ -199,3 +205,40 @@ class WhatsAppService:
             "text": {"body": "Your session has timed out due to inactivity. Please send a message to start a new interaction."}
         }
         return self.send_message(payload)
+    
+    def send_template_message(self, to: str, template_name: str, language_code: str, components: list) -> dict:
+        """
+        Sends a WhatsApp template message.
+
+        Args:
+            to (str): The recipient's WhatsApp ID.
+            template_name (str): The name of the template to send.
+            language_code (str): The language code for the template (e.g., 'en').
+            components (list): List of component dictionaries for template parameters.
+
+        Returns:
+            dict: The response from the WhatsApp API, or None if an error occurred.
+        """
+        try:
+            # Validate inputs
+            if not to or not template_name or not language_code or not components:
+                logger.error(f"Invalid parameters: to='{to}', template_name='{template_name}', language_code='{language_code}', components='{components}'")
+                return None
+                
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": str(to),  # Ensure 'to' is a string
+                "type": "template",
+                "template": {
+                    "name": str(template_name),
+                    "language": {"code": str(language_code)},
+                    "components": components
+                }
+            }
+            logger.debug(f"Created template message payload for {to}: {payload}")
+            return self.send_message(payload)
+        except Exception as e:
+            logger.error(f"Error creating template message for {to}: {e}", exc_info=True)
+            # Fallback to text message with error information
+            return self.create_text_message(to, f"⚠️ Error sending template message. Please contact support.")

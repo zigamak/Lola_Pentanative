@@ -81,8 +81,21 @@ def webhook():
     """
     Endpoint for receiving incoming WhatsApp messages.
     Handles the POST request containing message data from WhatsApp.
+    This route also handles Paystack webhooks by checking the X-Paystack-Signature header.
     """
     return webhook_handler.handle_webhook(request)
+
+# --- NEW: Dedicated route for Paystack webhooks ---
+@app.route("/api/paystack/webhook", methods=["POST"])
+def paystack_webhook():
+    """
+    Dedicated endpoint for Paystack webhooks.
+    This route directly calls the Paystack webhook handling logic.
+    """
+    # Note: _handle_paystack_webhook is a "private" method by convention (due to leading underscore).
+    # Calling it directly here is acceptable for routing, but consider if you want to make it
+    # a public method in WebhookHandler if it's meant for direct external exposure.
+    return webhook_handler._handle_paystack_webhook(request)
 
 @app.route("/payment-callback", methods=["GET", "POST"])
 def payment_callback():
@@ -125,4 +138,3 @@ if __name__ == "__main__":
     logger.info("Logs: Check bot.log file for detailed logs")
     logger.info("To run this application, use Gunicorn from your terminal:")
     logger.info(f"gunicorn -w 4 -b 0.0.0.0:{config.APP_PORT} app:app")
-
