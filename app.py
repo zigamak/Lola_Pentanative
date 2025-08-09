@@ -7,6 +7,8 @@ from config import Config
 from handlers.webhook_handler import WebhookHandler
 from handlers.payment_handler import PaymentHandler
 from handlers.product_sync_handler import ProductSyncHandler
+from handlers.feedback_handler import FeedbackHandler
+from handlers.greeting_handler import GreetingHandler
 from utils.session_manager import SessionManager
 from utils.data_manager import DataManager
 from services.whatsapp_service import WhatsAppService
@@ -51,10 +53,16 @@ except Exception as e:
     logger.error(f"Error initializing a core service: {e}", exc_info=True)
     exit(1)
 
-# Initialize the WebhookHandler
-webhook_handler = WebhookHandler(config)
+# --- Initialize GreetingHandler and FeedbackHandler ---
+try:
+    greeting_handler = GreetingHandler(config, session_manager, data_manager, whatsapp_service)
+    feedback_handler = FeedbackHandler(config, session_manager, data_manager, whatsapp_service, greeting_handler)
+    logger.info("GreetingHandler and FeedbackHandler initialized.")
+except Exception as e:
+    logger.error(f"Error initializing a handler: {e}", exc_info=True)
+    exit(1)
 
-# Initialize the PaymentHandler
+# Initialize the PaymentHandler with FeedbackHandler
 try:
     payment_handler = PaymentHandler(
         config,
@@ -62,11 +70,15 @@ try:
         data_manager,
         whatsapp_service,
         payment_service,
-        location_service
+        location_service,
+        feedback_handler=feedback_handler  # Pass FeedbackHandler
     )
 except Exception as e:
     logger.error(f"Error initializing PaymentHandler: {e}", exc_info=True)
     exit(1)
+
+# Initialize the WebhookHandler
+webhook_handler = WebhookHandler(config)
 
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
@@ -85,16 +97,12 @@ def webhook():
     """
     return webhook_handler.handle_webhook(request)
 
-# --- NEW: Dedicated route for Paystack webhooks ---
 @app.route("/api/paystack/webhook", methods=["POST"])
 def paystack_webhook():
     """
     Dedicated endpoint for Paystack webhooks.
     This route directly calls the Paystack webhook handling logic.
     """
-    # Note: _handle_paystack_webhook is a "private" method by convention (due to leading underscore).
-    # Calling it directly here is acceptable for routing, but consider if you want to make it
-    # a public method in WebhookHandler if it's meant for direct external exposure.
     return webhook_handler._handle_paystack_webhook(request)
 
 @app.route("/payment-callback", methods=["GET", "POST"])
@@ -129,8 +137,6 @@ def sync_products():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
-    # This block will now primarily contain informational messages.
-    # Gunicorn will be used to run the 'app' Flask instance directly.
     logger.info("Preparing to start WhatsApp bot server with Gunicorn...")
     logger.info(f"Webhook URL: {config.CALLBACK_BASE_URL}/webhook")
     logger.info(f"Payment Callback: {config.CALLBACK_BASE_URL}/payment-callback")

@@ -29,14 +29,16 @@ class PaymentHandler(BaseHandler):
         self.merchant_phone_number = getattr(config, 'MERCHANT_PHONE_NUMBER', None)
         self.payment_timers = {}
         if not self.feedback_handler:
-            self.logger.warning("FeedbackHandler not provided, feedback collection will be skipped")
+            logger.warning("FeedbackHandler not provided, feedback collection will be skipped")
+        else:
+            logger.info("FeedbackHandler successfully provided to PaymentHandler")
         if not self.merchant_phone_number:
-            self.logger.warning("MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped")
-        self.logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, delivery fee ₦{self.delivery_fee}, service charge {self.service_charge_percentage}%, merchant phone {self.merchant_phone_number}")
+            logger.warning("MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped")
+        logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, delivery fee ₦{self.delivery_fee}, service charge {self.service_charge_percentage}%, merchant phone {self.merchant_phone_number}")
     
     def handle_payment_processing_state(self, state, message, session_id):
         """Handle payment processing state - entry point from order handler."""
-        self.logger.info(f"Handling payment processing for session {session_id}, message: {message}")
+        logger.info(f"Handling payment processing for session {session_id}, message: {message}")
         
         if message == "initiate_payment":
             return self.create_payment_link(state, session_id)
@@ -49,10 +51,10 @@ class PaymentHandler(BaseHandler):
     def create_payment_link(self, state, session_id):
         """Create payment link for an existing order with subaccount splitting, delivery fee, service charge, and automatic monitoring."""
         try:
-            self.logger.info(f"Creating payment link for session {session_id}")
+            logger.info(f"Creating payment link for session {session_id}")
             
             if not state.get("cart"):
-                self.logger.warning(f"Cannot create payment - cart is empty for session {session_id}")
+                logger.warning(f"Cannot create payment - cart is empty for session {session_id}")
                 state["current_state"] = "greeting"
                 state["current_handler"] = "greeting_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -63,7 +65,7 @@ class PaymentHandler(BaseHandler):
             
             order_id = state.get("order_id")
             if not order_id:
-                self.logger.error(f"No order_id found in state for session {session_id}")
+                logger.error(f"No order_id found in state for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -74,7 +76,7 @@ class PaymentHandler(BaseHandler):
             
             order_data = self.data_manager.get_order_by_id(order_id)
             if not order_data:
-                self.logger.error(f"Order {order_id} not found in database for session {session_id}")
+                logger.error(f"Order {order_id} not found in database for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -85,7 +87,7 @@ class PaymentHandler(BaseHandler):
             
             subtotal = order_data.get("total_amount", 0)
             if subtotal <= 0:
-                self.logger.warning(f"Invalid subtotal amount {subtotal} for session {session_id}")
+                logger.warning(f"Invalid subtotal amount {subtotal} for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -115,7 +117,7 @@ class PaymentHandler(BaseHandler):
             }
             success = self.data_manager.update_order_status(order_id, "pending_payment", payment_data)
             if not success:
-                self.logger.error(f"Failed to update order {order_id} to pending_payment status for session {session_id}")
+                logger.error(f"Failed to update order {order_id} to pending_payment status for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -153,7 +155,7 @@ class PaymentHandler(BaseHandler):
                 state["current_handler"] = "payment_handler"
                 self.session_manager.update_session_state(session_id, state)
                 
-                self.logger.info(f"Payment link created successfully for order {order_id} with subaccount {self.subaccount_code}")
+                logger.info(f"Payment link created successfully for order {order_id} with subaccount {self.subaccount_code}")
                 
                 order_items = self.data_manager.get_order_items(order_id)
                 formatted_items = self._format_order_items(order_items)
@@ -173,7 +175,7 @@ class PaymentHandler(BaseHandler):
                     f"⏰ Payment link expires in 15 minutes."
                 )
             else:
-                self.logger.error(f"Failed to generate payment link for order {order_id}")
+                logger.error(f"Failed to generate payment link for order {order_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -183,7 +185,7 @@ class PaymentHandler(BaseHandler):
                 )
                 
         except Exception as e:
-            self.logger.error(f"Error creating payment link for session {session_id}: {e}", exc_info=True)
+            logger.error(f"Error creating payment link for session {session_id}: {e}", exc_info=True)
             state["current_state"] = "order_summary"
             state["current_handler"] = "order_handler"
             self.session_manager.update_session_state(session_id, state)
@@ -216,7 +218,7 @@ class PaymentHandler(BaseHandler):
     def _send_payment_success_message(self, session_id: str, order_id: str, total_amount: float, items: List[Dict], delivery_address: str, maps_info: str = ""):
         """Send payment success message to customer and detailed notification to merchant via bot."""
         try:
-            # Customer notification (unchanged)
+            # Customer notification
             order_data = self.data_manager.get_order_by_id(order_id)
             service_charge = order_data.get("service_charge", 0) if order_data else 0
             formatted_items = self._format_order_items(items, for_template=False)
@@ -225,22 +227,25 @@ class PaymentHandler(BaseHandler):
                 f"📋 *Order ID:* {order_id}\n"
                 f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
                 f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:*\n{formatted_items}\n"
                 f"📍 *Delivery Address:* {delivery_address}{maps_info}\n\n"
-                f"🎉 Thank you for your order. It is now being processed, and you will receive an update on delivery soon"
+                f"🎉 Thank you for your order. It is now being processed, and you will receive an update on delivery soon."
             )
             self.whatsapp_service.create_text_message(session_id, customer_message)
-            self.logger.info(f"Sent payment success text message for order {order_id} to customer {session_id}")
+            logger.info(f"Sent payment success text message for order {order_id} to customer {session_id}")
+            
+            # Trigger feedback collection immediately
+            state = self.session_manager.get_session_state(session_id)
+            self._initiate_feedback_collection(state, session_id, order_id)
             
             # Detailed merchant notification via bot
             if self.merchant_phone_number:
-                state = self.session_manager.get_session_state(session_id)
                 customer_name = state.get("user_name", "Guest")
                 customer_phone = state.get("phone_number", session_id)
                 customer_notes = state.get("customer_notes", "No special instructions provided")
                 order_placement_time = order_data.get("created_at", "Not available") if order_data else "Not available"
-                payment_method = order_data.get("payment_method_type", "paystack") if order_data else "paystack"
                 
                 merchant_message = (
                     f"🔔 *New Order Alert*\n\n"
@@ -251,20 +256,19 @@ class PaymentHandler(BaseHandler):
                     f"🛒 *Items:*\n{formatted_items}\n"
                     f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
                     f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-    
+                    f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"📝 *Customer Notes:* {customer_notes}\n"
-                    
-                    f"💳 *Payment Method:* {payment_method}\n\n"
+                    f"📅 *Order Placed:* {order_placement_time}\n"
                     f"📌 Please process this order promptly."
                 )
                 self.whatsapp_service.create_text_message(self.merchant_phone_number, merchant_message)
-                self.logger.info(f"Sent detailed merchant notification for order {order_id} to {self.merchant_phone_number}")
+                logger.info(f"Sent detailed merchant notification for order {order_id} to {self.merchant_phone_number}")
             else:
-                self.logger.warning("Merchant phone number not configured, skipping merchant notification")
+                logger.warning("Merchant phone number not configured, skipping merchant notification")
                 
         except Exception as e:
-            self.logger.error(f"Error sending payment success messages for order {order_id}: {e}", exc_info=True)
+            logger.error(f"Error sending payment success messages for order {order_id}: {e}", exc_info=True)
             # Send fallback merchant notification if primary fails
             if self.merchant_phone_number:
                 state = self.session_manager.get_session_state(session_id)
@@ -272,7 +276,6 @@ class PaymentHandler(BaseHandler):
                 customer_phone = state.get("phone_number", session_id)
                 customer_notes = state.get("customer_notes", "No special instructions provided")
                 order_placement_time = order_data.get("created_at", "Not available") if order_data else "Not available"
-                payment_method = order_data.get("payment_method_type", "paystack") if order_data else "paystack"
                 fallback_message = (
                     f"🔔 *New Order Alert*\n\n"
                     f"📋 *Order ID:* {order_id}\n"
@@ -282,19 +285,16 @@ class PaymentHandler(BaseHandler):
                     f"🛒 *Items:*\n{formatted_items}\n"
                     f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0) if order_data else 0:,}\n"
                     f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                   
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"📝 *Customer Notes:* {customer_notes}\n"
-                   
-                    f"💳 *Payment Method:* {payment_method}\n\n"
                     f"📌 Please process this order promptly."
                 )
                 self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
-                self.logger.info(f"Sent detailed fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
+                logger.info(f"Sent detailed fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
     
     def start_payment_monitoring(self, session_id, payment_reference, order_id):
         """Start monitoring payment status every minute for up to 15 minutes."""
-        self.logger.info(f"Starting payment monitoring for order {order_id}, reference {payment_reference}")
+        logger.info(f"Starting payment monitoring for order {order_id}, reference {payment_reference}")
         
         def check_payment_status(attempt=1, max_attempts=15):
             """Check payment status and handle accordingly."""
@@ -302,7 +302,7 @@ class PaymentHandler(BaseHandler):
                 payment_status, payment_data = self.payment_service.verify_payment_detailed(payment_reference)
                 
                 if payment_status:
-                    self.logger.info(f"Payment verified for order {order_id} on attempt {attempt}")
+                    logger.info(f"Payment verified for order {order_id} on attempt {attempt}")
                     self.handle_successful_auto_payment(session_id, order_id, payment_reference)
                     
                     if session_id in self.payment_timers:
@@ -310,7 +310,7 @@ class PaymentHandler(BaseHandler):
                         del self.payment_timers[session_id]
                     return
                 
-                self.logger.info(f"Payment not yet verified for order {order_id}, attempt {attempt}/{max_attempts}")
+                logger.info(f"Payment not yet verified for order {order_id}, attempt {attempt}/{max_attempts}")
                 
                 if attempt == 5:
                     self.send_payment_reminder(session_id, order_id, payment_reference)
@@ -320,14 +320,14 @@ class PaymentHandler(BaseHandler):
                     self.payment_timers[session_id] = timer
                     timer.start()
                 else:
-                    self.logger.info(f"Payment monitoring expired for order {order_id} after {max_attempts} attempts")
+                    logger.info(f"Payment monitoring expired for order {order_id} after {max_attempts} attempts")
                     self.handle_payment_timeout(session_id, order_id, payment_reference)
                     
                     if session_id in self.payment_timers:
                         del self.payment_timers[session_id]
                         
             except Exception as e:
-                self.logger.error(f"Error in payment monitoring for order {order_id}: {e}")
+                logger.error(f"Error in payment monitoring for order {order_id}: {e}", exc_info=True)
                 if attempt < max_attempts:
                     timer = Timer(60, lambda: check_payment_status(attempt + 1, max_attempts))
                     self.payment_timers[session_id] = timer
@@ -341,7 +341,7 @@ class PaymentHandler(BaseHandler):
             payment_verified, payment_data = self.payment_service.verify_payment_detailed(payment_reference)
             
             if not payment_verified:
-                self.logger.warning(f"handle_successful_auto_payment called but payment not verified for {payment_reference}")
+                logger.warning(f"handle_successful_auto_payment called but payment not verified for {payment_reference}")
                 return
             
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
@@ -349,7 +349,7 @@ class PaymentHandler(BaseHandler):
                 service_charge = order_data.get("service_charge", 0)
                 if service_charge == 0 and order_data.get("total_amount", 0) > 0:
                     service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    self.logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
+                    logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
                 success = self.data_manager.update_order_status(
                     order_id,
                     "confirmed",
@@ -365,15 +365,15 @@ class PaymentHandler(BaseHandler):
                     }
                 )
                 if not success:
-                    self.logger.error(f"Failed to update order {order_id} to confirmed status for session {session_id}")
+                    logger.error(f"Failed to update order {order_id} to confirmed status for session {session_id}")
                     return
             else:
-                self.logger.error(f"Order data not found for payment reference {payment_reference} during auto-payment handling.")
+                logger.error(f"Order data not found for payment reference {payment_reference} during auto-payment handling.")
                 return
             
             state = self.session_manager.get_session_state(session_id)
-            state["current_state"] = "order_confirmation"
-            state["current_handler"] = "payment_handler"
+            state["current_state"] = "feedback_rating"
+            state["current_handler"] = "feedback_handler"
             state["cart"] = {}
             self.session_manager.update_session_state(session_id, state)
             
@@ -381,15 +381,15 @@ class PaymentHandler(BaseHandler):
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
                     self.lead_tracking_handler.track_order_conversion(session_id, order_id, order_data["total_amount"] + self.delivery_fee + service_charge)
                 else:
-                    self.logger.debug("Lead tracking handler not available for order conversion tracking")
+                    logger.debug("Lead tracking handler not available for order conversion tracking")
             except Exception as e:
-                self.logger.error(f"Error tracking order conversion: {e}")
+                logger.error(f"Error tracking order conversion: {e}", exc_info=True)
             
             try:
                 self.session_manager.extend_session_for_paid_user(session_id, order_id, hours=24)
-                self.logger.info(f"Extended session for paid user {session_id} for 24 hours")
+                logger.info(f"Extended session for paid user {session_id} for 24 hours")
             except Exception as e:
-                self.logger.error(f"Error extending paid user session: {e}")
+                logger.error(f"Error extending paid user session: {e}", exc_info=True)
             
             try:
                 if hasattr(self, 'order_tracking_handler') and self.order_tracking_handler:
@@ -399,7 +399,7 @@ class PaymentHandler(BaseHandler):
                         "Your order has been received and is being processed."
                     )
             except Exception as e:
-                self.logger.error(f"Error initializing order status: {e}")
+                logger.error(f"Error initializing order status: {e}", exc_info=True)
             
             maps_info = self._generate_maps_info(state)
             order_items = self.data_manager.get_order_items(order_id)
@@ -413,18 +413,8 @@ class PaymentHandler(BaseHandler):
                 maps_info
             )
             
-            # Explicitly trigger feedback collection with enhanced logging
-            try:
-                if self.feedback_handler:
-                    self.logger.info(f"Initiating feedback collection for order {order_id}, session {session_id}")
-                    self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
-                else:
-                    self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping feedback collection")
-            except Exception as e:
-                self.logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
-            
         except Exception as e:
-            self.logger.error(f"Error handling successful auto payment for order {order_id}: {e}", exc_info=True)
+            logger.error(f"Error handling successful auto payment for order {order_id}: {e}", exc_info=True)
     
     def send_payment_reminder(self, session_id, order_id, payment_reference):
         """Send payment reminder after 5 minutes."""
@@ -433,13 +423,13 @@ class PaymentHandler(BaseHandler):
             
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             if not order_data:
-                self.logger.error(f"Order data not found for reminder for order {order_id}.")
+                logger.error(f"Order data not found for reminder for order {order_id}.")
                 return
             
             subtotal = order_data.get("total_amount", 0)
             service_charge = order_data.get("service_charge", subtotal * (self.service_charge_percentage / 100))
             if service_charge == 0 and subtotal > 0:
-                self.logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
+                logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
             total_amount = subtotal + self.delivery_fee + service_charge
             
             customer_email = self.payment_service.generate_customer_email(
@@ -474,7 +464,6 @@ class PaymentHandler(BaseHandler):
                     f"We notice your payment for Order #{order_id} hasn't been completed yet.\n\n"
                     f"💰 *Subtotal:* ₦{subtotal:,}\n"
                     f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                    f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                     f"💰 *Total Amount:* ₦{total_amount:,.2f}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
@@ -484,19 +473,19 @@ class PaymentHandler(BaseHandler):
                 )
                 
                 self.whatsapp_service.create_text_message(session_id, reminder_message)
-                self.logger.info(f"Payment reminder sent for order {order_id}")
+                logger.info(f"Payment reminder sent for order {order_id}")
             else:
-                self.logger.warning(f"Could not generate new payment link for reminder for order {order_id}.")
+                logger.warning(f"Could not generate new payment link for reminder for order {order_id}.")
             
         except Exception as e:
-            self.logger.error(f"Error sending payment reminder for order {order_id}: {e}")
+            logger.error(f"Error sending payment reminder for order {order_id}: {e}", exc_info=True)
     
     def handle_payment_timeout(self, session_id, order_id, payment_reference):
         """Handle payment timeout after 15 minutes."""
         try:
             success = self.data_manager.update_order_status(order_id, "expired", {})
             if not success:
-                self.logger.error(f"Failed to update order {order_id} to expired status for session {session_id}")
+                logger.error(f"Failed to update order {order_id} to expired status for session {session_id}")
             
             state = self.session_manager.get_session_state(session_id)
             state["cart"] = {}
@@ -531,17 +520,17 @@ class PaymentHandler(BaseHandler):
             ]
             
             self.whatsapp_service.create_button_message(session_id, timeout_message, buttons)
-            self.logger.info(f"Payment timeout handled for order {order_id}")
+            logger.info(f"Payment timeout handled for order {order_id}")
             
         except Exception as e:
-            self.logger.error(f"Error handling payment timeout for order {order_id}: {e}")
+            logger.error(f"Error handling payment timeout for order {order_id}: {e}", exc_info=True)
     
     def stop_payment_monitoring(self, session_id):
         """Stop payment monitoring for a session."""
         if session_id in self.payment_timers:
             self.payment_timers[session_id].cancel()
             del self.payment_timers[session_id]
-            self.logger.info(f"Payment monitoring stopped for session {session_id}")
+            logger.info(f"Payment monitoring stopped for session {session_id}")
     
     def handle_awaiting_payment_state(self, state, message, session_id):
         """Handle awaiting payment state with both manual and auto verification."""
@@ -556,7 +545,7 @@ class PaymentHandler(BaseHandler):
             )
         
         if message.lower() == "paid":
-            self.logger.info(f"Received 'paid' command for session {session_id}, attempting manual verification for ref: {payment_reference}")
+            logger.info(f"Received 'paid' command for session {session_id}, attempting manual verification for ref: {payment_reference}")
             return self._handle_manual_payment_verification(state, session_id, payment_reference)
         
         elif message.lower() in ["cancel", "cancel_order"]:
@@ -568,18 +557,18 @@ class PaymentHandler(BaseHandler):
     def _handle_manual_payment_verification(self, state, session_id, payment_reference):
         """Handle manual 'paid' verification."""
         try:
-            self.logger.debug(f"Attempting manual payment verification for session {session_id}, reference {payment_reference}")
+            logger.debug(f"Attempting manual payment verification for session {session_id}, reference {payment_reference}")
             payment_verified, payment_data = self.payment_service.verify_payment_detailed(payment_reference)
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             
             if payment_verified and order_data:
-                self.logger.info(f"Manual payment verification successful for order {order_data['order_id']}")
+                logger.info(f"Manual payment verification successful for order {order_data['order_id']}")
                 self.stop_payment_monitoring(session_id)
                 
                 service_charge = order_data.get("service_charge", 0)
                 if service_charge == 0 and order_data.get("total_amount", 0) > 0:
                     service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    self.logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                    logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
                 
                 success = self.data_manager.update_order_status(
                     order_data["order_id"],
@@ -596,14 +585,14 @@ class PaymentHandler(BaseHandler):
                     }
                 )
                 if not success:
-                    self.logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for session {session_id}")
+                    logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for session {session_id}")
                     return self.whatsapp_service.create_text_message(
                         session_id,
                         "⚠️ Error confirming payment. Please contact support."
                     )
                 
-                state["current_state"] = "order_confirmation"
-                state["current_handler"] = "payment_handler"
+                state["current_state"] = "feedback_rating"
+                state["current_handler"] = "feedback_handler"
                 state["cart"] = {}
                 self.session_manager.update_session_state(session_id, state)
                 
@@ -611,9 +600,9 @@ class PaymentHandler(BaseHandler):
                     if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
                         self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + service_charge)
                     else:
-                        self.logger.debug("Lead tracking handler not available for order conversion tracking")
+                        logger.debug("Lead tracking handler not available for order conversion tracking")
                 except Exception as e:
-                    self.logger.error(f"Error tracking order conversion: {e}")
+                    logger.error(f"Error tracking order conversion: {e}", exc_info=True)
                 
                 order_items = self.data_manager.get_order_items(order_data["order_id"])
                 maps_info = self._generate_maps_info(state)
@@ -627,20 +616,10 @@ class PaymentHandler(BaseHandler):
                     maps_info
                 )
                 
-                # Explicitly trigger feedback collection with enhanced logging
-                try:
-                    if self.feedback_handler:
-                        self.logger.info(f"Initiating feedback collection for order {order_data['order_id']}, session {session_id}")
-                        self.feedback_handler.initiate_feedback_request(state, session_id, order_data['order_id'])
-                    else:
-                        self.logger.warning(f"FeedbackHandler not available for order {order_data['order_id']}, skipping feedback collection")
-                except Exception as e:
-                    self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']}: {e}", exc_info=True)
-                
-                return {"message": "Payment confirmed and feedback initiated"}
+                return {"message": "Payment confirmed, feedback request sent"}
                 
             elif not payment_verified:
-                self.logger.info(f"Manual payment verification failed for reference {payment_reference}. Paystack status: {payment_data.get('status', 'N/A') if payment_data else 'N/A'}")
+                logger.info(f"Manual payment verification failed for reference {payment_reference}. Paystack status: {payment_data.get('status', 'N/A') if payment_data else 'N/A'}")
                 order_items = self.data_manager.get_order_items(order_data["order_id"] if order_data else "0")
                 formatted_items = self._format_order_items(order_items)
                 service_charge = order_data.get("service_charge", 0) if order_data else 0
@@ -663,7 +642,7 @@ class PaymentHandler(BaseHandler):
                     f"❌ Send 'cancel' to cancel the order."
                 )
             else:
-                self.logger.error(f"Order not found for payment reference {payment_reference} during manual verification.")
+                logger.error(f"Order not found for payment reference {payment_reference} during manual verification.")
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"⚠️ *Order Not Found*\n\n"
@@ -672,7 +651,7 @@ class PaymentHandler(BaseHandler):
                 )
                 
         except Exception as e:
-            self.logger.error(f"Error in manual payment verification for reference {payment_reference}: {e}", exc_info=True)
+            logger.error(f"Error in manual payment verification for reference {payment_reference}: {e}", exc_info=True)
             return self.whatsapp_service.create_text_message(
                 session_id,
                 "⚠️ Error checking payment status. Please try again or contact support."
@@ -688,9 +667,9 @@ class PaymentHandler(BaseHandler):
                 if order_data:
                     success = self.data_manager.update_order_status(order_data["order_id"], "cancelled", {})
                     if not success:
-                        self.logger.error(f"Failed to update order {order_data['order_id']} to cancelled status for session {session_id}")
+                        logger.error(f"Failed to update order {order_data['order_id']} to cancelled status for session {session_id}")
                 else:
-                    self.logger.warning(f"No order found for payment reference {state['payment_reference']} during cancellation.")
+                    logger.warning(f"No order found for payment reference {state['payment_reference']} during cancellation.")
             
             state["cart"] = {}
             state["current_state"] = "greeting"
@@ -712,7 +691,7 @@ class PaymentHandler(BaseHandler):
             )
             
         except Exception as e:
-            self.logger.error(f"Error handling payment cancellation for session {session_id}: {e}", exc_info=True)
+            logger.error(f"Error handling payment cancellation for session {session_id}: {e}", exc_info=True)
             return self.handle_back_to_main(state, session_id)
     
     def _handle_payment_waiting_message(self, state, session_id, payment_reference):
@@ -720,10 +699,10 @@ class PaymentHandler(BaseHandler):
         order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
         
         if order_data and order_data.get("status") == "confirmed":
-            self.logger.info(f"User sent message while in awaiting_payment, but order {order_data['order_id']} was already confirmed.")
+            logger.info(f"User sent message while in awaiting_payment, but order {order_data['order_id']} was already confirmed.")
             self.stop_payment_monitoring(session_id)
-            state["current_state"] = "order_confirmation"
-            state["current_handler"] = "payment_handler"
+            state["current_state"] = "feedback_rating"
+            state["current_handler"] = "feedback_handler"
             state["cart"] = {}
             self.session_manager.update_session_state(session_id, state)
             
@@ -740,19 +719,9 @@ class PaymentHandler(BaseHandler):
                 maps_info
             )
             
-            # Explicitly trigger feedback collection with enhanced logging
-            try:
-                if self.feedback_handler:
-                    self.logger.info(f"Initiating feedback collection for order {order_data['order_id']}, session {session_id}")
-                    self.feedback_handler.initiate_feedback_request(state, session_id, order_data['order_id'])
-                else:
-                    self.logger.warning(f"FeedbackHandler not available for order {order_data['order_id']}, skipping feedback collection")
-            except Exception as e:
-                self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']}: {e}", exc_info=True)
-            
-            return {"message": "Payment already confirmed, text message and feedback initiated"}
+            return {"message": "Payment already confirmed, feedback request sent"}
         else:
-            self.logger.info(f"User sent message while still awaiting payment for order {state.get('order_id', 'N/A')}.")
+            logger.info(f"User sent message while still awaiting payment for order {state.get('order_id', 'N/A')}.")
             order_id = state.get("order_id", "0")
             order_items = self.data_manager.get_order_items(order_id)
             formatted_items = self._format_order_items(order_items)
@@ -766,7 +735,7 @@ class PaymentHandler(BaseHandler):
                 f"📋 *Order ID:* {state.get('order_id', 'N/A')}\n"
                 f"💰 *Subtotal:* ₦{subtotal:,}\n"
                 f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-      
+                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:* {formatted_items}\n\n"
                 f"✅ Once payment is confirmed, you'll receive an automatic confirmation.\n"
@@ -788,9 +757,9 @@ class PaymentHandler(BaseHandler):
                 maps_link = self.location_service.generate_maps_link(state["address"])
                 maps_info = f"\n🗺️ View on Maps: {maps_link}"
             else:
-                self.logger.debug("No location coordinates or valid address/API key to generate maps info.")
+                logger.debug("No location coordinates or valid address/API key to generate maps info.")
         except Exception as e:
-            self.logger.error(f"Error generating maps info: {e}", exc_info=True)
+            logger.error(f"Error generating maps info: {e}", exc_info=True)
         return maps_info
     
     def handle_order_confirmation_state(self, state, session_id):
@@ -799,9 +768,9 @@ class PaymentHandler(BaseHandler):
         order_data = self.data_manager.get_order_by_payment_reference(state.get("payment_reference"))
         
         if order_data and order_data["status"] == "confirmed":
+            state["current_state"] = "feedback_rating"
+            state["current_handler"] = "feedback_handler"
             state["cart"] = {}
-            state["current_state"] = "greeting"
-            state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             
             order_items = self.data_manager.get_order_items(order_id)
@@ -817,19 +786,9 @@ class PaymentHandler(BaseHandler):
                 maps_info
             )
             
-            # Explicitly trigger feedback collection with enhanced logging
-            try:
-                if self.feedback_handler:
-                    self.logger.info(f"Initiating feedback collection for order {order_id}, session {session_id}")
-                    self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
-                else:
-                    self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping feedback collection")
-            except Exception as e:
-                self.logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
-            
-            return {"message": "Order confirmed, text message and feedback initiated"}
+            return {"message": "Order confirmed, feedback request sent"}
         else:
-            self.logger.warning(f"handle_order_confirmation_state called but order {order_id} not found or not confirmed. Status: {order_data.get('status') if order_data else 'N/A'}")
+            logger.warning(f"handle_order_confirmation_state called but order {order_id} not found or not confirmed. Status: {order_data.get('status') if order_data else 'N/A'}")
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
@@ -844,23 +803,23 @@ class PaymentHandler(BaseHandler):
             event = webhook_data.get("event")
             if event == "charge.success":
                 payment_reference = webhook_data["data"]["reference"]
-                self.logger.info(f"Received 'charge.success' webhook for reference: {payment_reference}")
+                logger.info(f"Received 'charge.success' webhook for reference: {payment_reference}")
                 order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
                 
                 if not order_data:
-                    self.logger.error(f"No order found for payment reference {payment_reference} from webhook.")
+                    logger.error(f"No order found for payment reference {payment_reference} from webhook.")
                     return
                 
                 session_id = order_data.get("phone_number")
                 if not session_id:
                     session_id = webhook_data.get("data", {}).get("metadata", {}).get("phone_number")
                     if not session_id:
-                        self.logger.warning(f"No phone_number found in order_data or webhook metadata for reference {payment_reference}. Processing order status update without user notifications.")
+                        logger.warning(f"No phone_number found in order_data or webhook metadata for reference {payment_reference}. Processing order status update without user notifications.")
                 
                 service_charge = order_data.get("service_charge", 0)
                 if service_charge == 0 and order_data.get("total_amount", 0) > 0:
                     service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    self.logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                    logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
                 
                 success = self.data_manager.update_order_status(
                     order_data["order_id"],
@@ -877,15 +836,15 @@ class PaymentHandler(BaseHandler):
                     }
                 )
                 if not success:
-                    self.logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for webhook")
+                    logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for webhook")
                     return
                 
                 if session_id:
                     self.stop_payment_monitoring(session_id)
                     
                     state = session_manager.get_session_state(session_id)
-                    state["current_state"] = "order_confirmation"
-                    state["current_handler"] = "payment_handler"
+                    state["current_state"] = "feedback_rating"
+                    state["current_handler"] = "feedback_handler"
                     state["cart"] = {}
                     session_manager.update_session_state(session_id, state)
                     
@@ -893,9 +852,9 @@ class PaymentHandler(BaseHandler):
                         if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
                             self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + service_charge)
                         else:
-                            self.logger.debug("Lead tracking handler not available for order conversion tracking")
+                            logger.debug("Lead tracking handler not available for order conversion tracking")
                     except Exception as e:
-                        self.logger.error(f"Error tracking order conversion: {e}")
+                        logger.error(f"Error tracking order conversion: {e}", exc_info=True)
                     
                     order_items = self.data_manager.get_order_items(order_data["order_id"])
                     maps_info = self._generate_maps_info(state)
@@ -908,19 +867,8 @@ class PaymentHandler(BaseHandler):
                         order_data.get("address", "Not provided"),
                         maps_info
                     )
-                    
-                    # Explicitly trigger feedback collection with enhanced logging
-                    try:
-                        if self.feedback_handler:
-                            self.logger.info(f"Initiating feedback collection for order {order_data['order_id']}, session {session_id}")
-                            self.feedback_handler.initiate_feedback_request(state, session_id, order_data['order_id'])
-                        else:
-                            self.logger.warning(f"FeedbackHandler not available for order {order_data['order_id']}, skipping feedback collection")
-                    except Exception as e:
-                        self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']}: {e}", exc_info=True)
                 else:
-                    self.logger.info(f"Order {order_data['order_id']} confirmed, but no session_id available. Sending merchant notification only.")
-                    # Send merchant notification even without session_id
+                    logger.info(f"Order {order_data['order_id']} confirmed, but no session_id available. Sending merchant notification only.")
                     order_items = self.data_manager.get_order_items(order_data["order_id"])
                     total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
                     self._send_payment_success_message(
@@ -930,22 +878,12 @@ class PaymentHandler(BaseHandler):
                         order_items,
                         order_data.get("address", "Not provided")
                     )
-                    # Attempt to trigger feedback using order_data phone_number if available
-                    try:
-                        if self.feedback_handler and order_data.get("phone_number"):
-                            state = session_manager.get_session_state(order_data["phone_number"]) or {}
-                            self.logger.info(f"Initiating feedback collection for order {order_data['order_id']} using order_data phone_number {order_data['phone_number']}")
-                            self.feedback_handler.initiate_feedback_request(state, order_data["phone_number"], order_data['order_id'])
-                        else:
-                            self.logger.warning(f"FeedbackHandler or phone_number not available for order {order_data['order_id']}, skipping feedback collection")
-                    except Exception as e:
-                        self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']} using order_data phone_number: {e}", exc_info=True)
                 
             else:
-                self.logger.info(f"Ignored webhook event: {event}")
+                logger.info(f"Ignored webhook event: {event}")
                 
         except Exception as e:
-            self.logger.error(f"Error handling payment webhook for reference {payment_reference}: {e}", exc_info=True)
+            logger.error(f"Error handling payment webhook for reference {payment_reference}: {e}", exc_info=True)
     
     def cleanup_expired_monitoring(self):
         """Clean up expired payment monitoring timers."""
@@ -955,42 +893,66 @@ class PaymentHandler(BaseHandler):
             for session_id in list(self.payment_timers.keys()):
                 state = self.session_manager.get_session_state(session_id)
                 if state.get("current_state") != "awaiting_payment":
-                    self.logger.info(f"Session {session_id} state changed from awaiting_payment, cleaning up timer.")
+                    logger.info(f"Session {session_id} state changed from awaiting_payment, cleaning up timer.")
                     expired_sessions.append(session_id)
             
             for session_id in expired_sessions:
                 self.stop_payment_monitoring(session_id)
             
             if expired_sessions:
-                self.logger.info(f"Cleaned up {len(expired_sessions)} expired payment monitoring timers")
+                logger.info(f"Cleaned up {len(expired_sessions)} expired payment monitoring timers")
                 
         except Exception as e:
-            self.logger.error(f"Error cleaning up payment monitoring: {e}", exc_info=True)
+            logger.error(f"Error cleaning up payment monitoring: {e}", exc_info=True)
     
     def _initiate_feedback_collection(self, state: Dict, session_id: str, order_id: str) -> None:
         """Initiate feedback collection after successful payment."""
         try:
             if self.feedback_handler:
-                self.logger.info(f"Attempting feedback collection for order {order_id}, session {session_id}")
+                logger.info(f"Attempting feedback collection for order {order_id}, session {session_id}")
                 self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
-                self.logger.info(f"Successfully initiated feedback collection for order {order_id}")
+                logger.info(f"Successfully initiated feedback collection for order {order_id}")
             else:
-                self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping feedback collection")
+                logger.warning(f"FeedbackHandler not available for order {order_id}, transitioning to greeting state")
+                state["current_state"] = "greeting"
+                state["current_handler"] = "greeting_handler"
+                self.session_manager.update_session_state(session_id, state)
         except Exception as e:
-            self.logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
+            logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
+            state["current_state"] = "greeting"
+            state["current_handler"] = "greeting_handler"
+            self.session_manager.update_session_state(session_id, state)
+            self.whatsapp_service.create_text_message(
+                session_id,
+                "⚠️ Error processing feedback. Let's start fresh. How can I help you today?"
+            )
     
     def _initiate_feedback_collection_webhook(self, session_id: str, order_id: str, session_manager) -> None:
         """Initiate feedback collection for webhook payments."""
         try:
             if self.feedback_handler:
                 state = session_manager.get_session_state(session_id) or {}
-                self.logger.info(f"Attempting webhook feedback collection for order {order_id}, session {session_id}")
+                logger.info(f"Attempting webhook feedback collection for order {order_id}, session {session_id}")
                 self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
-                self.logger.info(f"Successfully initiated webhook feedback collection for order {order_id}")
+                logger.info(f"Successfully initiated webhook feedback collection for order {order_id}")
             else:
-                self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping webhook feedback collection")
+                logger.warning(f"FeedbackHandler not available for order {order_id}, skipping webhook feedback collection")
+                if session_id:
+                    state = session_manager.get_session_state(session_id) or {}
+                    state["current_state"] = "greeting"
+                    state["current_handler"] = "greeting_handler"
+                    session_manager.update_session_state(session_id, state)
         except Exception as e:
-            self.logger.error(f"Failed to initiate webhook feedback collection for order {order_id}: {e}", exc_info=True)
+            logger.error(f"Failed to initiate webhook feedback collection for order {order_id}: {e}", exc_info=True)
+            if session_id:
+                state = session_manager.get_session_state(session_id) or {}
+                state["current_state"] = "greeting"
+                state["current_handler"] = "greeting_handler"
+                session_manager.update_session_state(session_id, state)
+                self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ Error processing feedback. Let's start fresh. How can I help you today?"
+                )
     
     def handle_back_to_main(self, state, session_id):
         """Return to main menu."""
@@ -1001,3 +963,77 @@ class PaymentHandler(BaseHandler):
             session_id,
             "🔙 Back to main menu. How can I assist you today?"
         )
+
+    def handle_payment_callback(self, request):
+        """Handle Paystack payment callback/redirects."""
+        try:
+            reference = request.args.get('reference') or request.form.get('reference')
+            if not reference:
+                logger.error("No reference provided in payment callback")
+                return jsonify({"status": "error", "message": "No reference provided"}), 400
+
+            payment_verified, payment_data = self.payment_service.verify_payment_detailed(reference)
+            order_data = self.data_manager.get_order_by_payment_reference(reference)
+
+            if not order_data:
+                logger.error(f"No order found for payment reference {reference}")
+                return jsonify({"status": "error", "message": "Order not found"}), 404
+
+            session_id = order_data.get("phone_number")
+            if not session_id:
+                logger.warning(f"No session_id found for reference {reference}")
+                return jsonify({"status": "error", "message": "Session not found"}), 400
+
+            state = self.session_manager.get_session_state(session_id)
+
+            if payment_verified:
+                logger.info(f"Payment callback verified for reference {reference}, order {order_data['order_id']}")
+                service_charge = order_data.get("service_charge", 0)
+                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
+                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
+                    logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+
+                success = self.data_manager.update_order_status(
+                    order_data["order_id"],
+                    "confirmed",
+                    {
+                        "payment_reference": reference,
+                        "payment_method_type": payment_data.get("payment_method_type", "paystack"),
+                        "delivery_fee": self.delivery_fee,
+                        "service_charge": service_charge,
+                        "subaccount_split": {
+                            "subaccount_code": self.subaccount_code,
+                            "percentage": self.subaccount_percentage
+                        } if self.subaccount_code else None
+                    }
+                )
+                if not success:
+                    logger.error(f"Failed to update order {order_data['order_id']} to confirmed status")
+                    return jsonify({"status": "error", "message": "Failed to update order status"}), 500
+
+                self.stop_payment_monitoring(session_id)
+                state["current_state"] = "feedback_rating"
+                state["current_handler"] = "feedback_handler"
+                state["cart"] = {}
+                self.session_manager.update_session_state(session_id, state)
+
+                order_items = self.data_manager.get_order_items(order_data["order_id"])
+                maps_info = self._generate_maps_info(state)
+                total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
+                self._send_payment_success_message(
+                    session_id,
+                    order_data["order_id"],
+                    total_amount,
+                    order_items,
+                    state.get("address", "Not provided"),
+                    maps_info
+                )
+
+                return jsonify({"status": "success", "message": "Payment verified and order confirmed, feedback request sent"}), 200
+            else:
+                logger.info(f"Payment callback verification failed for reference {reference}")
+                return jsonify({"status": "error", "message": "Payment not verified"}), 400
+
+        except Exception as e:
+            logger.error(f"Error handling payment callback for reference {reference}: {e}", exc_info=True)
+            return jsonify({"status": "error", "message": "Internal server error"}), 500

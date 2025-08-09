@@ -161,6 +161,7 @@ class OrderHandler(BaseHandler):
         elif message_strip == "add_note":
             logger.info(f"User chose to add a note for session {session_id}.")
             state["current_state"] = "add_note"
+            state["from_order_summary"] = True  # Flag to indicate origin
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -207,6 +208,7 @@ class OrderHandler(BaseHandler):
         elif message_strip == "note":
             logger.info(f"User typed 'note' to add a note for session {session_id}.")
             state["current_state"] = "add_note"
+            state["from_order_summary"] = True  # Flag to indicate origin
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -283,9 +285,10 @@ class OrderHandler(BaseHandler):
         message_strip = message.strip()
 
         if message_strip == "back":
-            # Check if coming from AI order to return to note prompt
             if state.get("from_ai_order", False):
+                # Return to prompt_add_note state if coming from AI order
                 state["current_state"] = "prompt_add_note"
+                state.pop("from_order_summary", None)  # Clear flag if present
                 self.session_manager.update_session_state(session_id, state)
                 logger.info(f"User typed 'back' from add note state for AI order for session {session_id}.")
                 buttons = [
@@ -297,19 +300,32 @@ class OrderHandler(BaseHandler):
                     "Would you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
                     buttons
                 )
-            else:
+            elif state.get("from_order_summary", False):
+                # Return to order_summary state if coming from order summary
                 state["current_state"] = "order_summary"
+                state.pop("from_order_summary", None)  # Clear flag
                 self.session_manager.update_session_state(session_id, state)
-                logger.info(f"User typed 'back' from add note state for session {session_id}.")
+                logger.info(f"User typed 'back' from add note state to order summary for session {session_id}.")
                 return self.whatsapp_service.create_button_message(
                     session_id,
                     self._get_order_summary_message_text(state),
                     self._get_order_summary_buttons()
                 )
+            else:
+                # Fallback to main menu if no specific origin
+                state["current_state"] = "greeting"
+                state["current_handler"] = "greeting_handler"
+                self.session_manager.update_session_state(session_id, state)
+                logger.info(f"User typed 'back' from add note state with no specific origin for session {session_id}.")
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "🔙 Back to main menu. How can I assist you today?"
+                )
 
         # Save the note to the state
         state["order_note"] = message_strip
         state["current_state"] = "confirm_order"
+        state.pop("from_order_summary", None)  # Clear flag if present
         self.session_manager.update_session_state(session_id, state)
         logger.info(f"Note '{message_strip}' added for session {session_id}.")
 
@@ -354,7 +370,7 @@ class OrderHandler(BaseHandler):
                 ]
                 return self.whatsapp_service.create_button_message(
                     session_id,
-                    "🎉 *Order Confirmed!*\n\nWould you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
+                    "Would you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
                     buttons
                 )
 
@@ -395,10 +411,18 @@ class OrderHandler(BaseHandler):
                         "❌ Sorry, there was an error saving your details. Please try again."
                     )
 
-                state["current_state"] = "confirm_order"
+                state["current_state"] = "prompt_add_note"  # Transition to prompt_add_note instead of confirm_order
                 self.session_manager.update_session_state(session_id, state)
-                logger.info(f"Address set, proceeding to confirm order for manual session {session_id}.")
-                return self._show_order_confirmation(state, session_id)
+                logger.info(f"Address set, prompting for note for manual session {session_id}.")
+                buttons = [
+                    {"type": "reply", "reply": {"id": "add_note", "title": "📝 Yes"}},
+                    {"type": "reply", "reply": {"id": "proceed_to_confirmation", "title": "❌ No"}}
+                ]
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    "Would you like to add a note to your order (e.g., 'Please deliver after 5 PM')?",
+                    buttons
+                )
         
         elif message_strip == "change_all_details":
             logger.info(f"User opted to change details for session {session_id}.")
@@ -427,12 +451,12 @@ class OrderHandler(BaseHandler):
             )
 
     def handle_prompt_add_note_state(self, state: Dict, message: str, session_id: str) -> Dict:
-        """Handle the prompt to add a note after AI order confirmation."""
+        """Handle the prompt to add a note after AI or manual order confirmation."""
         logger.debug(f"Handling prompt add note state for session {session_id}, message: {message}")
         message_strip = message.strip()
 
         if message_strip == "add_note":
-            logger.info(f"User chose to add a note after AI confirmation for session {session_id}.")
+            logger.info(f"User chose to add a note after confirmation for session {session_id}.")
             state["current_state"] = "add_note"
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
