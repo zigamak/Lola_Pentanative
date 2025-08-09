@@ -214,7 +214,7 @@ class PaymentHandler(BaseHandler):
         return "\n".join(f"- {item}" for item in formatted)
     
     def _send_payment_success_message(self, session_id: str, order_id: str, total_amount: float, items: List[Dict], delivery_address: str, maps_info: str = ""):
-        """Send payment success message to customer and notify merchant using Meta API template."""
+        """Send payment success message to customer and detailed notification to merchant via bot."""
         try:
             # Customer notification (unchanged)
             order_data = self.data_manager.get_order_by_id(order_id)
@@ -225,47 +225,41 @@ class PaymentHandler(BaseHandler):
                 f"📋 *Order ID:* {order_id}\n"
                 f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
                 f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:*\n{formatted_items}\n"
                 f"📍 *Delivery Address:* {delivery_address}{maps_info}\n\n"
-                f"🎉 Thank you for your order! You'll receive updates on processing and delivery."
+                f"🎉 Thank you for your order. It is now being processed, and you will receive an update on delivery soon"
             )
             self.whatsapp_service.create_text_message(session_id, customer_message)
             self.logger.info(f"Sent payment success text message for order {order_id} to customer {session_id}")
             
-            # Merchant notification using Meta API template
+            # Detailed merchant notification via bot
             if self.merchant_phone_number:
-                formatted_items_for_template = self._format_order_items(items, for_template=True)
                 state = self.session_manager.get_session_state(session_id)
                 customer_name = state.get("user_name", "Guest")
-                try:
-                    self.whatsapp_service.send_template_message(
-                        phone_number=self.merchant_phone_number,
-                        template_name="merchant_order",
-                        parameters=[
-                            order_id,
-                            customer_name,
-                            delivery_address,
-                            formatted_items_for_template,
-                            f"₦{total_amount:,.2f}",
-                            f"₦{self.delivery_fee:,}",
-                            f"₦{service_charge:,.2f}"
-                        ]
-                    )
-                    self.logger.info(f"Sent merchant_order template notification for order {order_id} to {self.merchant_phone_number}")
-                except Exception as e:
-                    self.logger.error(f"Failed to send merchant_order template for order {order_id}: {e}", exc_info=True)
-                    # Fallback to text message
-                    fallback_message = (
-                        f"⚠️ *New Order Alert*\n\n"
-                        f"Order ID: {order_id}\n"
-                        f"Customer: {customer_name}\n"
-                        f"Address: {delivery_address}\n"
-                        f"Please check system for full details and process order."
-                    )
-                    self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
-                    self.logger.info(f"Sent fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
+                customer_phone = state.get("phone_number", session_id)
+                customer_notes = state.get("customer_notes", "No special instructions provided")
+                order_placement_time = order_data.get("created_at", "Not available") if order_data else "Not available"
+                payment_method = order_data.get("payment_method_type", "paystack") if order_data else "paystack"
+                
+                merchant_message = (
+                    f"🔔 *New Order Alert*\n\n"
+                    f"📋 *Order ID:* {order_id}\n"
+                    f"👤 *Customer Name:* {customer_name}\n"
+                    f"📞 *Customer Phone:* {customer_phone}\n"
+                    f"📍 *Delivery Address:* {delivery_address}{maps_info}\n"
+                    f"🛒 *Items:*\n{formatted_items}\n"
+                    f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
+                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+    
+                    f"💰 *Total:* ₦{total_amount:,.2f}\n"
+                    f"📝 *Customer Notes:* {customer_notes}\n"
+                    
+                    f"💳 *Payment Method:* {payment_method}\n\n"
+                    f"📌 Please process this order promptly."
+                )
+                self.whatsapp_service.create_text_message(self.merchant_phone_number, merchant_message)
+                self.logger.info(f"Sent detailed merchant notification for order {order_id} to {self.merchant_phone_number}")
             else:
                 self.logger.warning("Merchant phone number not configured, skipping merchant notification")
                 
@@ -273,15 +267,30 @@ class PaymentHandler(BaseHandler):
             self.logger.error(f"Error sending payment success messages for order {order_id}: {e}", exc_info=True)
             # Send fallback merchant notification if primary fails
             if self.merchant_phone_number:
+                state = self.session_manager.get_session_state(session_id)
+                customer_name = state.get("user_name", "Guest")
+                customer_phone = state.get("phone_number", session_id)
+                customer_notes = state.get("customer_notes", "No special instructions provided")
+                order_placement_time = order_data.get("created_at", "Not available") if order_data else "Not available"
+                payment_method = order_data.get("payment_method_type", "paystack") if order_data else "paystack"
                 fallback_message = (
-                    f"⚠️ *New Order Alert*\n\n"
-                    f"Order ID: {order_id}\n"
-                    f"Customer: {self.session_manager.get_session_state(session_id).get('user_name', 'Guest')}\n"
-                    f"Address: {delivery_address}\n"
-                    f"Please check system for full details and process order."
+                    f"🔔 *New Order Alert*\n\n"
+                    f"📋 *Order ID:* {order_id}\n"
+                    f"👤 *Customer Name:* {customer_name}\n"
+                    f"📞 *Customer Phone:* {customer_phone}\n"
+                    f"📍 *Delivery Address:* {delivery_address}\n"
+                    f"🛒 *Items:*\n{formatted_items}\n"
+                    f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0) if order_data else 0:,}\n"
+                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+                   
+                    f"💰 *Total:* ₦{total_amount:,.2f}\n"
+                    f"📝 *Customer Notes:* {customer_notes}\n"
+                   
+                    f"💳 *Payment Method:* {payment_method}\n\n"
+                    f"📌 Please process this order promptly."
                 )
                 self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
-                self.logger.info(f"Sent fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
+                self.logger.info(f"Sent detailed fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
     
     def start_payment_monitoring(self, session_id, payment_reference, order_id):
         """Start monitoring payment status every minute for up to 15 minutes."""
@@ -757,7 +766,7 @@ class PaymentHandler(BaseHandler):
                 f"📋 *Order ID:* {state.get('order_id', 'N/A')}\n"
                 f"💰 *Subtotal:* ₦{subtotal:,}\n"
                 f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+      
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:* {formatted_items}\n\n"
                 f"✅ Once payment is confirmed, you'll receive an automatic confirmation.\n"

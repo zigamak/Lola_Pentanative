@@ -11267,3 +11267,390 @@ TypeError: WhatsAppService.send_template_message() got an unexpected keyword arg
 2025-08-09 17:04:28,804 - services.payment_service - INFO - Payment verified successfully for reference PAY-134. Status: success
 2025-08-09 17:04:33,661 - utils.data_manager - INFO - Order 134 status updated to confirmed in database
 2025-08-09 17:04:37,966 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:55:15,219 - __main__ - INFO - Starting WhatsApp bot server...
+2025-08-09 17:55:17,359 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 17:55:28,509 - utils.data_manager - ERROR - Database error while adding customers_note column: could not translate host name "ep-autumn-flower-a8gfew31-pooler.eastus2.azure.neon.tech" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Pentanative\Lola_Pentanative\utils\data_manager.py", line 65, in add_customers_note_column
+    with psycopg2.connect(**self.db_params) as conn:
+         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zigam\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "ep-autumn-flower-a8gfew31-pooler.eastus2.azure.neon.tech" to address: Name or service not known
+
+2025-08-09 17:55:39,654 - utils.data_manager - ERROR - Database error while loading user details: could not translate host name "ep-autumn-flower-a8gfew31-pooler.eastus2.azure.neon.tech" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Pentanative\Lola_Pentanative\utils\data_manager.py", line 126, in load_user_details
+    with psycopg2.connect(**self.db_params) as conn:
+         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zigam\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "ep-autumn-flower-a8gfew31-pooler.eastus2.azure.neon.tech" to address: Name or service not known
+
+2025-08-09 17:55:39,692 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 17:55:44,883 - __main__ - INFO - Bot server stopped by user.
+2025-08-09 17:55:47,570 - __main__ - INFO - Starting WhatsApp bot server...
+2025-08-09 17:55:49,188 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 17:55:53,707 - utils.data_manager - INFO - Successfully loaded 16 user details from database
+2025-08-09 17:55:54,015 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 17:55:56,582 - handlers.product_sync_handler - INFO - Successfully synced 15 products to data\products.json
+2025-08-09 17:55:56,816 - app - INFO - Initial product sync successful on startup
+2025-08-09 17:55:56,817 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 17:56:00,967 - utils.data_manager - INFO - Successfully loaded 16 user details from database
+2025-08-09 17:56:01,207 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 17:56:01,208 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-08-09 17:56:01,209 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-08-09 17:56:01,210 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-08-09 17:56:01,261 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-08-09 17:56:01,262 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 17:56:01,281 - handlers.location_address_handler - INFO - LocationAddressHandler initialized.
+2025-08-09 17:56:01,940 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-08-09 17:56:01,941 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-08-09 17:56:01,941 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-08-09 17:56:01,942 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 17:56:01,949 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 17:56:01,992 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-08-09 17:56:01,993 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-09 17:56:16,203 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-08-09 17:56:16,204 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-08-09 17:56:21,046 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:56:21,049 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455
+2025-08-09 17:56:23,459 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 17:56:24,838 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjZCN0JGREExQTg3RDg3NUUwOAA="}]}
+2025-08-09 17:56:24,889 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjZCN0JGREExQTg3RDg3NUUwOAA='}]}
+2025-08-09 17:56:24,891 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:24] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:26,188 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:26] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:26,231 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:26] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:26,414 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:26] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:30,483 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'ai_bulk_order_direct'}
+2025-08-09 17:56:37,124 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:56:37,126 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:56:37,126 - handlers.base_handler - INFO - GreetingHandler: Handling message 'ai_bulk_order_direct' in greeting state for session 2348055614455.
+2025-08-09 17:56:37,127 - handlers.base_handler - INFO - Session 2348055614455 redirecting to AIHandler for AI Bulk Order (Let Lola Order).
+2025-08-09 17:56:37,129 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'ai_handler' with message 'start_ai_bulk_order'.
+2025-08-09 17:56:37,130 - handlers.base_handler - INFO - AIHandler: Handling message 'start_ai_bulk_order' in AI bulk order state for session 2348055614455. Original: 'ai_bulk_order_direct'
+2025-08-09 17:56:37,131 - services.whatsapp_service - DEBUG - Created image message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-08-09 17:56:37,132 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-08-09 17:56:38,559 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkExNkE0QzlENkNCNzYxMDc4NwA="}]}
+2025-08-09 17:56:38,561 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador \n\nTake a look at the menu and type in your order\n\n"}}
+2025-08-09 17:56:38,563 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador \n\nTake a look at the menu and type in your order\n\n"}}
+2025-08-09 17:56:39,583 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkY1MDZCQ0RGQkM4RDBEMkU3RAA="}]}
+2025-08-09 17:56:39,586 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkY1MDZCQ0RGQkM4RDBEMkU3RAA='}]}
+2025-08-09 17:56:39,589 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:39] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:40,566 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:40] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:41,163 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:41,179 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:41,239 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:41,703 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:41,709 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:47,100 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Jellof rice'}
+2025-08-09 17:56:51,459 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:56:51,460 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:56:51,461 - handlers.base_handler - INFO - AIHandler: Handling message 'jellof rice' in AI bulk order state for session 2348055614455. Original: 'Jellof rice'
+2025-08-09 17:56:54,462 - httpx - INFO - HTTP Request: POST https://insig-maduyfup-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK"
+2025-08-09 17:56:55,521 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkU4NzMzQTlGOEU3NzJDOUYwMwA="}]}
+2025-08-09 17:56:55,523 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkU4NzMzQTlGOEU3NzJDOUYwMwA='}]}
+2025-08-09 17:56:55,525 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:55] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:56,696 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:56] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:57,012 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:57] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:56:57,109 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:56:57] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:12,967 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'confirm_ai_order'}
+2025-08-09 17:57:17,367 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:57:17,368 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:57:17,369 - handlers.base_handler - INFO - AI order confirmed. Cart: {'Jollof Rice': {'item_id': '99', 'quantity': 1, 'price': 1500.0, 'total_price': 1500.0, 'variations': {}}}. Redirecting to order handler.
+2025-08-09 17:57:17,369 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'order_handler' with message 'process_final_order'.
+2025-08-09 17:57:17,370 - handlers.order_handler - INFO - AI initiated order processing for session 2348055614455.
+2025-08-09 17:57:17,371 - handlers.order_handler - INFO - Prompting for note after AI order confirmation for session 2348055614455.
+2025-08-09 17:57:18,583 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkExOTlDRDY3RjBCQTI3RTA5MgA="}]}
+2025-08-09 17:57:19,641 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:19] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:19,814 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:19] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:20,115 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:20] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:22,698 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'add_note'}
+2025-08-09 17:57:23,204 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:57:23,270 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkExOTlDRDY3RjBCQTI3RTA5MgA='}]}
+2025-08-09 17:57:23,272 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:23] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:27,709 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:57:27,711 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:57:27,712 - handlers.order_handler - INFO - User chose to add a note after AI confirmation for session 2348055614455.
+2025-08-09 17:57:27,713 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to skip adding a note."}}
+2025-08-09 17:57:27,715 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to skip adding a note."}}
+2025-08-09 17:57:29,781 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 400 Client Error: Bad Request for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"(#10) Application does not have permission for this action","type":"OAuthException","code":10,"error_data":{"messaging_product":"whatsapp","details":"There was a problem with the access token or permissions you are using for the API call."},"fbtrace_id":"A_lrDl2_SlevqYebwub7fG_"}}
+2025-08-09 17:57:29,783 - handlers.message_processor - WARNING - Session 2348055614455: No handler response for handler 'order_handler', state 'prompt_add_note', message 'add_note'. Resetting to greeting.
+2025-08-09 17:57:29,783 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 17:57:30,885 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkQwNDc4MzY1MUNGMjg3OTcyNQA="}]}
+2025-08-09 17:57:32,108 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:32] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:32,222 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:32] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:32,225 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:32] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:57:36,515 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:57:36,533 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkQwNDc4MzY1MUNGMjg3OTcyNQA='}]}
+2025-08-09 17:57:36,534 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:57:36] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:03,628 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:03] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:05,112 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'ai_bulk_order_direct'}
+2025-08-09 17:59:14,570 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:14,572 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:59:14,573 - handlers.base_handler - INFO - GreetingHandler: Handling message 'ai_bulk_order_direct' in greeting state for session 2348055614455.
+2025-08-09 17:59:14,574 - handlers.base_handler - INFO - Session 2348055614455 redirecting to AIHandler for AI Bulk Order (Let Lola Order).
+2025-08-09 17:59:14,575 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'ai_handler' with message 'start_ai_bulk_order'.
+2025-08-09 17:59:14,576 - handlers.base_handler - INFO - AIHandler: Handling message 'start_ai_bulk_order' in AI bulk order state for session 2348055614455. Original: 'ai_bulk_order_direct'
+2025-08-09 17:59:14,577 - services.whatsapp_service - DEBUG - Created image message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-08-09 17:59:14,578 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-08-09 17:59:17,917 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjcwRUI0RTMzMkM1Nzk5MkM1MgA="}]}
+2025-08-09 17:59:17,918 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador \n\nTake a look at the menu and type in your order\n\n"}}
+2025-08-09 17:59:17,919 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador \n\nTake a look at the menu and type in your order\n\n"}}
+2025-08-09 17:59:18,677 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:18] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:19,003 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:19] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:19,433 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:19] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:19,918 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjg3MjJFMDU5MkY1Q0MyRTg0QwA="}]}
+2025-08-09 17:59:20,990 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:20] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:21,135 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:21] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:21,444 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:21] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:23,919 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Jellof rice'}
+2025-08-09 17:59:24,796 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:24,808 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjg3MjJFMDU5MkY1Q0MyRTg0QwA='}]}
+2025-08-09 17:59:24,809 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:24] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:29,330 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:29,332 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:59:29,333 - handlers.base_handler - INFO - AIHandler: Handling message 'jellof rice' in AI bulk order state for session 2348055614455. Original: 'Jellof rice'
+2025-08-09 17:59:31,258 - httpx - INFO - HTTP Request: POST https://insig-maduyfup-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK"
+2025-08-09 17:59:32,188 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkVDRkJDMzU4RjNEMDg0RjdEOAA="}]}
+2025-08-09 17:59:33,442 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:33] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:33,448 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:33] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:33,562 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:33] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:34,885 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'modify_ai_order'}
+2025-08-09 17:59:36,009 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:36,019 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkVDRkJDMzU4RjNEMDg0RjdEOAA='}]}
+2025-08-09 17:59:36,020 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:36] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:38,768 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:38,770 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:59:38,771 - handlers.base_handler - INFO - User chose to modify AI order for session 2348055614455.
+2025-08-09 17:59:38,772 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': 'Please tell me your updated order:'}}
+2025-08-09 17:59:38,773 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': 'Please tell me your updated order:'}}
+2025-08-09 17:59:39,816 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkUyQjRFRDJDNDQyQTVENzhDOQA="}]}
+2025-08-09 17:59:40,831 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:40] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:41,029 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:41,604 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:41] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:44,294 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:44,312 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkUyQjRFRDJDNDQyQTVENzhDOQA='}]}
+2025-08-09 17:59:44,314 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 17:59:44] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 17:59:50,317 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Fried rice and egg'}
+2025-08-09 17:59:55,196 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 17:59:55,198 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 17:59:55,199 - handlers.base_handler - INFO - AIHandler: Handling message 'fried rice and egg' in AI bulk order state for session 2348055614455. Original: 'Fried rice and egg'
+2025-08-09 17:59:57,579 - httpx - INFO - HTTP Request: POST https://insig-maduyfup-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK"
+2025-08-09 17:59:58,855 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkMzRDdERkIwNDZFNzM0RUYyNAA="}]}
+2025-08-09 18:00:00,132 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:00:00] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:00:00,135 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:00:00] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:00:00,239 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:00:00] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:00:02,135 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'confirm_ai_order'}
+2025-08-09 18:00:03,357 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:00:03,368 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkMzRDdERkIwNDZFNzM0RUYyNAA='}]}
+2025-08-09 18:00:03,370 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:00:03] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:00:06,411 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:00:06,412 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:00:06,413 - handlers.base_handler - INFO - AI order confirmed. Cart: {'Fried Rice': {'item_id': '100', 'quantity': 1, 'price': 1700.0, 'total_price': 1700.0, 'variations': {}}, 'Egg': {'item_id': '108', 'quantity': 1, 'price': 100.0, 'total_price': 100.0, 'variations': {}}}. Redirecting to order handler.
+2025-08-09 18:00:06,414 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'order_handler' with message 'process_final_order'.
+2025-08-09 18:00:06,415 - handlers.order_handler - INFO - AI initiated order processing for session 2348055614455.
+2025-08-09 18:00:06,416 - handlers.order_handler - INFO - Prompting for note after AI order confirmation for session 2348055614455.
+2025-08-09 18:00:06,756 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"Error validating access token: Session has expired on Saturday, 09-Aug-25 10:00:00 PDT. The current time is Saturday, 09-Aug-25 10:00:06 PDT.","type":"OAuthException","code":190,"error_subcode":463,"fbtrace_id":"A2NoyC9MZGkUdoD9cxEhOe0"}}
+2025-08-09 18:00:06,758 - handlers.message_processor - WARNING - Session 2348055614455: No handler response for handler 'order_handler', state 'confirm_details', message 'process_final_order'. Resetting to greeting.
+2025-08-09 18:00:06,760 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 18:00:07,261 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"Error validating access token: Session has expired on Saturday, 09-Aug-25 10:00:00 PDT. The current time is Saturday, 09-Aug-25 10:00:07 PDT.","type":"OAuthException","code":190,"error_subcode":463,"fbtrace_id":"AEnITfvF2cQv7n7xj1AzrUb"}}
+2025-08-09 18:00:12,369 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:00:12,380 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:00:12] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:00:58,168 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Cancel'}
+2025-08-09 18:01:06,132 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:01:06,133 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:01:06,133 - handlers.base_handler - INFO - GreetingHandler: Handling message 'cancel' in greeting state for session 2348055614455.
+2025-08-09 18:01:06,134 - handlers.base_handler - WARNING - Session 2348055614455: Invalid option 'cancel' in greeting state for non-paid user.
+2025-08-09 18:01:06,437 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"Error validating access token: Session has expired on Saturday, 09-Aug-25 10:00:00 PDT. The current time is Saturday, 09-Aug-25 10:01:06 PDT.","type":"OAuthException","code":190,"error_subcode":463,"fbtrace_id":"AggqY0k3mn-i3zhdkk7etB6"}}
+2025-08-09 18:01:06,440 - handlers.message_processor - WARNING - Session 2348055614455: No handler response for handler 'greeting_handler', state 'greeting', message 'cancel'. Resetting to greeting.
+2025-08-09 18:01:06,441 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 18:01:06,948 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"Error validating access token: Session has expired on Saturday, 09-Aug-25 10:00:00 PDT. The current time is Saturday, 09-Aug-25 10:01:06 PDT.","type":"OAuthException","code":190,"error_subcode":463,"fbtrace_id":"A_hi0_YisU9y4P6sa0vzo4v"}}
+2025-08-09 18:01:11,166 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:01:11,176 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:01:11] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:02:43,172 - __main__ - INFO - Starting WhatsApp bot server...
+2025-08-09 18:02:44,899 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 18:02:48,868 - utils.data_manager - INFO - Successfully loaded 16 user details from database
+2025-08-09 18:02:49,151 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 18:02:52,220 - handlers.product_sync_handler - INFO - Successfully synced 15 products to data\products.json
+2025-08-09 18:02:52,522 - app - INFO - Initial product sync successful on startup
+2025-08-09 18:02:52,523 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 18:02:57,541 - utils.data_manager - INFO - Successfully loaded 16 user details from database
+2025-08-09 18:02:57,827 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 18:02:57,828 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-08-09 18:02:57,829 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-08-09 18:02:57,829 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-08-09 18:02:57,831 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-08-09 18:02:57,832 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 18:02:57,847 - handlers.location_address_handler - INFO - LocationAddressHandler initialized.
+2025-08-09 18:02:58,383 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-08-09 18:02:58,384 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-08-09 18:02:58,384 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-08-09 18:02:58,385 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 18:02:58,392 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 18:02:58,420 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-08-09 18:02:58,421 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-09 18:03:02,060 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-08-09 18:03:02,061 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-08-09 18:03:07,063 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:03:07,066 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455
+2025-08-09 18:03:08,988 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 18:03:09,287 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"Error validating access token: Session has expired on Saturday, 09-Aug-25 10:00:00 PDT. The current time is Saturday, 09-Aug-25 10:03:09 PDT.","type":"OAuthException","code":190,"error_subcode":463,"fbtrace_id":"A46zi4D-aElQqZawz6ySzst"}}
+2025-08-09 18:03:09,290 - handlers.message_processor - WARNING - Session 2348055614455: No handler response for handler 'greeting_handler', state 'start', message 'hello'. Resetting to greeting.
+2025-08-09 18:03:09,291 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 18:03:09,704 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - {"error":{"message":"Error validating access token: Session has expired on Saturday, 09-Aug-25 10:00:00 PDT. The current time is Saturday, 09-Aug-25 10:03:09 PDT.","type":"OAuthException","code":190,"error_subcode":463,"fbtrace_id":"AwBflCtAzXEcku9TbGDi1bp"}}
+2025-08-09 18:03:09,709 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:03:09] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:03:46,235 - __main__ - INFO - Starting WhatsApp bot server...
+2025-08-09 18:03:47,964 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 18:03:52,325 - utils.data_manager - INFO - Successfully loaded 16 user details from database
+2025-08-09 18:03:52,595 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 18:03:55,472 - handlers.product_sync_handler - INFO - Successfully synced 15 products to data\products.json
+2025-08-09 18:03:55,807 - app - INFO - Initial product sync successful on startup
+2025-08-09 18:03:55,807 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-09 18:04:00,235 - utils.data_manager - INFO - Successfully loaded 16 user details from database
+2025-08-09 18:04:00,448 - services.payment_service - INFO - PaymentService initialized
+2025-08-09 18:04:00,448 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-08-09 18:04:00,448 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-08-09 18:04:00,449 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-08-09 18:04:00,450 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-08-09 18:04:00,451 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 18:04:00,464 - handlers.location_address_handler - INFO - LocationAddressHandler initialized.
+2025-08-09 18:04:01,291 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-08-09 18:04:01,292 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-08-09 18:04:01,292 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-08-09 18:04:01,293 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 18:04:01,299 - handlers.base_handler - WARNING - FeedbackHandler not provided, feedback collection will be skipped
+2025-08-09 18:04:01,332 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-08-09 18:04:01,332 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-09 18:04:21,653 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hell'}
+2025-08-09 18:04:21,654 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-08-09 18:04:25,710 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:04:25,712 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455
+2025-08-09 18:04:28,268 - handlers.base_handler - INFO - Session 2348055614455 greeted returning user 'ziga'.
+2025-08-09 18:04:29,291 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkM3NUEzMzkxQ0VGODI3OTA2NAA="}]}
+2025-08-09 18:04:29,293 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkM3NUEzMzkxQ0VGODI3OTA2NAA='}]}
+2025-08-09 18:04:29,295 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:29] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:30,351 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:30] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:30,729 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:30] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:30,737 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:30] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:33,038 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'ai_bulk_order_direct'}
+2025-08-09 18:04:42,155 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:04:42,156 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:04:42,157 - handlers.base_handler - INFO - GreetingHandler: Handling message 'ai_bulk_order_direct' in greeting state for session 2348055614455.
+2025-08-09 18:04:42,158 - handlers.base_handler - INFO - Session 2348055614455 redirecting to AIHandler for AI Bulk Order (Let Lola Order).
+2025-08-09 18:04:42,159 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'ai_handler' with message 'start_ai_bulk_order'.
+2025-08-09 18:04:42,160 - handlers.base_handler - INFO - AIHandler: Handling message 'start_ai_bulk_order' in AI bulk order state for session 2348055614455. Original: 'ai_bulk_order_direct'
+2025-08-09 18:04:42,161 - services.whatsapp_service - DEBUG - Created image message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-08-09 18:04:42,162 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-08-09 18:04:43,833 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjEyNTM0NUJCRTNDQzQ3NzMwNwA="}]}
+2025-08-09 18:04:43,836 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador \n\nTake a look at the menu and type in your order\n\n"}}
+2025-08-09 18:04:43,837 - services.whatsapp_service - INFO - Sending WhatsApp payload: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador \n\nTake a look at the menu and type in your order\n\n"}}
+2025-08-09 18:04:44,562 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:44] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:44,716 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkQ4QkZFQkE3NDFBREVDOTc2MAA="}]}
+2025-08-09 18:04:44,717 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkQ4QkZFQkE3NDFBREVDOTc2MAA='}]}
+2025-08-09 18:04:44,718 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:44] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:44,771 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:44] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:44,868 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:44] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:45,912 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:45] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:46,088 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:46] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:46,146 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:46] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:48,767 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Jellof rice'}
+2025-08-09 18:04:54,060 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:04:54,062 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:04:54,063 - handlers.base_handler - INFO - AIHandler: Handling message 'jellof rice' in AI bulk order state for session 2348055614455. Original: 'Jellof rice'
+2025-08-09 18:04:56,930 - httpx - INFO - HTTP Request: POST https://insig-maduyfup-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK"
+2025-08-09 18:04:57,899 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkM2MkQ5MjI4NzFFODNFQjAxMAA="}]}
+2025-08-09 18:04:57,902 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkM2MkQ5MjI4NzFFODNFQjAxMAA='}]}
+2025-08-09 18:04:57,904 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:57] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:58,966 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:58] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:59,094 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:59] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:04:59,149 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:04:59] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:00,942 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'confirm_ai_order'}
+2025-08-09 18:05:05,950 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:05,952 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:05:05,953 - handlers.base_handler - INFO - AI order confirmed. Cart: {'Jollof Rice': {'item_id': '99', 'quantity': 1, 'price': 1500.0, 'total_price': 1500.0, 'variations': {}}}. Redirecting to order handler.
+2025-08-09 18:05:05,954 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'order_handler' with message 'process_final_order'.
+2025-08-09 18:05:05,955 - handlers.order_handler - INFO - AI initiated order processing for session 2348055614455.
+2025-08-09 18:05:05,956 - handlers.order_handler - INFO - Prompting for note after AI order confirmation for session 2348055614455.
+2025-08-09 18:05:07,078 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjNCODI5MzJCOEZFODE5QjUzNgA="}]}
+2025-08-09 18:05:08,113 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:08] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:08,226 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:08] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:08,245 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:08] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:11,521 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:11,532 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjNCODI5MzJCOEZFODE5QjUzNgA='}]}
+2025-08-09 18:05:11,533 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:11] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:16,622 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'proceed_to_confirmation'}
+2025-08-09 18:05:21,726 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:21,728 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:05:21,729 - handlers.order_handler - INFO - User chose to proceed to final confirmation without adding a note for session 2348055614455.
+2025-08-09 18:05:22,745 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjE3MDU5N0FGMEFBRkREMTcyMwA="}]}
+2025-08-09 18:05:23,804 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:23] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:24,067 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:24] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:24,279 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:24] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:27,438 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:27,452 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjE3MDU5N0FGMEFBRkREMTcyMwA='}]}
+2025-08-09 18:05:27,453 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:27] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:27,965 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'final_confirm'}
+2025-08-09 18:05:33,326 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:33,327 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:05:37,251 - utils.data_manager - INFO - Order 136 and its details saved to database
+2025-08-09 18:05:37,253 - handlers.order_handler - INFO - Order 136 saved to database for session 2348055614455
+2025-08-09 18:05:39,306 - utils.data_manager - INFO - User details for 2348055614455 saved to database
+2025-08-09 18:05:39,307 - handlers.order_handler - INFO - User details saved for session 2348055614455 during order confirmation.
+2025-08-09 18:05:43,632 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:43,643 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'payment_handler' with message 'initiate_payment'.
+2025-08-09 18:05:43,644 - handlers.base_handler - INFO - Handling payment processing for session 2348055614455, message: initiate_payment
+2025-08-09 18:05:43,644 - handlers.base_handler - INFO - Creating payment link for session 2348055614455
+2025-08-09 18:05:48,769 - utils.data_manager - INFO - Order 136 status updated to pending_payment in database
+2025-08-09 18:05:48,771 - services.payment_service - INFO - Adding subaccount split: code=ACCT_u9knhyzn5eq4iop, percentage=1%
+2025-08-09 18:05:48,772 - services.payment_service - INFO - Attempting to create payment link for reference: PAY-136 with amount: 253750, email: ziga4455@lola.com
+2025-08-09 18:05:49,576 - services.payment_service - INFO - Payment link created for ziga ziga (2348055614455), URL: https://checkout.paystack.com/lja64gsr7tqts1p
+2025-08-09 18:05:49,578 - handlers.base_handler - INFO - Starting payment monitoring for order 136, reference PAY-136
+2025-08-09 18:05:49,579 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-136
+2025-08-09 18:05:50,170 - services.payment_service - WARNING - Payment not successful for reference PAY-136. Paystack status: abandoned. Response: {'status': True, 'message': 'Verification successful', 'data': {'id': 5223787081, 'domain': 'test', 'status': 'abandoned', 'reference': 'PAY-136', 'receipt_number': None, 'amount': 253750, 'message': None, 'gateway_response': 'The transaction was not completed', 'paid_at': None, 'created_at': '2025-08-09T17:05:49.000Z', 'channel': 'card', 'currency': 'NGN', 'ip_address': '102.89.82.98, 172.70.86.179, 172.31.62.52', 'metadata': {'customer_name': 'ziga', 'customer_phone': '2348055614455', 'first_name': 'ziga', 'last_name': 'ziga', 'order_id': '136', 'delivery_address': 'horizon estate', 'delivery_fee': '1000', 'service_charge': '37.5', 'phone_number': '2348055614455'}, 'log': None, 'fees': None, 'fees_split': {'paystack': 13807, 'integration': '2537', 'subaccount': 237406, 'params': {'bearer': 'subaccount', 'transaction_charge': '2537', 'percentage_charge': '0'}}, 'authorization': {}, 'customer': {'id': 296816511, 'first_name': None, 'last_name': None, 'email': 'ziga4455@lola.com', 'customer_code': 'CUS_3maokfy2as1d6qe', 'phone': None, 'metadata': None, 'risk_action': 'default', 'international_format_phone': None}, 'plan': None, 'split': {}, 'order_id': None, 'paidAt': None, 'createdAt': '2025-08-09T17:05:49.000Z', 'requested_amount': 253750, 'pos_transaction_data': None, 'source': None, 'fees_breakdown': None, 'connect': None, 'transaction_date': '2025-08-09T17:05:49.000Z', 'plan_object': {}, 'subaccount': {'id': 1381359, 'subaccount_code': 'ACCT_u9knhyzn5eq4iop', 'business_name': 'MAKINDE VICTOR OLUWASEGUN', 'description': 'MAKINDE VICTOR OLUWASEGUN', 'primary_contact_name': None, 'primary_contact_email': None, 'primary_contact_phone': None, 'metadata': None, 'percentage_charge': 0, 'settlement_bank': 'First City Monument Bank', 'bank_id': 8, 'account_number': '4955073017', 'currency': 'NGN', 'active': True, 'is_verified': True}}}
+2025-08-09 18:05:50,171 - handlers.base_handler - INFO - Payment not yet verified for order 136, attempt 1/15
+2025-08-09 18:05:50,172 - handlers.base_handler - INFO - Payment link created successfully for order 136 with subaccount ACCT_u9knhyzn5eq4iop
+2025-08-09 18:05:53,324 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'final_confirm'}
+2025-08-09 18:05:54,285 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkZCQzUxNDdBNzI2MzFDOTU0QQA="}]}
+2025-08-09 18:05:55,340 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:55] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:55,577 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:55] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:55,806 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:55] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:05:57,997 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:58,000 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-08-09 18:05:58,939 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:05:58,950 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkZCQzUxNDdBNzI2MzFDOTU0QQA='}]}
+2025-08-09 18:05:58,951 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:05:58] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:00,797 - handlers.base_handler - INFO - User sent message while still awaiting payment for order 136.
+2025-08-09 18:06:04,748 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjdCNzlEMUNCRjVDODY3NDA2OAA="}]}
+2025-08-09 18:06:05,759 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:05] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:06,364 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:06] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:06,632 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:06] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:08,981 - handlers.base_handler - INFO - Received 'charge.success' webhook for reference: PAY-136
+2025-08-09 18:06:11,399 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:06:11,418 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjdCNzlEMUNCRjVDODY3NDA2OAA='}]}
+2025-08-09 18:06:11,419 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:11] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:13,271 - utils.data_manager - INFO - Order 136 status updated to confirmed in database
+2025-08-09 18:06:19,275 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjBDQTA0OENEQzJBMTlFMkRDNgA="}]}
+2025-08-09 18:06:19,277 - handlers.base_handler - INFO - Sent payment success text message for order 136 to customer 2348055614455
+2025-08-09 18:06:20,344 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:20] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:20,742 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:20] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:20,807 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:20] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:21,278 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2347082345056","wa_id":"2347082345056"}],"messages":[{"id":"wamid.HBgNMjM0NzA4MjM0NTA1NhUCABEYEkMxQUU3NkY2MzlEMTdBMEMwQQA="}]}
+2025-08-09 18:06:21,280 - handlers.base_handler - INFO - Sent detailed merchant notification for order 136 to 2347082345056
+2025-08-09 18:06:21,280 - handlers.base_handler - WARNING - FeedbackHandler not available for order 136, skipping feedback collection
+2025-08-09 18:06:21,281 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:21] "POST /api/paystack/webhook HTTP/1.1" 200 -
+2025-08-09 18:06:22,292 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:22] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:23,987 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:23] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:31,568 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:06:31] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:06:50,184 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-136
+2025-08-09 18:06:50,793 - services.payment_service - INFO - Payment verified successfully for reference PAY-136. Status: success
+2025-08-09 18:06:50,824 - handlers.base_handler - INFO - Payment verified for order 136 on attempt 2
+2025-08-09 18:06:50,824 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-136
+2025-08-09 18:06:51,610 - services.payment_service - INFO - Payment verified successfully for reference PAY-136. Status: success
+2025-08-09 18:06:56,510 - utils.data_manager - INFO - Order 136 status updated to confirmed in database
+2025-08-09 18:07:00,530 - utils.data_manager - INFO - Lead details for 2348055614455 saved/updated in database.
+2025-08-09 18:07:07,732 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:07:07] "POST /webhook HTTP/1.1" 200 -
+2025-08-09 18:07:07,734 - werkzeug - INFO - 127.0.0.1 - - [09/Aug/2025 18:07:07] "POST /webhook HTTP/1.1" 200 -
