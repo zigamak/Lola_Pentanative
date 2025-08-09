@@ -17,16 +17,22 @@ logger.setLevel(logging.DEBUG)
 class PaymentHandler(BaseHandler):
     """Handles payment processing and order completion with dual verification and subaccount splitting."""
     
-    def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service):
+    def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service, feedback_handler=None):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
         self.payment_service = payment_service
         self.location_service = location_service
+        self.feedback_handler = feedback_handler
         self.subaccount_code = getattr(config, 'SUBACCOUNT_CODE', None)
         self.subaccount_percentage = getattr(config, 'SUBACCOUNT_PERCENTAGE', 30)
         self.delivery_fee = 1000
         self.service_charge_percentage = 2.5
+        self.merchant_phone_number = getattr(config, 'MERCHANT_PHONE_NUMBER', None)
         self.payment_timers = {}
-        self.logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, delivery fee ₦{self.delivery_fee}, service charge {self.service_charge_percentage}%")
+        if not self.feedback_handler:
+            self.logger.warning("FeedbackHandler not provided, feedback collection will be skipped")
+        if not self.merchant_phone_number:
+            self.logger.warning("MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped")
+        self.logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, delivery fee ₦{self.delivery_fee}, service charge {self.service_charge_percentage}%, merchant phone {self.merchant_phone_number}")
     
     def handle_payment_processing_state(self, state, message, session_id):
         """Handle payment processing state - entry point from order handler."""
@@ -101,7 +107,7 @@ class PaymentHandler(BaseHandler):
                 "payment_method_type": "paystack",
                 "delivery_fee": self.delivery_fee,
                 "service_charge": service_charge,
-                "phone_number": state.get("phone_number", session_id),  # Ensure phone_number is stored
+                "phone_number": state.get("phone_number", session_id),
                 "subaccount_split": {
                     "subaccount_code": self.subaccount_code,
                     "percentage": self.subaccount_percentage
@@ -134,7 +140,7 @@ class PaymentHandler(BaseHandler):
                     "delivery_address": state.get("address", "Not provided"),
                     "delivery_fee": self.delivery_fee,
                     "service_charge": service_charge,
-                    "phone_number": state.get("phone_number", session_id)  # Include in metadata
+                    "phone_number": state.get("phone_number", session_id)
                 },
                 subaccount_code=self.subaccount_code,
                 split_percentage=self.subaccount_percentage
@@ -208,21 +214,74 @@ class PaymentHandler(BaseHandler):
         return "\n".join(f"- {item}" for item in formatted)
     
     def _send_payment_success_message(self, session_id: str, order_id: str, total_amount: float, items: List[Dict], delivery_address: str, maps_info: str = ""):
-        """Send payment success message as a bot text response."""
+        """Send payment success message to customer and notify merchant using Meta API template."""
         try:
+            # Customer notification (unchanged)
+            order_data = self.data_manager.get_order_by_id(order_id)
+            service_charge = order_data.get("service_charge", 0) if order_data else 0
             formatted_items = self._format_order_items(items, for_template=False)
-            message = (
+            customer_message = (
                 f"✅ *Payment Successful!*\n\n"
                 f"📋 *Order ID:* {order_id}\n"
+                f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
+                f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
-                f"🛒 *Items:* {formatted_items}\n"
+                f"🛒 *Items:*\n{formatted_items}\n"
                 f"📍 *Delivery Address:* {delivery_address}{maps_info}\n\n"
-                f"🎉 Thank you for your order! We'll notify you once it's on its way."
+                f"🎉 Thank you for your order! You'll receive updates on processing and delivery."
             )
-            self.whatsapp_service.create_text_message(session_id, message)
-            self.logger.info(f"Sent payment success text message for order {order_id} to {session_id}")
+            self.whatsapp_service.create_text_message(session_id, customer_message)
+            self.logger.info(f"Sent payment success text message for order {order_id} to customer {session_id}")
+            
+            # Merchant notification using Meta API template
+            if self.merchant_phone_number:
+                formatted_items_for_template = self._format_order_items(items, for_template=True)
+                state = self.session_manager.get_session_state(session_id)
+                customer_name = state.get("user_name", "Guest")
+                try:
+                    self.whatsapp_service.send_template_message(
+                        phone_number=self.merchant_phone_number,
+                        template_name="merchant_order",
+                        parameters=[
+                            order_id,
+                            customer_name,
+                            delivery_address,
+                            formatted_items_for_template,
+                            f"₦{total_amount:,.2f}",
+                            f"₦{self.delivery_fee:,}",
+                            f"₦{service_charge:,.2f}"
+                        ]
+                    )
+                    self.logger.info(f"Sent merchant_order template notification for order {order_id} to {self.merchant_phone_number}")
+                except Exception as e:
+                    self.logger.error(f"Failed to send merchant_order template for order {order_id}: {e}", exc_info=True)
+                    # Fallback to text message
+                    fallback_message = (
+                        f"⚠️ *New Order Alert*\n\n"
+                        f"Order ID: {order_id}\n"
+                        f"Customer: {customer_name}\n"
+                        f"Address: {delivery_address}\n"
+                        f"Please check system for full details and process order."
+                    )
+                    self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
+                    self.logger.info(f"Sent fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
+            else:
+                self.logger.warning("Merchant phone number not configured, skipping merchant notification")
+                
         except Exception as e:
-            self.logger.error(f"Error sending payment success text message for order {order_id}: {e}", exc_info=True)
+            self.logger.error(f"Error sending payment success messages for order {order_id}: {e}", exc_info=True)
+            # Send fallback merchant notification if primary fails
+            if self.merchant_phone_number:
+                fallback_message = (
+                    f"⚠️ *New Order Alert*\n\n"
+                    f"Order ID: {order_id}\n"
+                    f"Customer: {self.session_manager.get_session_state(session_id).get('user_name', 'Guest')}\n"
+                    f"Address: {delivery_address}\n"
+                    f"Please check system for full details and process order."
+                )
+                self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
+                self.logger.info(f"Sent fallback merchant notification for order {order_id} to {self.merchant_phone_number}")
     
     def start_payment_monitoring(self, session_id, payment_reference, order_id):
         """Start monitoring payment status every minute for up to 15 minutes."""
@@ -278,6 +337,10 @@ class PaymentHandler(BaseHandler):
             
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             if order_data:
+                service_charge = order_data.get("service_charge", 0)
+                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
+                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
+                    self.logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
                 success = self.data_manager.update_order_status(
                     order_id,
                     "confirmed",
@@ -285,7 +348,7 @@ class PaymentHandler(BaseHandler):
                         "payment_reference": payment_reference,
                         "payment_method_type": payment_data.get("payment_method_type", "paystack"),
                         "delivery_fee": self.delivery_fee,
-                        "service_charge": order_data.get("service_charge", 0),
+                        "service_charge": service_charge,
                         "subaccount_split": {
                             "subaccount_code": self.subaccount_code,
                             "percentage": self.subaccount_percentage
@@ -307,7 +370,7 @@ class PaymentHandler(BaseHandler):
             
             try:
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                    self.lead_tracking_handler.track_order_conversion(session_id, order_id, order_data["total_amount"] + self.delivery_fee + order_data.get("service_charge", 0))
+                    self.lead_tracking_handler.track_order_conversion(session_id, order_id, order_data["total_amount"] + self.delivery_fee + service_charge)
                 else:
                     self.logger.debug("Lead tracking handler not available for order conversion tracking")
             except Exception as e:
@@ -331,7 +394,7 @@ class PaymentHandler(BaseHandler):
             
             maps_info = self._generate_maps_info(state)
             order_items = self.data_manager.get_order_items(order_id)
-            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + order_data.get("service_charge", 0)
+            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
             self._send_payment_success_message(
                 session_id,
                 order_id,
@@ -341,10 +404,18 @@ class PaymentHandler(BaseHandler):
                 maps_info
             )
             
-            self._initiate_feedback_collection(state, session_id, order_id)
+            # Explicitly trigger feedback collection with enhanced logging
+            try:
+                if self.feedback_handler:
+                    self.logger.info(f"Initiating feedback collection for order {order_id}, session {session_id}")
+                    self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
+                else:
+                    self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping feedback collection")
+            except Exception as e:
+                self.logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
             
         except Exception as e:
-            self.logger.error(f"Error handling successful auto payment for order {order_id}: {e}")
+            self.logger.error(f"Error handling successful auto payment for order {order_id}: {e}", exc_info=True)
     
     def send_payment_reminder(self, session_id, order_id, payment_reference):
         """Send payment reminder after 5 minutes."""
@@ -356,8 +427,10 @@ class PaymentHandler(BaseHandler):
                 self.logger.error(f"Order data not found for reminder for order {order_id}.")
                 return
             
-            subtotal = order_data["total_amount"]
+            subtotal = order_data.get("total_amount", 0)
             service_charge = order_data.get("service_charge", subtotal * (self.service_charge_percentage / 100))
+            if service_charge == 0 and subtotal > 0:
+                self.logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
             total_amount = subtotal + self.delivery_fee + service_charge
             
             customer_email = self.payment_service.generate_customer_email(
@@ -424,10 +497,18 @@ class PaymentHandler(BaseHandler):
             
             order_items = self.data_manager.get_order_items(order_id)
             formatted_items = self._format_order_items(order_items)
+            order_data = self.data_manager.get_order_by_id(order_id)
+            service_charge = order_data.get("service_charge", 0) if order_data else 0
+            subtotal = order_data.get("total_amount", 0) if order_data else 0
+            total_amount = subtotal + self.delivery_fee + service_charge
             
             timeout_message = (
                 f"⏰ *Payment Expired*\n\n"
                 f"Your payment for Order #{order_id} has expired after 15 minutes.\n\n"
+                f"💰 *Subtotal:* ₦{subtotal:,}\n"
+                f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:* {formatted_items}\n"
                 f"❌ The order has been automatically cancelled.\n"
                 f"🛒 You can place a new order anytime by sending any message.\n\n"
@@ -486,6 +567,11 @@ class PaymentHandler(BaseHandler):
                 self.logger.info(f"Manual payment verification successful for order {order_data['order_id']}")
                 self.stop_payment_monitoring(session_id)
                 
+                service_charge = order_data.get("service_charge", 0)
+                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
+                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
+                    self.logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                
                 success = self.data_manager.update_order_status(
                     order_data["order_id"],
                     "confirmed",
@@ -493,7 +579,7 @@ class PaymentHandler(BaseHandler):
                         "payment_reference": payment_reference,
                         "payment_method_type": payment_data.get("payment_method_type", "paystack"),
                         "delivery_fee": self.delivery_fee,
-                        "service_charge": order_data.get("service_charge", 0),
+                        "service_charge": service_charge,
                         "subaccount_split": {
                             "subaccount_code": self.subaccount_code,
                             "percentage": self.subaccount_percentage
@@ -514,7 +600,7 @@ class PaymentHandler(BaseHandler):
                 
                 try:
                     if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                        self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + order_data.get("service_charge", 0))
+                        self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + service_charge)
                     else:
                         self.logger.debug("Lead tracking handler not available for order conversion tracking")
                 except Exception as e:
@@ -522,7 +608,7 @@ class PaymentHandler(BaseHandler):
                 
                 order_items = self.data_manager.get_order_items(order_data["order_id"])
                 maps_info = self._generate_maps_info(state)
-                total_amount = order_data.get("total_amount", 0) + self.delivery_fee + order_data.get("service_charge", 0)
+                total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
                 self._send_payment_success_message(
                     session_id,
                     order_data["order_id"],
@@ -532,7 +618,15 @@ class PaymentHandler(BaseHandler):
                     maps_info
                 )
                 
-                self._initiate_feedback_collection(state, session_id, order_data['order_id'])
+                # Explicitly trigger feedback collection with enhanced logging
+                try:
+                    if self.feedback_handler:
+                        self.logger.info(f"Initiating feedback collection for order {order_data['order_id']}, session {session_id}")
+                        self.feedback_handler.initiate_feedback_request(state, session_id, order_data['order_id'])
+                    else:
+                        self.logger.warning(f"FeedbackHandler not available for order {order_data['order_id']}, skipping feedback collection")
+                except Exception as e:
+                    self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']}: {e}", exc_info=True)
                 
                 return {"message": "Payment confirmed and feedback initiated"}
                 
@@ -540,15 +634,18 @@ class PaymentHandler(BaseHandler):
                 self.logger.info(f"Manual payment verification failed for reference {payment_reference}. Paystack status: {payment_data.get('status', 'N/A') if payment_data else 'N/A'}")
                 order_items = self.data_manager.get_order_items(order_data["order_id"] if order_data else "0")
                 formatted_items = self._format_order_items(order_items)
+                service_charge = order_data.get("service_charge", 0) if order_data else 0
+                subtotal = order_data.get("total_amount", 0) if order_data else 0
+                total_amount = subtotal + self.delivery_fee + service_charge
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"⏳ *Payment Not Yet Received*\n\n"
                     f"📋 *Order ID:* {order_data['order_id'] if order_data else 'N/A'}\n"
-                    f"🛒 *Items:* {formatted_items}\n"
-                    f"💰 *Subtotal:* ₦{order_data['total_amount'] if order_data else 0:,}\n"
+                    f"💰 *Subtotal:* ₦{subtotal:,}\n"
                     f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                    f"💸 *Service Charge (2.5%):* ₦{order_data.get('service_charge', 0) if order_data else 0:,.2f}\n"
-                    f"💰 *Total:* ₦{(order_data['total_amount'] if order_data else 0) + self.delivery_fee + (order_data.get('service_charge', 0) if order_data else 0):,}\n\n"
+                    f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                    f"💰 *Total:* ₦{total_amount:,.2f}\n"
+                    f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 Please:\n"
                     f"1️⃣ Complete the payment using the link provided\n"
                     f"2️⃣ Wait a moment for processing\n"
@@ -615,6 +712,7 @@ class PaymentHandler(BaseHandler):
         
         if order_data and order_data.get("status") == "confirmed":
             self.logger.info(f"User sent message while in awaiting_payment, but order {order_data['order_id']} was already confirmed.")
+            self.stop_payment_monitoring(session_id)
             state["current_state"] = "order_confirmation"
             state["current_handler"] = "payment_handler"
             state["cart"] = {}
@@ -622,7 +720,8 @@ class PaymentHandler(BaseHandler):
             
             order_items = self.data_manager.get_order_items(order_data["order_id"])
             maps_info = self._generate_maps_info(state)
-            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + order_data.get("service_charge", 0)
+            service_charge = order_data.get("service_charge", 0)
+            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
             self._send_payment_success_message(
                 session_id,
                 order_data["order_id"],
@@ -632,22 +731,35 @@ class PaymentHandler(BaseHandler):
                 maps_info
             )
             
-            return {"message": "Payment already confirmed, text message sent"}
+            # Explicitly trigger feedback collection with enhanced logging
+            try:
+                if self.feedback_handler:
+                    self.logger.info(f"Initiating feedback collection for order {order_data['order_id']}, session {session_id}")
+                    self.feedback_handler.initiate_feedback_request(state, session_id, order_data['order_id'])
+                else:
+                    self.logger.warning(f"FeedbackHandler not available for order {order_data['order_id']}, skipping feedback collection")
+            except Exception as e:
+                self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']}: {e}", exc_info=True)
+            
+            return {"message": "Payment already confirmed, text message and feedback initiated"}
         else:
             self.logger.info(f"User sent message while still awaiting payment for order {state.get('order_id', 'N/A')}.")
             order_id = state.get("order_id", "0")
             order_items = self.data_manager.get_order_items(order_id)
             formatted_items = self._format_order_items(order_items)
+            service_charge = order_data.get("service_charge", 0) if order_data else 0
+            subtotal = order_data.get("total_amount", 0) if order_data else 0
+            total_amount = subtotal + self.delivery_fee + service_charge
             
             return self.whatsapp_service.create_text_message(
                 session_id,
                 f"🔄 *Payment Monitoring Active*\n\n"
                 f"📋 *Order ID:* {state.get('order_id', 'N/A')}\n"
-                f"🛒 *Items:* {formatted_items}\n"
-                f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0) if order_data else 0:,}\n"
+                f"💰 *Subtotal:* ₦{subtotal:,}\n"
                 f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                f"💸 *Service Charge (2.5%):* ₦{order_data.get('service_charge', 0) if order_data else 0:,.2f}\n"
-                f"💰 *Total:* ₦{(order_data.get('total_amount', 0) if order_data else 0) + self.delivery_fee + (order_data.get('service_charge', 0) if order_data else 0):,}\n\n"
+                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                f"💰 *Total:* ₦{total_amount:,.2f}\n"
+                f"🛒 *Items:* {formatted_items}\n\n"
                 f"✅ Once payment is confirmed, you'll receive an automatic confirmation.\n"
                 f"💬 Send 'paid' to check status immediately.\n"
                 f"❌ Send 'cancel' to cancel this order."
@@ -672,7 +784,7 @@ class PaymentHandler(BaseHandler):
             self.logger.error(f"Error generating maps info: {e}", exc_info=True)
         return maps_info
     
-    def handle_order_confirmation_state(self, state, message, session_id):
+    def handle_order_confirmation_state(self, state, session_id):
         """Handle order confirmation state."""
         order_id = state.get("order_id")
         order_data = self.data_manager.get_order_by_payment_reference(state.get("payment_reference"))
@@ -685,7 +797,8 @@ class PaymentHandler(BaseHandler):
             
             order_items = self.data_manager.get_order_items(order_id)
             maps_info = self._generate_maps_info(state)
-            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + order_data.get("service_charge", 0)
+            service_charge = order_data.get("service_charge", 0)
+            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
             self._send_payment_success_message(
                 session_id,
                 order_id,
@@ -695,7 +808,17 @@ class PaymentHandler(BaseHandler):
                 maps_info
             )
             
-            return {"message": "Order confirmed, text message sent"}
+            # Explicitly trigger feedback collection with enhanced logging
+            try:
+                if self.feedback_handler:
+                    self.logger.info(f"Initiating feedback collection for order {order_id}, session {session_id}")
+                    self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
+                else:
+                    self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping feedback collection")
+            except Exception as e:
+                self.logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
+            
+            return {"message": "Order confirmed, text message and feedback initiated"}
         else:
             self.logger.warning(f"handle_order_confirmation_state called but order {order_id} not found or not confirmed. Status: {order_data.get('status') if order_data else 'N/A'}")
             state["current_state"] = "greeting"
@@ -719,14 +842,17 @@ class PaymentHandler(BaseHandler):
                     self.logger.error(f"No order found for payment reference {payment_reference} from webhook.")
                     return
                 
-                # Try to get session_id from order_data or webhook metadata
                 session_id = order_data.get("phone_number")
                 if not session_id:
                     session_id = webhook_data.get("data", {}).get("metadata", {}).get("phone_number")
                     if not session_id:
                         self.logger.warning(f"No phone_number found in order_data or webhook metadata for reference {payment_reference}. Processing order status update without user notifications.")
                 
-                # Update order status regardless of session_id availability
+                service_charge = order_data.get("service_charge", 0)
+                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
+                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
+                    self.logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                
                 success = self.data_manager.update_order_status(
                     order_data["order_id"],
                     "confirmed",
@@ -734,7 +860,7 @@ class PaymentHandler(BaseHandler):
                         "payment_reference": payment_reference,
                         "payment_method_type": webhook_data["data"].get("payment_method_type", "paystack"),
                         "delivery_fee": self.delivery_fee,
-                        "service_charge": order_data.get("service_charge", 0),
+                        "service_charge": service_charge,
                         "subaccount_split": {
                             "subaccount_code": self.subaccount_code,
                             "percentage": self.subaccount_percentage
@@ -745,7 +871,6 @@ class PaymentHandler(BaseHandler):
                     self.logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for webhook")
                     return
                 
-                # If session_id is available, perform user-specific actions
                 if session_id:
                     self.stop_payment_monitoring(session_id)
                     
@@ -757,7 +882,7 @@ class PaymentHandler(BaseHandler):
                     
                     try:
                         if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                            self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + order_data.get("service_charge", 0))
+                            self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + service_charge)
                         else:
                             self.logger.debug("Lead tracking handler not available for order conversion tracking")
                     except Exception as e:
@@ -765,7 +890,7 @@ class PaymentHandler(BaseHandler):
                     
                     order_items = self.data_manager.get_order_items(order_data["order_id"])
                     maps_info = self._generate_maps_info(state)
-                    total_amount = order_data["total_amount"] + self.delivery_fee + order_data.get("service_charge", 0)
+                    total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
                     self._send_payment_success_message(
                         session_id,
                         order_data["order_id"],
@@ -775,9 +900,37 @@ class PaymentHandler(BaseHandler):
                         maps_info
                     )
                     
-                    self._initiate_feedback_collection_webhook(session_id, order_data['order_id'], session_manager)
+                    # Explicitly trigger feedback collection with enhanced logging
+                    try:
+                        if self.feedback_handler:
+                            self.logger.info(f"Initiating feedback collection for order {order_data['order_id']}, session {session_id}")
+                            self.feedback_handler.initiate_feedback_request(state, session_id, order_data['order_id'])
+                        else:
+                            self.logger.warning(f"FeedbackHandler not available for order {order_data['order_id']}, skipping feedback collection")
+                    except Exception as e:
+                        self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']}: {e}", exc_info=True)
                 else:
-                    self.logger.info(f"Order {order_data['order_id']} confirmed, but no session_id available. Skipping notifications and feedback.")
+                    self.logger.info(f"Order {order_data['order_id']} confirmed, but no session_id available. Sending merchant notification only.")
+                    # Send merchant notification even without session_id
+                    order_items = self.data_manager.get_order_items(order_data["order_id"])
+                    total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
+                    self._send_payment_success_message(
+                        session_id or order_data.get("phone_number", ""),
+                        order_data["order_id"],
+                        total_amount,
+                        order_items,
+                        order_data.get("address", "Not provided")
+                    )
+                    # Attempt to trigger feedback using order_data phone_number if available
+                    try:
+                        if self.feedback_handler and order_data.get("phone_number"):
+                            state = session_manager.get_session_state(order_data["phone_number"]) or {}
+                            self.logger.info(f"Initiating feedback collection for order {order_data['order_id']} using order_data phone_number {order_data['phone_number']}")
+                            self.feedback_handler.initiate_feedback_request(state, order_data["phone_number"], order_data['order_id'])
+                        else:
+                            self.logger.warning(f"FeedbackHandler or phone_number not available for order {order_data['order_id']}, skipping feedback collection")
+                    except Exception as e:
+                        self.logger.error(f"Failed to initiate feedback collection for order {order_data['order_id']} using order_data phone_number: {e}", exc_info=True)
                 
             else:
                 self.logger.info(f"Ignored webhook event: {event}")
@@ -808,23 +961,27 @@ class PaymentHandler(BaseHandler):
     def _initiate_feedback_collection(self, state: Dict, session_id: str, order_id: str) -> None:
         """Initiate feedback collection after successful payment."""
         try:
-            if hasattr(self, 'feedback_handler') and self.feedback_handler:
+            if self.feedback_handler:
+                self.logger.info(f"Attempting feedback collection for order {order_id}, session {session_id}")
                 self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
+                self.logger.info(f"Successfully initiated feedback collection for order {order_id}")
             else:
-                self.logger.debug("FeedbackHandler not available for feedback collection")
+                self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping feedback collection")
         except Exception as e:
-            self.logger.error(f"Error initiating feedback collection for order {order_id}: {e}")
+            self.logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
     
     def _initiate_feedback_collection_webhook(self, session_id: str, order_id: str, session_manager) -> None:
         """Initiate feedback collection for webhook payments."""
         try:
-            if hasattr(self, 'feedback_handler') and self.feedback_handler:
-                state = session_manager.get_session_state(session_id)
+            if self.feedback_handler:
+                state = session_manager.get_session_state(session_id) or {}
+                self.logger.info(f"Attempting webhook feedback collection for order {order_id}, session {session_id}")
                 self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
+                self.logger.info(f"Successfully initiated webhook feedback collection for order {order_id}")
             else:
-                self.logger.debug("FeedbackHandler not available for webhook feedback collection")
+                self.logger.warning(f"FeedbackHandler not available for order {order_id}, skipping webhook feedback collection")
         except Exception as e:
-            self.logger.error(f"Error initiating webhook feedback collection for order {order_id}: {e}")
+            self.logger.error(f"Failed to initiate webhook feedback collection for order {order_id}: {e}", exc_info=True)
     
     def handle_back_to_main(self, state, session_id):
         """Return to main menu."""

@@ -31,12 +31,12 @@ class AIHandler(BaseHandler):
         # Dictionary to map day names to their respective menu image URLs
         self.menu_image_urls = {
             "Monday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-monday.jpg",
-            "Tuesday": "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg",
+            "Tuesday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg",
             "Wednesday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-wednesday.jpg",
             "Thursday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-thursday.jpg",
             "Friday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-friday.jpg",
-            "Saturday": "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg", # Fallback for weekends
-            "Sunday": "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg" # Fallback for weekends
+            "Saturday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg", # Fallback for weekends
+            "Sunday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg" # Fallback for weekends
         }
 
         if not self.ai_enabled:

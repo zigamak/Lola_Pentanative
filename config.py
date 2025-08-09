@@ -30,6 +30,8 @@ class Config:
         self.SUBACCOUNT_PERCENTAGE = 1
         #self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
         #self.SUBACCOUNT_PERCENTAGE = 1
+        NOTIFICATION_PHONE_NUMBER = "2348033035929"
+        self.MERCHANT_PHONE_NUMBER= "2347082345056"
         
         
         # Other services
