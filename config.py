@@ -24,7 +24,7 @@ class Config:
         # Payment configuration
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
-        self.SUBACCOUNT_CODE = "ACCT_939kju7zdvsk76y"
+        self.SUBACCOUNT_CODE = "ACCT_iwv6csej0ra4k7g"
         #self.SUBACCOUNT_PERCENTAGE = 1
         #self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
         self.SUBACCOUNT_PERCENTAGE = 1
