@@ -1,16 +1,6 @@
 {
   "Rice": [
     {
-      "id": "99",
-      "name": "Jollof Rice",
-      "variant": null,
-      "price": 1500.0,
-      "currency": null,
-      "availability_status": true,
-      "description": "Red, Spicy, Smokey, fully flavored Nigerian Rice",
-      "quantity": 10
-    },
-    {
       "id": "100",
       "name": "Fried Rice",
       "variant": null,
@@ -19,6 +9,16 @@
       "availability_status": true,
       "description": "Fried Rice with Vegetables",
       "quantity": 6
+    },
+    {
+      "id": "99",
+      "name": "Jollof Rice",
+      "variant": null,
+      "price": 1500.0,
+      "currency": null,
+      "availability_status": true,
+      "description": "Red, Spicy, Smokey, fully flavored Nigerian Rice",
+      "quantity": 5
     },
     {
       "id": "111",
