@@ -49,6 +49,7 @@ class ProductSyncHandler:
                             last_updated,
                             quantity
                         FROM whatsapp_merchant_product_inventory
+                        WHERE availability_status = true
                     """
                     cur.execute(query)
                     rows = cur.fetchall()

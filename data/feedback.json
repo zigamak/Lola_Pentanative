@@ -25,5 +25,41 @@
     "comment": "",
     "timestamp": "2025-08-05T00:37:42.693085",
     "session_duration": 8.09
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "Ziga",
+    "order_id": 163,
+    "rating": "excellent",
+    "comment": "",
+    "timestamp": "2025-08-10T19:26:11.621585",
+    "session_duration": 22.55
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "Ziga",
+    "order_id": 165,
+    "rating": "good",
+    "comment": "",
+    "timestamp": "2025-08-10T19:41:55.538539",
+    "session_duration": 12.68
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "Ziga",
+    "order_id": 170,
+    "rating": "good",
+    "comment": "",
+    "timestamp": "2025-08-14T02:19:53.781402",
+    "session_duration": 8.63
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "Ziga",
+    "order_id": 171,
+    "rating": "good",
+    "comment": "",
+    "timestamp": "2025-08-14T02:33:58.471836",
+    "session_duration": 14.4
   }
 ]

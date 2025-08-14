@@ -1,9 +1,14 @@
 import logging
 import sys
 import io
+import datetime
 from threading import Timer
 from typing import Dict, Any, List
 from .base_handler import BaseHandler
+from flask import jsonify
+from .product_sync_handler import ProductSyncHandler
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Configure logging with UTF-8 encoding
 logger = logging.getLogger(__name__)
@@ -15,27 +20,150 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 class PaymentHandler(BaseHandler):
-    """Handles payment processing and order completion with dual verification and subaccount splitting."""
+    """Handles payment processing and order completion with dual verification, subaccount splitting, inventory management, and feedback saving."""
     
-    def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service, feedback_handler=None):
+    def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service, feedback_handler=None, product_sync_handler=None):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
         self.payment_service = payment_service
         self.location_service = location_service
         self.feedback_handler = feedback_handler
+        self.product_sync_handler = product_sync_handler or ProductSyncHandler(config)
         self.subaccount_code = getattr(config, 'SUBACCOUNT_CODE', None)
         self.subaccount_percentage = getattr(config, 'SUBACCOUNT_PERCENTAGE', 30)
         self.delivery_fee = 1000
         self.service_charge_percentage = 2.5
         self.merchant_phone_number = getattr(config, 'MERCHANT_PHONE_NUMBER', None)
         self.payment_timers = {}
+        self.db_params = {
+            'dbname': config.DB_NAME,
+            'user': config.DB_USER,
+            'password': config.DB_PASSWORD,
+            'host': config.DB_HOST,
+            'port': config.DB_PORT
+        }
         if not self.feedback_handler:
-            logger.warning("FeedbackHandler not provided, feedback collection will be skipped")
+            logger.warning("FeedbackHandler not provided, feedback collection will be manual")
         else:
             logger.info("FeedbackHandler successfully provided to PaymentHandler")
         if not self.merchant_phone_number:
             logger.warning("MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped")
+        if not self.product_sync_handler:
+            logger.warning("ProductSyncHandler not provided, product syncing will be skipped")
+        else:
+            logger.info("ProductSyncHandler successfully provided to PaymentHandler")
         logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, delivery fee ₦{self.delivery_fee}, service charge {self.service_charge_percentage}%, merchant phone {self.merchant_phone_number}")
-    
+
+    def _save_feedback_to_db(self, feedback_data: Dict) -> bool:
+        """Save feedback data to the whatsapp_feedback table."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        INSERT INTO whatsapp_feedback (phone_number, user_name, order_id, rating, comment, timestamp, session_duration)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """
+                    cur.execute(query, (
+                        feedback_data['phone_number'],
+                        feedback_data['user_name'],
+                        feedback_data['order_id'],
+                        feedback_data['rating'],
+                        feedback_data['comment'],
+                        feedback_data['timestamp'],
+                        feedback_data['session_duration']
+                    ))
+                    conn.commit()
+                    feedback_id = cur.fetchone()['id']
+                    logger.info(f"Saved feedback to database with ID {feedback_id} for order {feedback_data['order_id']}")
+                    return True
+        except Exception as e:
+            logger.error(f"Error saving feedback to database: {str(e)}", exc_info=True)
+            conn.rollback()
+            return False
+
+    def _initiate_feedback_collection(self, state: Dict, session_id: str, order_id: str) -> None:
+        """Initiate feedback collection after successful payment by sending a manual feedback prompt."""
+        try:
+            logger.info(f"Initiating manual feedback collection for order {order_id}, session {session_id}")
+            
+            # Set the session state for feedback
+            state["current_state"] = "feedback_rating"
+            state["current_handler"] = "feedback_handler"
+            state["feedback_order_id"] = order_id
+            state["feedback_started_at"] = datetime.datetime.now().isoformat()
+            self.session_manager.update_session_state(session_id, state)
+            logger.debug(f"Updated state for session {session_id}: {state}")
+            
+            # Define feedback buttons
+            buttons = [
+                {"type": "reply", "reply": {"id": "excellent", "title": "🤩 Excellent"}},
+                {"type": "reply", "reply": {"id": "good", "title": "😊 Good"}},
+                {"type": "reply", "reply": {"id": "bad", "title": "😞 Bad"}}
+            ]
+            
+            # Send manual feedback prompt
+            message = (
+                f"🎉 *Thank you for your order!*\n\n"
+                f"📋 Order ID: {order_id}\n\n"
+                f"💬 *How was your ordering experience?*\n"
+                f"Your feedback helps us improve our service!"
+            )
+            
+            response = self.whatsapp_service.create_button_message(session_id, message, buttons)
+            logger.info(f"Manual feedback prompt sent for order {order_id}, session {session_id}, response: {response}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send manual feedback prompt for order {order_id}, session {session_id}: {str(e)}", exc_info=True)
+            state["current_state"] = "greeting"
+            state["current_handler"] = "greeting_handler"
+            self.session_manager.update_session_state(session_id, state)
+            self.whatsapp_service.create_text_message(
+                session_id,
+                "⚠️ Issue sending feedback request. Let's start fresh. How can I help you today?"
+            )
+
+    def _initiate_feedback_collection_webhook(self, session_id: str, order_id: str, session_manager) -> None:
+        """Initiate feedback collection for webhook payments."""
+        try:
+            state = session_manager.get_session_state(session_id) or {}
+            logger.info(f"Initiating manual feedback collection for webhook order {order_id}, session {session_id}")
+            
+            # Set the session state for feedback
+            state["current_state"] = "feedback_rating"
+            state["current_handler"] = "feedback_handler"
+            state["feedback_order_id"] = order_id
+            state["feedback_started_at"] = datetime.datetime.now().isoformat()
+            session_manager.update_session_state(session_id, state)
+            logger.debug(f"Updated state for session {session_id}: {state}")
+            
+            # Define feedback buttons
+            buttons = [
+                {"type": "reply", "reply": {"id": "excellent", "title": "🤩 Excellent"}},
+                {"type": "reply", "reply": {"id": "good", "title": "😊 Good"}},
+                {"type": "reply", "reply": {"id": "bad", "title": "😞 Bad"}}
+            ]
+            
+            # Send manual feedback prompt
+            message = (
+                f"🎉 *Thank you for your order!*\n\n"
+                f"📋 Order ID: {order_id}\n\n"
+                f"💬 *How was your ordering experience?*\n"
+                f"Your feedback helps us improve our service!"
+            )
+            
+            response = self.whatsapp_service.create_button_message(session_id, message, buttons)
+            logger.info(f"Manual feedback prompt sent for webhook order {order_id}, session {session_id}, response: {response}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send manual feedback prompt for webhook order {order_id}, session {session_id}: {str(e)}", exc_info=True)
+            state["current_state"] = "greeting"
+            state["current_handler"] = "greeting_handler"
+            session_manager.update_session_state(session_id, state)
+            self.whatsapp_service.create_text_message(
+                session_id,
+                "⚠️ Issue sending feedback request. Let's start fresh. How can I help you today?"
+            )
+
     def handle_payment_processing_state(self, state, message, session_id):
         """Handle payment processing state - entry point from order handler."""
         logger.info(f"Handling payment processing for session {session_id}, message: {message}")
@@ -245,7 +373,7 @@ class PaymentHandler(BaseHandler):
                 customer_name = state.get("user_name", "Guest")
                 customer_phone = state.get("phone_number", session_id)
                 customer_notes = state.get("customer_notes", "No special instructions provided")
-                order_placement_time = order_data.get("created_at", "Not available") if order_data else "Not available"
+                order_placement_time = order_data.get("dateadded", "Not available") if order_data else "Not available"
                 
                 merchant_message = (
                     f"🔔 *New Order Alert*\n\n"
@@ -256,10 +384,8 @@ class PaymentHandler(BaseHandler):
                     f"🛒 *Items:*\n{formatted_items}\n"
                     f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
                     f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                    f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"📝 *Customer Notes:* {customer_notes}\n"
-                    f"📅 *Order Placed:* {order_placement_time}\n"
                     f"📌 Please process this order promptly."
                 )
                 self.whatsapp_service.create_text_message(self.merchant_phone_number, merchant_message)
@@ -275,7 +401,7 @@ class PaymentHandler(BaseHandler):
                 customer_name = state.get("user_name", "Guest")
                 customer_phone = state.get("phone_number", session_id)
                 customer_notes = state.get("customer_notes", "No special instructions provided")
-                order_placement_time = order_data.get("created_at", "Not available") if order_data else "Not available"
+                order_placement_time = order_data.get("dateadded", "Not available") if order_data else "Not available"
                 fallback_message = (
                     f"🔔 *New Order Alert*\n\n"
                     f"📋 *Order ID:* {order_id}\n"
@@ -345,31 +471,76 @@ class PaymentHandler(BaseHandler):
                 return
             
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
-            if order_data:
-                service_charge = order_data.get("service_charge", 0)
-                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
-                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
-                success = self.data_manager.update_order_status(
-                    order_id,
-                    "confirmed",
-                    {
-                        "payment_reference": payment_reference,
-                        "payment_method_type": payment_data.get("payment_method_type", "paystack"),
-                        "delivery_fee": self.delivery_fee,
-                        "service_charge": service_charge,
-                        "subaccount_split": {
-                            "subaccount_code": self.subaccount_code,
-                            "percentage": self.subaccount_percentage
-                        } if self.subaccount_code else None
-                    }
-                )
-                if not success:
-                    logger.error(f"Failed to update order {order_id} to confirmed status for session {session_id}")
-                    return
-            else:
+            if not order_data:
                 logger.error(f"Order data not found for payment reference {payment_reference} during auto-payment handling.")
                 return
+            
+            service_charge = order_data.get("service_charge", 0)
+            if service_charge == 0 and order_data.get("total_amount", 0) > 0:
+                service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
+                logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
+                
+            success = self.data_manager.update_order_status(
+                order_id,
+                "confirmed",
+                {
+                    "payment_reference": payment_reference,
+                    "payment_method_type": payment_data.get("payment_method_type", "paystack"),
+                    "delivery_fee": self.delivery_fee,
+                    "service_charge": service_charge,
+                    "subaccount_split": {
+                        "subaccount_code": self.subaccount_code,
+                        "percentage": self.subaccount_percentage
+                    } if self.subaccount_code else None
+                }
+            )
+            if not success:
+                logger.error(f"Failed to update order {order_id} to confirmed status for session {session_id}")
+                self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ Error confirming your order. Please contact support."
+                )
+                return
+            
+            # Retrieve and validate order items
+            order_items = self.data_manager.get_order_items(order_id)
+            valid_items = [item for item in order_items if item.get("product_id") and item.get("quantity")]
+            invalid_items = [item for item in order_items if not (item.get("product_id") and item.get("quantity"))]
+            
+            if invalid_items:
+                logger.error(f"Invalid order items for order {order_id}: {invalid_items}")
+                self.whatsapp_service.create_text_message(
+                    self.merchant_phone_number,
+                    f"⚠️ Invalid items in Order #{order_id}: {self._format_order_items(invalid_items)}. Please verify product IDs in inventory."
+                )
+            
+            if valid_items:
+                # Reduce inventory for valid items only
+                if not self.data_manager.reduce_inventory(order_id, valid_items):
+                    logger.error(f"Failed to reduce inventory for order {order_id}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ Inventory reduction failed for Order #{order_id}. Please check stock manually."
+                    )
+                # Sync products to JSON after inventory reduction
+                if self.product_sync_handler:
+                    success = self.product_sync_handler.sync_products_to_json()
+                    if success:
+                        logger.info(f"Successfully synced products to JSON after inventory reduction for order {order_id}")
+                    else:
+                        logger.error(f"Failed to sync products to JSON after inventory reduction for order {order_id}")
+                else:
+                    logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_id}")
+            else:
+                logger.warning(f"No valid items to reduce inventory for order {order_id}")
+                self.whatsapp_service.create_text_message(
+                    self.merchant_phone_number,
+                    f"⚠️ No valid items to reduce inventory for Order #{order_id}. Please verify order details."
+                )
+            
+            # Check for low inventory
+            for item in valid_items:
+                self.data_manager.check_low_inventory(item.get("product_id"), threshold=5)
             
             state = self.session_manager.get_session_state(session_id)
             state["current_state"] = "feedback_rating"
@@ -402,7 +573,6 @@ class PaymentHandler(BaseHandler):
                 logger.error(f"Error initializing order status: {e}", exc_info=True)
             
             maps_info = self._generate_maps_info(state)
-            order_items = self.data_manager.get_order_items(order_id)
             total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
             self._send_payment_success_message(
                 session_id,
@@ -415,6 +585,10 @@ class PaymentHandler(BaseHandler):
             
         except Exception as e:
             logger.error(f"Error handling successful auto payment for order {order_id}: {e}", exc_info=True)
+            self.whatsapp_service.create_text_message(
+                session_id,
+                "⚠️ Error processing payment confirmation. Please contact support."
+            )
     
     def send_payment_reminder(self, session_id, order_id, payment_reference):
         """Send payment reminder after 5 minutes."""
@@ -562,16 +736,16 @@ class PaymentHandler(BaseHandler):
             order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
             
             if payment_verified and order_data:
-                logger.info(f"Manual payment verification successful for order {order_data['order_id']}")
+                logger.info(f"Manual payment verification successful for order {order_data['id']}")
                 self.stop_payment_monitoring(session_id)
                 
                 service_charge = order_data.get("service_charge", 0)
                 if service_charge == 0 and order_data.get("total_amount", 0) > 0:
                     service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                    logger.warning(f"Service charge was 0 for order {order_data['id']}, recalculated to ₦{service_charge:,.2f}")
                 
                 success = self.data_manager.update_order_status(
-                    order_data["order_id"],
+                    order_data["id"],
                     "confirmed",
                     {
                         "payment_reference": payment_reference,
@@ -585,11 +759,51 @@ class PaymentHandler(BaseHandler):
                     }
                 )
                 if not success:
-                    logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for session {session_id}")
+                    logger.error(f"Failed to update order {order_data['id']} to confirmed status for session {session_id}")
                     return self.whatsapp_service.create_text_message(
                         session_id,
                         "⚠️ Error confirming payment. Please contact support."
                     )
+                
+                # Retrieve and validate order items
+                order_items = self.data_manager.get_order_items(order_data["id"])
+                valid_items = [item for item in order_items if item.get("product_id") and item.get("quantity")]
+                invalid_items = [item for item in order_items if not (item.get("product_id") and item.get("quantity"))]
+                
+                if invalid_items:
+                    logger.error(f"Invalid order items for order {order_data['id']}: {invalid_items}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ Invalid items in Order #{order_data['id']}: {self._format_order_items(invalid_items)}. Please verify product IDs in inventory."
+                    )
+                
+                if valid_items:
+                    # Reduce inventory for valid items only
+                    if not self.data_manager.reduce_inventory(order_data["id"], valid_items):
+                        logger.error(f"Failed to reduce inventory for order {order_data['id']}")
+                        self.whatsapp_service.create_text_message(
+                            self.merchant_phone_number,
+                            f"⚠️ Inventory reduction failed for Order #{order_data['id']}. Please check stock manually."
+                        )
+                    # Sync products to JSON after inventory reduction
+                    if self.product_sync_handler:
+                        success = self.product_sync_handler.sync_products_to_json()
+                        if success:
+                            logger.info(f"Successfully synced products to JSON after inventory reduction for order {order_data['id']}")
+                        else:
+                            logger.error(f"Failed to sync products to JSON after inventory reduction for order {order_data['id']}")
+                    else:
+                        logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_data['id']}")
+                else:
+                    logger.warning(f"No valid items to reduce inventory for order {order_data['id']}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ No valid items to reduce inventory for Order #{order_data['id']}. Please verify order details."
+                    )
+                
+                # Check for low inventory
+                for item in valid_items:
+                    self.data_manager.check_low_inventory(item.get("product_id"), threshold=5)
                 
                 state["current_state"] = "feedback_rating"
                 state["current_handler"] = "feedback_handler"
@@ -598,18 +812,18 @@ class PaymentHandler(BaseHandler):
                 
                 try:
                     if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                        self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + service_charge)
+                        self.lead_tracking_handler.track_order_conversion(session_id, order_data["id"], order_data["total_amount"] + self.delivery_fee + service_charge)
                     else:
                         logger.debug("Lead tracking handler not available for order conversion tracking")
                 except Exception as e:
                     logger.error(f"Error tracking order conversion: {e}", exc_info=True)
                 
-                order_items = self.data_manager.get_order_items(order_data["order_id"])
+                order_items = self.data_manager.get_order_items(order_data["id"])
                 maps_info = self._generate_maps_info(state)
                 total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
                 self._send_payment_success_message(
                     session_id,
-                    order_data["order_id"],
+                    order_data["id"],
                     total_amount,
                     order_items,
                     state.get("address", "Not provided"),
@@ -620,7 +834,7 @@ class PaymentHandler(BaseHandler):
                 
             elif not payment_verified:
                 logger.info(f"Manual payment verification failed for reference {payment_reference}. Paystack status: {payment_data.get('status', 'N/A') if payment_data else 'N/A'}")
-                order_items = self.data_manager.get_order_items(order_data["order_id"] if order_data else "0")
+                order_items = self.data_manager.get_order_items(order_data["id"] if order_data else "0")
                 formatted_items = self._format_order_items(order_items)
                 service_charge = order_data.get("service_charge", 0) if order_data else 0
                 subtotal = order_data.get("total_amount", 0) if order_data else 0
@@ -628,7 +842,7 @@ class PaymentHandler(BaseHandler):
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"⏳ *Payment Not Yet Received*\n\n"
-                    f"📋 *Order ID:* {order_data['order_id'] if order_data else 'N/A'}\n"
+                    f"📋 *Order ID:* {order_data['id'] if order_data else 'N/A'}\n"
                     f"💰 *Subtotal:* ₦{subtotal:,}\n"
                     f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
                     f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
@@ -656,7 +870,7 @@ class PaymentHandler(BaseHandler):
                 session_id,
                 "⚠️ Error checking payment status. Please try again or contact support."
             )
-    
+        
     def _handle_payment_cancellation(self, state, session_id):
         """Handle payment cancellation."""
         try:
@@ -665,9 +879,26 @@ class PaymentHandler(BaseHandler):
             if state.get("payment_reference"):
                 order_data = self.data_manager.get_order_by_payment_reference(state["payment_reference"])
                 if order_data:
-                    success = self.data_manager.update_order_status(order_data["order_id"], "cancelled", {})
+                    success = self.data_manager.update_order_status(order_data["id"], "cancelled", {})
                     if not success:
-                        logger.error(f"Failed to update order {order_data['order_id']} to cancelled status for session {session_id}")
+                        logger.error(f"Failed to update order {order_data['id']} to cancelled status for session {session_id}")
+                    # Restore inventory on cancellation
+                    order_items = self.data_manager.get_order_items(order_data["id"])
+                    if not self.data_manager.restore_inventory(order_data["id"], order_items):
+                        logger.error(f"Failed to restore inventory for order {order_data['id']}")
+                        self.whatsapp_service.create_text_message(
+                            self.merchant_phone_number,
+                            f"⚠️ Inventory restoration failed for cancelled Order #{order_data['id']}. Please check stock manually."
+                        )
+                    # Sync products to JSON after inventory restoration
+                    if self.product_sync_handler:
+                        success = self.product_sync_handler.sync_products_to_json()
+                        if success:
+                            logger.info(f"Successfully synced products to JSON after inventory restoration for order {order_data['id']}")
+                        else:
+                            logger.error(f"Failed to sync products to JSON after inventory restoration for order {order_data['id']}")
+                    else:
+                        logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_data['id']}")
                 else:
                     logger.warning(f"No order found for payment reference {state['payment_reference']} during cancellation.")
             
@@ -699,20 +930,41 @@ class PaymentHandler(BaseHandler):
         order_data = self.data_manager.get_order_by_payment_reference(payment_reference)
         
         if order_data and order_data.get("status") == "confirmed":
-            logger.info(f"User sent message while in awaiting_payment, but order {order_data['order_id']} was already confirmed.")
+            logger.info(f"User sent message while in awaiting_payment, but order {order_data['id']} was already confirmed.")
             self.stop_payment_monitoring(session_id)
+            order_items = self.data_manager.get_order_items(order_data["id"])
+            # Reduce inventory
+            if not self.data_manager.reduce_inventory(order_data["id"], order_items):
+                logger.error(f"Failed to reduce inventory for order {order_data['id']}")
+                self.whatsapp_service.create_text_message(
+                    self.merchant_phone_number,
+                    f"⚠️ Inventory reduction failed for Order #{order_data['id']}. Please check stock manually."
+                )
+            # Sync products to JSON after inventory reduction
+            if self.product_sync_handler:
+                success = self.product_sync_handler.sync_products_to_json()
+                if success:
+                    logger.info(f"Successfully synced products to JSON after inventory reduction for order {order_data['id']}")
+                else:
+                    logger.error(f"Failed to sync products to JSON after inventory reduction for order {order_data['id']}")
+            else:
+                logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_data['id']}")
+            
+            # Check for low inventory
+            for item in order_items:
+                self.data_manager.check_low_inventory(item.get("product_id"), threshold=5)
+            
             state["current_state"] = "feedback_rating"
             state["current_handler"] = "feedback_handler"
             state["cart"] = {}
             self.session_manager.update_session_state(session_id, state)
             
-            order_items = self.data_manager.get_order_items(order_data["order_id"])
             maps_info = self._generate_maps_info(state)
             service_charge = order_data.get("service_charge", 0)
             total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
             self._send_payment_success_message(
                 session_id,
-                order_data["order_id"],
+                order_data["id"],
                 total_amount,
                 order_items,
                 state.get("address", "Not provided"),
@@ -768,12 +1020,51 @@ class PaymentHandler(BaseHandler):
         order_data = self.data_manager.get_order_by_payment_reference(state.get("payment_reference"))
         
         if order_data and order_data["status"] == "confirmed":
+            # Retrieve and validate order items
+            order_items = self.data_manager.get_order_items(order_id)
+            valid_items = [item for item in order_items if item.get("product_id") and item.get("quantity")]
+            invalid_items = [item for item in order_items if not (item.get("product_id") and item.get("quantity"))]
+            
+            if invalid_items:
+                logger.error(f"Invalid order items for order {order_id}: {invalid_items}")
+                self.whatsapp_service.create_text_message(
+                    self.merchant_phone_number,
+                    f"⚠️ Invalid items in Order #{order_id}: {self._format_order_items(invalid_items)}. Please verify product IDs in inventory."
+                )
+            
+            if valid_items:
+                # Reduce inventory for valid items only
+                if not self.data_manager.reduce_inventory(order_id, valid_items):
+                    logger.error(f"Failed to reduce inventory for order {order_id}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ Inventory reduction failed for Order #{order_id}. Please check stock manually."
+                    )
+                # Sync products to JSON after inventory reduction
+                if self.product_sync_handler:
+                    success = self.product_sync_handler.sync_products_to_json()
+                    if success:
+                        logger.info(f"Successfully synced products to JSON after inventory reduction for order {order_id}")
+                    else:
+                        logger.error(f"Failed to sync products to JSON after inventory reduction for order {order_id}")
+                else:
+                    logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_id}")
+            else:
+                logger.warning(f"No valid items to reduce inventory for order {order_id}")
+                self.whatsapp_service.create_text_message(
+                    self.merchant_phone_number,
+                    f"⚠️ No valid items to reduce inventory for Order #{order_id}. Please verify order details."
+                )
+            
+            # Check for low inventory
+            for item in valid_items:
+                self.data_manager.check_low_inventory(item.get("product_id"), threshold=5)
+            
             state["current_state"] = "feedback_rating"
             state["current_handler"] = "feedback_handler"
             state["cart"] = {}
             self.session_manager.update_session_state(session_id, state)
             
-            order_items = self.data_manager.get_order_items(order_id)
             maps_info = self._generate_maps_info(state)
             service_charge = order_data.get("service_charge", 0)
             total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
@@ -796,7 +1087,7 @@ class PaymentHandler(BaseHandler):
                 session_id,
                 "⚠️ Order not found or not confirmed. Please start a new order."
             )
-    
+
     def handle_payment_webhook(self, webhook_data, session_manager, whatsapp_service):
         """Handle Paystack webhook for payment events."""
         try:
@@ -810,19 +1101,19 @@ class PaymentHandler(BaseHandler):
                     logger.error(f"No order found for payment reference {payment_reference} from webhook.")
                     return
                 
-                session_id = order_data.get("phone_number")
+                session_id = order_data.get("customer_id")
                 if not session_id:
                     session_id = webhook_data.get("data", {}).get("metadata", {}).get("phone_number")
                     if not session_id:
-                        logger.warning(f"No phone_number found in order_data or webhook metadata for reference {payment_reference}. Processing order status update without user notifications.")
+                        logger.warning(f"No customer_id found in order_data or webhook metadata for reference {payment_reference}. Processing order status update without user notifications.")
                 
                 service_charge = order_data.get("service_charge", 0)
                 if service_charge == 0 and order_data.get("total_amount", 0) > 0:
                     service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                    logger.warning(f"Service charge was 0 for order {order_data['id']}, recalculated to ₦{service_charge:,.2f}")
                 
                 success = self.data_manager.update_order_status(
-                    order_data["order_id"],
+                    order_data["id"],
                     "confirmed",
                     {
                         "payment_reference": payment_reference,
@@ -836,8 +1127,30 @@ class PaymentHandler(BaseHandler):
                     }
                 )
                 if not success:
-                    logger.error(f"Failed to update order {order_data['order_id']} to confirmed status for webhook")
+                    logger.error(f"Failed to update order {order_data['id']} to confirmed status for webhook")
                     return
+                
+                order_items = self.data_manager.get_order_items(order_data["id"])
+                # Reduce inventory
+                if not self.data_manager.reduce_inventory(order_data["id"], order_items):
+                    logger.error(f"Failed to reduce inventory for order {order_data['id']}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ Inventory reduction failed for Order #{order_data['id']}. Please check stock manually."
+                    )
+                # Sync products to JSON after inventory reduction
+                if self.product_sync_handler:
+                    success = self.product_sync_handler.sync_products_to_json()
+                    if success:
+                        logger.info(f"Successfully synced products to JSON after inventory reduction for order {order_data['id']}")
+                    else:
+                        logger.error(f"Failed to sync products to JSON after inventory reduction for order {order_data['id']}")
+                else:
+                    logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_data['id']}")
+                
+                # Check for low inventory
+                for item in order_items:
+                    self.data_manager.check_low_inventory(item.get("product_id"), threshold=5)
                 
                 if session_id:
                     self.stop_payment_monitoring(session_id)
@@ -850,30 +1163,28 @@ class PaymentHandler(BaseHandler):
                     
                     try:
                         if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                            self.lead_tracking_handler.track_order_conversion(session_id, order_data["order_id"], order_data["total_amount"] + self.delivery_fee + service_charge)
+                            self.lead_tracking_handler.track_order_conversion(session_id, order_data["id"], order_data["total_amount"] + self.delivery_fee + service_charge)
                         else:
                             logger.debug("Lead tracking handler not available for order conversion tracking")
                     except Exception as e:
                         logger.error(f"Error tracking order conversion: {e}", exc_info=True)
                     
-                    order_items = self.data_manager.get_order_items(order_data["order_id"])
                     maps_info = self._generate_maps_info(state)
                     total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
                     self._send_payment_success_message(
                         session_id,
-                        order_data["order_id"],
+                        order_data["id"],
                         total_amount,
                         order_items,
                         order_data.get("address", "Not provided"),
                         maps_info
                     )
                 else:
-                    logger.info(f"Order {order_data['order_id']} confirmed, but no session_id available. Sending merchant notification only.")
-                    order_items = self.data_manager.get_order_items(order_data["order_id"])
+                    logger.info(f"Order {order_data['id']} confirmed, but no session_id available. Sending merchant notification only.")
                     total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
                     self._send_payment_success_message(
-                        session_id or order_data.get("phone_number", ""),
-                        order_data["order_id"],
+                        session_id or order_data.get("customer_id", ""),
+                        order_data["id"],
                         total_amount,
                         order_items,
                         order_data.get("address", "Not provided")
@@ -905,55 +1216,6 @@ class PaymentHandler(BaseHandler):
         except Exception as e:
             logger.error(f"Error cleaning up payment monitoring: {e}", exc_info=True)
     
-    def _initiate_feedback_collection(self, state: Dict, session_id: str, order_id: str) -> None:
-        """Initiate feedback collection after successful payment."""
-        try:
-            if self.feedback_handler:
-                logger.info(f"Attempting feedback collection for order {order_id}, session {session_id}")
-                self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
-                logger.info(f"Successfully initiated feedback collection for order {order_id}")
-            else:
-                logger.warning(f"FeedbackHandler not available for order {order_id}, transitioning to greeting state")
-                state["current_state"] = "greeting"
-                state["current_handler"] = "greeting_handler"
-                self.session_manager.update_session_state(session_id, state)
-        except Exception as e:
-            logger.error(f"Failed to initiate feedback collection for order {order_id}: {e}", exc_info=True)
-            state["current_state"] = "greeting"
-            state["current_handler"] = "greeting_handler"
-            self.session_manager.update_session_state(session_id, state)
-            self.whatsapp_service.create_text_message(
-                session_id,
-                "⚠️ Error processing feedback. Let's start fresh. How can I help you today?"
-            )
-    
-    def _initiate_feedback_collection_webhook(self, session_id: str, order_id: str, session_manager) -> None:
-        """Initiate feedback collection for webhook payments."""
-        try:
-            if self.feedback_handler:
-                state = session_manager.get_session_state(session_id) or {}
-                logger.info(f"Attempting webhook feedback collection for order {order_id}, session {session_id}")
-                self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
-                logger.info(f"Successfully initiated webhook feedback collection for order {order_id}")
-            else:
-                logger.warning(f"FeedbackHandler not available for order {order_id}, skipping webhook feedback collection")
-                if session_id:
-                    state = session_manager.get_session_state(session_id) or {}
-                    state["current_state"] = "greeting"
-                    state["current_handler"] = "greeting_handler"
-                    session_manager.update_session_state(session_id, state)
-        except Exception as e:
-            logger.error(f"Failed to initiate webhook feedback collection for order {order_id}: {e}", exc_info=True)
-            if session_id:
-                state = session_manager.get_session_state(session_id) or {}
-                state["current_state"] = "greeting"
-                state["current_handler"] = "greeting_handler"
-                session_manager.update_session_state(session_id, state)
-                self.whatsapp_service.create_text_message(
-                    session_id,
-                    "⚠️ Error processing feedback. Let's start fresh. How can I help you today?"
-                )
-    
     def handle_back_to_main(self, state, session_id):
         """Return to main menu."""
         state["current_state"] = "greeting"
@@ -979,7 +1241,7 @@ class PaymentHandler(BaseHandler):
                 logger.error(f"No order found for payment reference {reference}")
                 return jsonify({"status": "error", "message": "Order not found"}), 404
 
-            session_id = order_data.get("phone_number")
+            session_id = order_data.get("customer_id")
             if not session_id:
                 logger.warning(f"No session_id found for reference {reference}")
                 return jsonify({"status": "error", "message": "Session not found"}), 400
@@ -987,14 +1249,14 @@ class PaymentHandler(BaseHandler):
             state = self.session_manager.get_session_state(session_id)
 
             if payment_verified:
-                logger.info(f"Payment callback verified for reference {reference}, order {order_data['order_id']}")
+                logger.info(f"Payment callback verified for reference {reference}, order {order_data['id']}")
                 service_charge = order_data.get("service_charge", 0)
                 if service_charge == 0 and order_data.get("total_amount", 0) > 0:
                     service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_data['order_id']}, recalculated to ₦{service_charge:,.2f}")
+                    logger.warning(f"Service charge was 0 for order {order_data['id']}, recalculated to ₦{service_charge:,.2f}")
 
                 success = self.data_manager.update_order_status(
-                    order_data["order_id"],
+                    order_data["id"],
                     "confirmed",
                     {
                         "payment_reference": reference,
@@ -1008,21 +1270,60 @@ class PaymentHandler(BaseHandler):
                     }
                 )
                 if not success:
-                    logger.error(f"Failed to update order {order_data['order_id']} to confirmed status")
+                    logger.error(f"Failed to update order {order_data['id']} to confirmed status")
                     return jsonify({"status": "error", "message": "Failed to update order status"}), 500
-
+                
+                # Retrieve and validate order items
+                order_items = self.data_manager.get_order_items(order_data["id"])
+                valid_items = [item for item in order_items if item.get("product_id") and item.get("quantity")]
+                invalid_items = [item for item in order_items if not (item.get("product_id") and item.get("quantity"))]
+                
+                if invalid_items:
+                    logger.error(f"Invalid order items for order {order_data['id']}: {invalid_items}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ Invalid items in Order #{order_data['id']}: {self._format_order_items(invalid_items)}. Please verify product IDs in inventory."
+                    )
+                
+                if valid_items:
+                    # Reduce inventory for valid items only
+                    if not self.data_manager.reduce_inventory(order_data["id"], valid_items):
+                        logger.error(f"Failed to reduce inventory for order {order_data['id']}")
+                        self.whatsapp_service.create_text_message(
+                            self.merchant_phone_number,
+                            f"⚠️ Inventory reduction failed for Order #{order_data['id']}. Please check stock manually."
+                        )
+                    # Sync products to JSON after inventory reduction
+                    if self.product_sync_handler:
+                        success = self.product_sync_handler.sync_products_to_json()
+                        if success:
+                            logger.info(f"Successfully synced products to JSON after inventory reduction for order {order_data['id']}")
+                        else:
+                            logger.error(f"Failed to sync products to JSON after inventory reduction for order {order_data['id']}")
+                    else:
+                        logger.warning(f"ProductSyncHandler not available, skipping product sync for order {order_data['id']}")
+                else:
+                    logger.warning(f"No valid items to reduce inventory for order {order_data['id']}")
+                    self.whatsapp_service.create_text_message(
+                        self.merchant_phone_number,
+                        f"⚠️ No valid items to reduce inventory for Order #{order_data['id']}. Please verify order details."
+                    )
+                
+                # Check for low inventory
+                for item in valid_items:
+                    self.data_manager.check_low_inventory(item.get("product_id"), threshold=5)
+                
                 self.stop_payment_monitoring(session_id)
                 state["current_state"] = "feedback_rating"
                 state["current_handler"] = "feedback_handler"
                 state["cart"] = {}
                 self.session_manager.update_session_state(session_id, state)
 
-                order_items = self.data_manager.get_order_items(order_data["order_id"])
                 maps_info = self._generate_maps_info(state)
                 total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
                 self._send_payment_success_message(
                     session_id,
-                    order_data["order_id"],
+                    order_data["id"],
                     total_amount,
                     order_items,
                     state.get("address", "Not provided"),

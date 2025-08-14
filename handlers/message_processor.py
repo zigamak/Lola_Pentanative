@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 from utils.helpers import format_cart
 from handlers.greeting_handler import GreetingHandler
 from handlers.enquiry_handler import EnquiryHandler
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 class MessageProcessor:
     """Main message processor with lead tracking, AI integration, and feedback collection."""
 
-    def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service):
+    def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service, location_service, product_sync_handler=None):
         self.config = config
         self.session_manager = session_manager
         self.data_manager = data_manager
@@ -51,15 +52,15 @@ class MessageProcessor:
             payment_service, location_service, lead_tracking_handler=self.lead_tracking_handler
         )
         
-        # Initialize payment handler
+        # Initialize payment handler with feedback and product sync handlers
         self.payment_handler = PaymentHandler(
             config, session_manager, data_manager, whatsapp_service, 
-            payment_service, location_service
+            payment_service, location_service, 
+            feedback_handler=self.feedback_handler,
+            product_sync_handler=product_sync_handler
         )
         # Set lead tracking handler reference for payment handler
         self.payment_handler.lead_tracking_handler = self.lead_tracking_handler
-        # Set feedback handler reference for payment handler
-        self.payment_handler.feedback_handler = self.feedback_handler
         
         self.location_handler = LocationAddressHandler(
             config, whatsapp_service, location_service, data_manager
@@ -125,7 +126,7 @@ class MessageProcessor:
         """Initiate feedback collection after successful payment."""
         try:
             state = self.session_manager.get_session_state(session_id)
-            return self.feedback_handler.initiate_feedback_request(state, session_id, order_id)
+            return self.payment_handler._initiate_feedback_collection(state, session_id, order_id)
         except Exception as e:
             logger.error(f"Session {session_id}: Error initiating feedback for order {order_id}: {e}", exc_info=True)
             return None
@@ -172,6 +173,12 @@ class MessageProcessor:
         response = None
 
         try:
+            # Add a global escape command to handle messages like "menu" or "start"
+            if message in ["menu", "back", "start", "hello"]:
+                logger.info(f"Session {session_id}: Global escape keyword '{message}' detected. Resetting to greeting.")
+                # This will reset the state and send the main menu
+                return self.greeting_handler.handle_back_to_main(state, session_id, "Let's start fresh. What can I do for you?")
+            
             # Handle redirect messages explicitly
             if message in ["show_enquiry_menu", "show_faq_categories", "start_track_order"]:
                 return self._handle_redirect_message(state, message, original_message, session_id, user_name)
@@ -270,7 +277,9 @@ class MessageProcessor:
                 elif current_state == "awaiting_payment":
                     response = self.payment_handler.handle_awaiting_payment_state(state, message, session_id)
                 elif current_state == "order_confirmation":
-                    response = self.payment_handler.handle_order_confirmation_state(state, message, session_id)
+                    response = self.payment_handler.handle_order_confirmation_state(state, session_id)
+                elif current_state == "feedback_rating":
+                    response = self.payment_handler.handle_feedback_response(state, message, session_id)
                 else:
                     logger.warning(f"Session {session_id}: Unhandled payment_handler state '{current_state}'.")
                     response = self.payment_handler.handle_back_to_main(state, session_id, "There was an issue with payment. Please try again or choose another option.")
@@ -278,7 +287,7 @@ class MessageProcessor:
             elif current_handler_name == "feedback_handler":
                 if current_state == "feedback_rating":
                     response = self.feedback_handler.handle_feedback_rating_state(state, message, session_id)
-                elif current_state == "feedback_completed":  # Updated to handle feedback_completed state
+                elif current_state == "feedback_completed":
                     response = self.feedback_handler.handle_feedback_completed_state(state, message, session_id)
                 else:
                     logger.warning(f"Session {session_id}: Unhandled feedback_handler state '{current_state}'.")
@@ -287,7 +296,8 @@ class MessageProcessor:
             elif current_handler_name == "location_handler":
                 response = self._handle_location_states(state, message, original_message, session_id)
             
-            # Handle global 'menu' command
+            # Handle global 'menu' command - This is now redundant due to the new global escape.
+            # I am keeping it for now to avoid breaking other parts of your code.
             if message == "menu" and current_handler_name != "greeting_handler":
                 return self.greeting_handler.handle_back_to_main(state, session_id)
 

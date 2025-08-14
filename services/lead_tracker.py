@@ -46,43 +46,38 @@ class LeadTracker:
                         interaction_count=1,
                         status="new_lead"
                     )
-                    self.data_manager.create_or_update_lead(lead)
+                    self.data_manager.save_lead(lead)  # Use save_lead instead of create_or_update_lead
                     logger.info(f"🆕 New lead created: {phone_number} ({user_name})")
                 else:
-                    lead_data = existing_lead or {}
-                    lead_data.update({
-                        'merchant_details_id': merchant_id,
-                        'phone_number': phone_number,
-                        'user_name': user_name or "Unknown",
-                        'user_id': phone_number,
-                        'last_interaction': datetime.now(timezone.utc),
-                        'interaction_count': (lead_data.get('interaction_count', 0) + 1),
-                        'status': lead_data.get('status', 'new_lead')
-                    })
-                    self.data_manager.create_or_update_lead(lead_data)
+                    lead = existing_lead or Lead(
+                        merchant_details_id=merchant_id,
+                        phone_number=phone_number,
+                        user_name=user_name or "Unknown",
+                        user_id=phone_number,
+                        source="whatsapp",
+                        first_contact=datetime.now(timezone.utc),
+                        last_interaction=datetime.now(timezone.utc),
+                        interaction_count=1,
+                        status="new_lead"
+                    )
+                    lead.last_interaction = datetime.now(timezone.utc)
+                    lead.interaction_count = (lead.interaction_count or 0) + 1
+                    lead.status = lead.status or "new_lead"
+                    self.data_manager.save_lead(lead)
                     logger.info(f"Updated lead interaction: {phone_number}")
             else:
                 if existing_lead:
-                    lead_data = existing_lead
-                    lead_data.update({
-                        'last_interaction': datetime.now(timezone.utc),
-                        'interaction_count': lead_data.get('interaction_count', 0) + 1
-                    })
-                    self.data_manager.create_or_update_lead(lead_data)
+                    lead = existing_lead
+                    lead.last_interaction = datetime.now(timezone.utc)
+                    lead.interaction_count = (lead.interaction_count or 0) + 1
+                    self.data_manager.save_lead(lead)
                     logger.info(f"Updated ongoing interaction: {phone_number}")
                 
         except Exception as e:
             logger.error(f"Error tracking user interaction for {phone_number}: {e}", exc_info=True)
     
     def track_cart_addition(self, phone_number: str, user_name: str, cart: Union[List[Dict[str, Any]], Dict[str, Any]]) -> None:
-        """
-        Track when a user adds items to cart.
-        
-        Args:
-            phone_number (str): User's phone number
-            user_name (str): User's name
-            cart (Union[List[Dict[str, Any]], Dict[str, Any]]): Cart contents
-        """
+    
         try:
             if not cart:
                 logger.debug(f"No items in cart for tracking for {phone_number}. Skipping cart activity track.")
@@ -95,7 +90,7 @@ class LeadTracker:
                 return
                 
             # Calculate total cart value
-            total_value = sum(item.get("price", 0.0) * item.get("quantity", 0) for item in cart_items)
+            total_value = sum(float(item.get("price", 0.0)) * float(item.get("quantity", 0)) for item in cart_items)
             
             # Get or create lead
             merchant_id = getattr(self.config, 'MERCHANT_ID', None)
@@ -104,30 +99,48 @@ class LeadTracker:
                 return
                 
             existing_lead = self.data_manager.get_lead_by_phone_number(phone_number)
-            lead_data = existing_lead or {
-                'merchant_details_id': merchant_id,
-                'phone_number': phone_number,
-                'user_name': user_name or "Unknown",
-                'user_id': phone_number,
-                'source': 'whatsapp',
-                'first_contact': datetime.now(timezone.utc),
-                'status': 'new_lead'
-            }
             
-            lead_data.update({
-                'last_interaction': datetime.now(timezone.utc),
-                'interaction_count': lead_data.get('interaction_count', 0) + 1,
-                'has_added_to_cart': True,
-                'total_cart_value': total_value,
-                'conversion_stage': 'cart_added'
-            })
+            # Ensure all required fields have proper values
+            current_time = datetime.now(timezone.utc)
+            lead = existing_lead or Lead(
+                merchant_details_id=merchant_id,
+                phone_number=phone_number,
+                user_name=user_name or "Unknown",
+                user_id=phone_number,
+                source="whatsapp",
+                first_contact=current_time,
+                last_interaction=current_time,
+                interaction_count=0,  # Will be incremented below
+                status="new_lead",
+                has_added_to_cart=False,
+                has_placed_order=False,
+                total_cart_value=0.0,
+                conversion_stage="initial_contact",
+                final_order_value=0.0,
+                converted_at=None
+            )
             
-            self.data_manager.create_or_update_lead(lead_data)
+            # Update lead fields
+            lead.last_interaction = current_time
+            lead.interaction_count = (lead.interaction_count or 0) + 1
+            lead.has_added_to_cart = True
+            lead.total_cart_value = float(total_value)  # Ensure this is a float
+            lead.conversion_stage = "cart_added"
+            
+            # Ensure all required fields are set
+            if not lead.first_contact:
+                lead.first_contact = current_time
+            if not lead.status:
+                lead.status = "new_lead"
+            if lead.total_cart_value is None:
+                lead.total_cart_value = 0.0
+                
+            logger.debug(f"Saving lead with data: {lead.__dict__}")
+            self.data_manager.save_lead(lead)
             logger.info(f"🛒 Cart activity tracked: {phone_number} - ₦{total_value:,.2f}")
             
         except Exception as e:
             logger.error(f"Error tracking cart addition for {phone_number}: {e}", exc_info=True)
-    
     def _normalize_cart_format(self, cart: Union[List[Dict[str, Any]], Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Normalize cart format to ensure it's a list of dictionaries.
@@ -182,26 +195,25 @@ class LeadTracker:
                 return
                 
             existing_lead = self.data_manager.get_lead_by_phone_number(phone_number)
-            lead_data = existing_lead or {
-                'merchant_details_id': merchant_id,
-                'phone_number': phone_number,
-                'user_id': phone_number,
-                'source': 'whatsapp',
-                'first_contact': datetime.now(timezone.utc),
-                'status': 'new_lead'
-            }
+            lead = existing_lead or Lead(
+                merchant_details_id=merchant_id,
+                phone_number=phone_number,
+                user_id=phone_number,
+                source="whatsapp",
+                first_contact=datetime.now(timezone.utc),
+                last_interaction=datetime.now(timezone.utc),
+                status="new_lead"
+            )
             
-            lead_data.update({
-                'last_interaction': datetime.now(timezone.utc),
-                'interaction_count': lead_data.get('interaction_count', 0) + 1,
-                'has_placed_order': True,
-                'final_order_value': order_value,
-                'converted_at': datetime.now(timezone.utc),
-                'status': 'converted',
-                'conversion_stage': 'order_completed'
-            })
+            lead.last_interaction = datetime.now(timezone.utc)
+            lead.interaction_count = (lead.interaction_count or 0) + 1
+            lead.has_placed_order = True
+            lead.final_order_value = order_value
+            lead.converted_at = datetime.now(timezone.utc)
+            lead.status = "converted"
+            lead.conversion_stage = "order_completed"
             
-            self.data_manager.create_or_update_lead(lead_data)
+            self.data_manager.save_lead(lead)
             logger.info(f"💰 Conversion tracked: {phone_number} - {order_id} (₦{order_value:,})")
             
         except Exception as e:
@@ -218,7 +230,7 @@ class LeadTracker:
             List[Dict]: List of abandoned cart entries
         """
         try:
-            return self.data_manager.get_abandoned_carts(hours_ago)
+            return self.data_manager.get_abandoned_cart_leads(hours_ago)
         except Exception as e:
             logger.error(f"Error getting abandoned carts: {e}", exc_info=True)
             return []

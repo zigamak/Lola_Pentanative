@@ -1,4 +1,3 @@
-# app/config.py
 import os
 from dotenv import load_dotenv
 import logging
@@ -25,13 +24,14 @@ class Config:
         # Payment configuration
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
-
         self.SUBACCOUNT_CODE = "ACCT_939kju7zdvsk76y"
         #self.SUBACCOUNT_PERCENTAGE = 1
         #self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
         self.SUBACCOUNT_PERCENTAGE = 1
-        self.MERCHANT_PHONE_NUMBER= "2347082345056"
+        self.MERCHANT_PHONE_NUMBER = "2347082345056"
         
+        # Merchant ID from environment variable
+        self.MERCHANT_ID = os.getenv('MERCHANT_ID', '18')
         
         # Other services
         self.Maps_API_KEY = os.getenv('Maps_API_KEY')
@@ -40,7 +40,6 @@ class Config:
         self.AZURE_DEPLOYMENT_NAME = os.getenv('AZURE_DEPLOYMENT_NAME')
         self.AZURE_API_VERSION = os.getenv('AZURE_API_VERSION')
         
-
         # Feature flags
         self.ENABLE_AI_FEATURES = os.getenv('ENABLE_AI_FEATURES', 'false').lower() == 'true'
         self.ENABLE_LOCATION_FEATURES = os.getenv('ENABLE_LOCATION_FEATURES', 'false').lower() == 'true'
@@ -64,11 +63,7 @@ class Config:
         self.PRODUCTS_FILE = os.getenv('PRODUCTS_FILE', os.path.join(self.DATA_DIR, 'products.json'))
 
         # Session configuration
-        self.SESSION_TIMEOUT = int(os.getenv('SESSION_TIMEOUT', 1800))  # 30 minutes default
-
-        # Merchant ID - Added this line
-        self.MERCHANT_ID = os.getenv('MERCHANT_ID', '18')
-
+        self.SESSION_TIMEOUT = int(os.getenv('SESSION_TIMEOUT', 3600))  # 30 minutes default
 
 # Define the configure_logging function
 def configure_logging():

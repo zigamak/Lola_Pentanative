@@ -1,11 +1,15 @@
 import requests
 import logging
+import sys
+import io
+from typing import Dict, Optional, List
 
 # Configure logging with UTF-8 encoding
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
+handler = logging.StreamHandler(stream=sys.stdout)
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-handler.stream.reconfigure(encoding='utf-8')  # Force UTF-8 encoding
+if sys.platform.startswith('win'):
+    handler.stream = io.TextIOWrapper(handler.stream.buffer, encoding='utf-8', errors='replace')
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
@@ -19,162 +23,154 @@ class WhatsAppService:
             "Authorization": f"Bearer {config.WHATSAPP_ACCESS_TOKEN}",
             "Content-Type": "application/json"
         }
+        logger.debug("WhatsAppService initialized with phone_number_id: %s", config.WHATSAPP_PHONE_NUMBER_ID)
     
-    def send_message(self, payload):
+    def send_message(self, payload: Dict) -> Optional[Dict]:
         """Send a message to the WhatsApp Business API."""
         try:
-            # Validate payload has required fields
-            if not payload:
-                logger.error("Payload is None or empty")
-                return None
-                
-            if not payload.get("to"):
-                logger.error(f"Missing 'to' parameter in payload: {payload}")
-                return None
-                
-            if not payload.get("type"):
-                logger.error(f"Missing 'type' parameter in payload: {payload}")
+            # Validate payload before sending
+            if not payload or not isinstance(payload, dict):
+                logger.error("Payload is None or not a dictionary: %s", payload)
                 return None
             
-            # Clean the payload to remove any unwanted fields
-            clean_payload = self._clean_payload(payload)
+            # This is the primary validation for outgoing messages
+            if "to" not in payload:
+                logger.error("Missing 'to' parameter in payload: %s", payload)
+                return None
+            
+            if "type" not in payload:
+                logger.error("Missing 'type' parameter in payload: %s", payload)
+                return None
+            
+            # Ensure messaging_product is always present for outgoing messages
+            if "messaging_product" not in payload:
+                payload["messaging_product"] = "whatsapp"
+                logger.warning("Added missing 'messaging_product' to payload: %s", payload)
             
             # Log the payload for debugging
-            logger.info(f"Sending WhatsApp payload: {clean_payload}")
+            logger.info("Sending WhatsApp payload to %s: %s", payload.get("to"), payload)
             
-            # Ensure messaging_product is always present
-            if "messaging_product" not in clean_payload:
-                clean_payload["messaging_product"] = "whatsapp"
-                logger.warning("Added missing messaging_product to payload")
-                
-            response = requests.post(self.base_url, json=clean_payload, headers=self.headers)
+            response = requests.post(self.base_url, json=payload, headers=self.headers)
             response.raise_for_status()
-            logger.info(f"WhatsApp API response: {response.status_code} - {response.text}")
+            logger.info("WhatsApp API response: %s - %s", response.status_code, response.text)
             return response.json()
         except requests.exceptions.HTTPError as http_err:
-            logger.error(f"HTTP error sending WhatsApp message: {http_err} - {response.text}")
+            logger.error("HTTP error sending WhatsApp message: %s - Response: %s", http_err, response.text if response else "No response")
+            return None
         except requests.RequestException as e:
-            logger.error(f"Error sending WhatsApp message: {e}")
+            logger.error("Request error sending WhatsApp message: %s", e)
+            return None
         except Exception as e:
-            logger.error(f"Unexpected error in send_message: {e}", exc_info=True)
-        return None
+            logger.error("Unexpected error in send_message: %s", e, exc_info=True)
+            return None
     
-    def _clean_payload(self, payload):
-        """Clean payload to remove unwanted fields that might cause API errors."""
+    def _clean_incoming_payload(self, payload: Dict) -> Dict:
+        """
+        Clean and extract relevant data from an INCOMING WhatsApp webhook payload.
+        This is for processing received messages, not for sending.
+        """
         try:
-            # Create a copy to avoid modifying the original
-            clean_payload = payload.copy() if isinstance(payload, dict) else payload
+            clean_payload = payload.copy() if isinstance(payload, dict) else {}
             
-            if not isinstance(clean_payload, dict):
-                logger.error(f"Payload is not a dictionary: {type(payload)} - {payload}")
-                return {"messaging_product": "whatsapp"}  # Minimal fallback
+            # Attempt to extract 'to' from the incoming 'contacts' list
+            if not clean_payload.get("to") and payload.get("contacts"):
+                try:
+                    contacts = payload.get("contacts", [])
+                    if contacts and isinstance(contacts, list) and len(contacts) > 0:
+                        wa_id = contacts[0].get("wa_id") or contacts[0].get("input")
+                        if wa_id:
+                            clean_payload["to"] = wa_id
+                            logger.info("Recovered 'to' field from contacts: %s", wa_id)
+                except Exception as e:
+                    logger.error("Failed to recover 'to' from contacts: %s", e)
             
-            # Remove fields that shouldn't be in outgoing messages
-            unwanted_fields = ['contacts', 'messages', 'input', 'wa_id']
+            # Remove fields from incoming payload that are not part of a valid outgoing message
+            unwanted_fields = ['contacts', 'messages', 'input', 'wa_id', 'status']
             for field in unwanted_fields:
-                if field in clean_payload:
-                    logger.warning(f"Removing unwanted field '{field}' from payload")
-                    del clean_payload[field]
+                clean_payload.pop(field, None)
             
             return clean_payload
         except Exception as e:
-            logger.error(f"Error cleaning payload: {e}, payload: {payload}")
-            return {"messaging_product": "whatsapp"}  # Minimal fallback
-    
-    def create_text_message(self, to, text):
+            logger.error("Error cleaning incoming payload: %s, original payload: %s", e, payload)
+            return {}  # Return an empty dictionary on error
+
+    def create_text_message(self, to: str, text: str) -> Optional[Dict]:
         """Create and send a text message."""
         try:
-            # Validate inputs
             if not to or not text:
-                logger.error(f"Invalid parameters: to='{to}', text='{text}'")
+                logger.error("Invalid parameters: to='%s', text='%s'", to, text)
                 return None
-                
+            
             payload = {
                 "messaging_product": "whatsapp",
                 "recipient_type": "individual", 
-                "to": str(to),  # Ensure 'to' is a string
+                "to": str(to),
                 "type": "text",
-                "text": {"body": str(text)}  # Ensure 'text' is a string
+                "text": {"body": str(text)}
             }
-            logger.debug(f"Created text message payload for {to}: {payload}")
+            logger.debug("Created text message payload for %s", to)
             return self.send_message(payload)
         except Exception as e:
-            logger.error(f"Error creating text message for {to}: {e}", exc_info=True)
+            logger.error("Error creating text message for %s: %s", to, e, exc_info=True)
             return None
     
-    def create_button_message(self, to, text, buttons):
+    def create_button_message(self, to: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
         """Create and send a button message."""
         try:
-            # Validate inputs
             if not to or not text or not buttons:
-                logger.error(f"Invalid parameters: to='{to}', text='{text}', buttons='{buttons}'")
+                logger.error("Invalid parameters: to='%s', text='%s', buttons='%s'", to, text, buttons)
                 return None
-                
-            # Validate buttons format
+            
             if not isinstance(buttons, list) or len(buttons) > 3:
-                logger.error(f"Invalid buttons format or too many buttons: {buttons}")
-                # Fallback to text message
+                logger.error("Invalid buttons format or too many buttons: %s", buttons)
                 return self.create_text_message(to, text)
             
             payload = {
                 "messaging_product": "whatsapp",
                 "recipient_type": "individual",
-                "to": str(to),  # Ensure 'to' is a string
+                "to": str(to),
                 "type": "interactive",
                 "interactive": {
                     "type": "button", 
-                    "body": {"text": str(text)},  # Ensure 'text' is a string
+                    "body": {"text": str(text)},
                     "action": {"buttons": buttons}
                 }
             }
-            logger.debug(f"Created button message payload for {to}: {payload}")
+            logger.debug("Created button message payload for %s", to)
             return self.send_message(payload)
         except Exception as e:
-            logger.error(f"Error creating button message for {to}: {e}", exc_info=True)
-            # Fallback to text message
+            logger.error("Error creating button message for %s: %s", to, e, exc_info=True)
             return self.create_text_message(to, text)
     
-    def create_list_message(self, to, text, button_text, sections):
+    def create_list_message(self, to: str, text: str, button_text: str, sections: List[Dict]) -> Optional[Dict]:
         """Create and send a list message."""
         try:
-            # Validate inputs
             if not to or not text or not button_text or not sections:
-                logger.error(f"Invalid parameters: to='{to}', text='{text}', button_text='{button_text}', sections='{sections}'")
+                logger.error("Invalid parameters: to='%s', text='%s', button_text='%s', sections='%s'", to, text, button_text, sections)
                 return None
-                
+            
             payload = {
                 "messaging_product": "whatsapp",
                 "recipient_type": "individual",
-                "to": str(to),  # Ensure 'to' is a string
+                "to": str(to),
                 "type": "interactive",
                 "interactive": {
                     "type": "list",
-                    "body": {"text": str(text)},  # Ensure 'text' is a string
+                    "body": {"text": str(text)},
                     "action": {"button": str(button_text), "sections": sections}
                 }
             }
-            logger.debug(f"Created list message payload for {to}: {payload}")
+            logger.debug("Created list message payload for %s", to)
             return self.send_message(payload)
         except Exception as e:
-            logger.error(f"Error creating list message for {to}: {e}", exc_info=True)
-            # Fallback to text message
+            logger.error("Error creating list message for %s: %s", to, e, exc_info=True)
             return self.create_text_message(to, text)
     
-    def send_image_message(self, to: str, image_url: str, caption: str = "") -> dict:
-        """
-        Sends an image message with an optional caption.
-
-        Args:
-            to (str): The recipient's WhatsApp ID.
-            image_url (str): The URL of the image to send.
-            caption (str, optional): An optional caption for the image. Defaults to "".
-
-        Returns:
-            dict: The response from the WhatsApp API, or None if an error occurred.
-        """
+    def send_image_message(self, to: str, image_url: str, caption: str = "") -> Optional[Dict]:
+        """Sends an image message with an optional caption."""
         try:
             if not to or not image_url:
-                logger.error(f"Invalid parameters for image message: to='{to}', image_url='{image_url}'")
+                logger.error("Invalid parameters for image message: to='%s', image_url='%s'", to, image_url)
                 return None
 
             payload = {
@@ -187,48 +183,44 @@ class WhatsAppService:
                 }
             }
             if caption:
-                payload["image"]["caption"] = str(caption) # Ensure caption is a string
+                payload["image"]["caption"] = str(caption)
             
-            logger.debug(f"Created image message payload for {to}: {payload}")
+            logger.debug("Created image message payload for %s", to)
             return self.send_message(payload)
         except Exception as e:
-            logger.error(f"Error creating image message for {to}: {e}", exc_info=True)
+            logger.error("Error creating image message for %s: %s", to, e, exc_info=True)
             return None
 
-    def send_timeout_message(self, session_id):
+    def send_timeout_message(self, session_id: str) -> Optional[Dict]:
         """Send timeout message to user."""
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": session_id,
-            "type": "text",
-            "text": {"body": "Your session has timed out due to inactivity. Please send a message to start a new interaction."}
-        }
-        return self.send_message(payload)
-    
-    def send_template_message(self, to: str, template_name: str, language_code: str, components: list) -> dict:
-        """
-        Sends a WhatsApp template message.
-
-        Args:
-            to (str): The recipient's WhatsApp ID.
-            template_name (str): The name of the template to send.
-            language_code (str): The language code for the template (e.g., 'en').
-            components (list): List of component dictionaries for template parameters.
-
-        Returns:
-            dict: The response from the WhatsApp API, or None if an error occurred.
-        """
         try:
-            # Validate inputs
-            if not to or not template_name or not language_code or not components:
-                logger.error(f"Invalid parameters: to='{to}', template_name='{template_name}', language_code='{language_code}', components='{components}'")
+            if not session_id:
+                logger.error("Invalid session_id for timeout message: %s", session_id)
                 return None
-                
             payload = {
                 "messaging_product": "whatsapp",
                 "recipient_type": "individual",
-                "to": str(to),  # Ensure 'to' is a string
+                "to": str(session_id),
+                "type": "text",
+                "text": {"body": "Your session has timed out due to inactivity. Please send a message to start a new interaction."}
+            }
+            logger.debug("Created timeout message payload for %s", session_id)
+            return self.send_message(payload)
+        except Exception as e:
+            logger.error("Error sending timeout message for %s: %s", session_id, e, exc_info=True)
+            return None
+    
+    def send_template_message(self, to: str, template_name: str, language_code: str, components: List[Dict]) -> Optional[Dict]:
+        """Sends a WhatsApp template message."""
+        try:
+            if not to or not template_name or not language_code or not components:
+                logger.error("Invalid parameters: to='%s', template_name='%s', language_code='%s', components='%s'", to, template_name, language_code, components)
+                return None
+            
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": str(to),
                 "type": "template",
                 "template": {
                     "name": str(template_name),
@@ -236,9 +228,35 @@ class WhatsAppService:
                     "components": components
                 }
             }
-            logger.debug(f"Created template message payload for {to}: {payload}")
+            logger.debug("Created template message payload for %s", to)
             return self.send_message(payload)
         except Exception as e:
-            logger.error(f"Error creating template message for {to}: {e}", exc_info=True)
-            # Fallback to text message with error information
-            return self.create_text_message(to, f"⚠️ Error sending template message. Please contact support.")
+            logger.error("Error creating template message for %s: %s", to, e, exc_info=True)
+            return self.create_text_message(to, "⚠️ Error sending template message. Please contact support.")
+
+    def validate_contact(self, phone_number: str) -> Optional[Dict]:
+        """Validate a phone number using the WhatsApp Business API."""
+        try:
+            if not phone_number:
+                logger.error("Invalid phone_number for contact validation: %s", phone_number)
+                return None
+            payload = {
+                "messaging_product": "whatsapp",
+                "contacts": [{"phone_number": str(phone_number)}]
+            }
+            url = f"https://graph.facebook.com/v17.0/{self.config.WHATSAPP_PHONE_NUMBER_ID}/contacts"
+            logger.debug("Validating contact with payload: %s", payload)
+            response = requests.post(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            response_data = response.json()
+            logger.info("Contact validation response: %s", response_data)
+            return response_data
+        except requests.exceptions.HTTPError as http_err:
+            logger.error("HTTP error validating contact %s: %s - Response: %s", phone_number, http_err, response.text if response else "No response")
+            return None
+        except requests.RequestException as e:
+            logger.error("Request error validating contact %s: %s", phone_number, e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error validating contact %s: %s", phone_number, e, exc_info=True)
+            return None
