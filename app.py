@@ -143,4 +143,8 @@ if __name__ == "__main__":
     logger.info(f"Product Sync Endpoint: {config.CALLBACK_BASE_URL}/sync-products")
     logger.info("Logs: Check bot.log file for detailed logs")
     logger.info("To run this application, use Gunicorn from your terminal:")
-    logger.info(f"gunicorn -w 4 -b 0.0.0.0:{config.APP_PORT} app:app")
+    logger.info(
+        "gunicorn -w 4 -k gevent --timeout 120 --preload -b 0.0.0.0:{port} app:app".format(
+            port=config.APP_PORT
+        )
+    )
