@@ -25,13 +25,13 @@ class Config:
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
         self.SUBACCOUNT_CODE = "ACCT_iwv6csej0ra4k7g"
-        #self.SUBACCOUNT_PERCENTAGE = 1
+        
         #self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
         self.SUBACCOUNT_PERCENTAGE = 1
         self.MERCHANT_PHONE_NUMBER = "2347082345056"
         
         # Merchant ID from environment variable
-        self.MERCHANT_ID = os.getenv('MERCHANT_ID', '18')
+        self.MERCHANT_ID = os.getenv('MERCHANT_ID', '20')
         
         # Other services
         self.Maps_API_KEY = os.getenv('Maps_API_KEY')

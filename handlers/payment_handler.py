@@ -202,7 +202,19 @@ class PaymentHandler(BaseHandler):
                     "⚠️ No order found. Please try checking out again."
                 )
             
+            # Add validation to ensure order_id is not the string "None"
+            if str(order_id).lower() == "none":
+                logger.error(f"Invalid order_id 'None' found for session {session_id}")
+                state["current_state"] = "order_summary"
+                state["current_handler"] = "order_handler"
+                self.session_manager.update_session_state(session_id, state)
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ Invalid order. Please try checking out again."
+                )
+            
             order_data = self.data_manager.get_order_by_id(order_id)
+            
             if not order_data:
                 logger.error(f"Order {order_id} not found in database for session {session_id}")
                 state["current_state"] = "order_summary"

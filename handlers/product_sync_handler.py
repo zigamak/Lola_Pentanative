@@ -8,7 +8,7 @@ from psycopg2.extras import RealDictCursor
 logger = logging.getLogger(__name__)
 
 class ProductSyncHandler:
-    """Handles syncing product data from PostgreSQL database to a JSON file."""
+    """Handles syncing product data for a specific merchant from PostgreSQL database to a JSON file."""
 
     def __init__(self, config):
         self.config = config
@@ -19,6 +19,7 @@ class ProductSyncHandler:
             'host': self.config.DB_HOST,
             'port': self.config.DB_PORT
         }
+        self.merchant_id = self.config.MERCHANT_ID
         self.json_file_path = self.config.PRODUCTS_FILE
         self._ensure_directory_exists()
 
@@ -30,7 +31,7 @@ class ProductSyncHandler:
             logger.info(f"Created directory: {directory}")
 
     def sync_products_to_json(self) -> bool:
-        """Fetches products from the database and saves them to products.json."""
+        """Fetches products for a specific merchant from the database and saves them to products.json."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -49,9 +50,9 @@ class ProductSyncHandler:
                             last_updated,
                             quantity
                         FROM whatsapp_merchant_product_inventory
-                        WHERE availability_status = true
+                        WHERE availability_status = true AND merchant_details_id = %s
                     """
-                    cur.execute(query)
+                    cur.execute(query, (self.merchant_id,))
                     rows = cur.fetchall()
 
                     menu_data: Dict[str, List[Dict]] = {}
@@ -59,15 +60,12 @@ class ProductSyncHandler:
                         category = row['product_category'] or 'Uncategorized'
                         if category not in menu_data:
                             menu_data[category] = []
-
-                        # Corrected Line: Handle NoneType for 'price'
-                        price_value = float(row['price']) if row['price'] is not None else 0.0
-
+                        
                         item = {
                             'id': str(row['id']),
                             'name': row['product_name'],
                             'variant': row['variant_name'],
-                            'price': price_value, # Use the handled price_value
+                            'price': float(row['price']) if row['price'] is not None else 0.0,
                             'currency': row['currency'],
                             'availability_status': row['availability_status'],
                             'description': row['description'],
@@ -78,7 +76,7 @@ class ProductSyncHandler:
                     try:
                         with open(self.json_file_path, 'w', encoding='utf-8') as f:
                             json.dump(menu_data, f, indent=2)
-                        logger.info(f"Successfully synced {len(rows)} products to {self.json_file_path}")
+                        logger.info(f"Successfully synced {len(rows)} products for merchant {self.merchant_id} to {self.json_file_path}")
                         return True
                     except Exception as e:
                         logger.error(f"Error writing to {self.json_file_path}: {e}")

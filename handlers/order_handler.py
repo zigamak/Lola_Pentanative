@@ -580,118 +580,98 @@ class OrderHandler(BaseHandler):
             phone_number = user_data.get("phone_number", session_id) if user_data else session_id
             address = state.get("address", user_data.get("address", "") if user_data else "")
             
-            items = [
-                {
+            # Prepare order items with product_id validation
+            items = []
+            for item_name, item_data in cart.items():
+                # Get product_id from menu data or inventory
+                product_id = item_data.get("product_id")
+                if not product_id:
+                    product_id = self.data_manager._get_product_id_by_name(item_name)
+                    if not product_id:
+                        logger.error(f"Could not find product_id for item: {item_name}")
+                        continue
+                
+                items.append({
                     "item_name": item_name,
                     "quantity": item_data.get("quantity", 1),
-                    "unit_price": item_data.get("price", 0.0)
-                }
-                for item_name, item_data in cart.items()
-            ]
+                    "unit_price": item_data.get("price", 0.0),
+                    "product_id": product_id
+                })
+            
+            if not items:
+                logger.error(f"No valid items in cart for session {session_id}")
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    "❌ Error: No valid items in your cart. Please try ordering again."
+                )
             
             order_data = {
                 "customer_id": session_id,
-                "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "default_business"),
+                "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "1"),  # Default to "1" if not set
                 "address": address,
-                "status": "confirmed",
+                "status": "pending_payment",  # Initial status before payment
                 "total_amount": total_amount,
-                "payment_reference": "",
+                "payment_reference": f"TEMP-{uuid.uuid4().hex[:8]}",  # Temporary reference
                 "payment_method_type": "paystack",
-                "timestamp": datetime.datetime.now(),
+                "timestamp": datetime.datetime.now(datetime.timezone.utc),
                 "customers_note": state.get("order_note", ""),
                 "items": items
             }
             
             try:
                 order_id = self.data_manager.save_user_order(order_data)
+                if not order_id:
+                    logger.error(f"Failed to save order - no order_id returned for session {session_id}")
+                    raise Exception("No order_id returned from save_user_order")
+                    
                 logger.info(f"Order {order_id} saved to database for session {session_id}")
-            except Exception as e:
-                logger.error(f"Failed to save order for session {session_id}: {e}", exc_info=True)
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ Sorry, there was an error saving your order. Please try again or contact support."
-                )
-            
-            user_data_to_save = {
-                "name": user_name,
-                "phone_number": phone_number,
-                "address": address,
-                "user_perferred_name": user_name,
-                "address2": user_data.get("address2", "") if user_data else "",
-                "address3": user_data.get("address3", "") if user_data else ""
-            }
-            try:
+                state["order_id"] = str(order_id)
+                state["total_amount"] = total_amount
+                state["order_status"] = "pending_payment"
+                state["order_timestamp"] = order_data["timestamp"].isoformat()
+                
+                # Save user details if not already saved
+                user_data_to_save = {
+                    "name": user_name,
+                    "phone_number": phone_number,
+                    "address": address,
+                    "user_perferred_name": user_name,
+                    "address2": user_data.get("address2", "") if user_data else "",
+                    "address3": user_data.get("address3", "") if user_data else ""
+                }
                 self.data_manager.save_user_details(session_id, user_data_to_save)
-                logger.info(f"User details saved for session {session_id} during order confirmation.")
-            except Exception as e:
-                logger.error(f"Failed to save user details for session {session_id}: {e}")
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ Sorry, there was an error saving your details. Please try again."
-                )
-            
-            state["order_id"] = str(order_id)
-            state["total_amount"] = total_amount
-            state["order_status"] = "confirmed"
-            state["order_timestamp"] = order_data["timestamp"].isoformat()
-            
-            logger.info(f"Order {order_id} confirmed for session {session_id}. Amount: ₦{total_amount:,.2f}")
-            
-            try:
+                
+                # Track conversion
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
                     self.lead_tracking_handler.track_order_conversion(session_id, str(order_id), total_amount)
+                
+                # Proceed to payment
+                if hasattr(self, 'payment_service') and self.payment_service:
+                    state["current_state"] = "payment_processing"
+                    state["current_handler"] = "payment_handler"
+                    self.session_manager.update_session_state(session_id, state)
+                    return {
+                        "redirect": "payment_handler",
+                        "redirect_message": "initiate_payment",
+                        "order_id": str(order_id),
+                        "total_amount": total_amount,
+                        "phone_number": phone_number
+                    }
                 else:
-                    logger.debug("Lead tracking handler not available for order conversion tracking")
+                    logger.error(f"Payment service not available for session {session_id}")
+                    return self.whatsapp_service.create_text_message(
+                        session_id,
+                        f"🎉 Order #{order_id} created!\n\n"
+                        f"Total: ₦{total_amount:,.2f}\n\n"
+                        f"⚠️ Payment service is currently unavailable. Please contact support."
+                    )
+                    
             except Exception as e:
-                logger.error(f"Error tracking order conversion: {e}")
-            
-            if hasattr(self, 'payment_service') and self.payment_service:
-                state["current_state"] = "payment_processing"
-                state["current_handler"] = "payment_handler"
-                self.session_manager.update_session_state(session_id, state)
-                return {
-                    "redirect": "payment_handler",
-                    "redirect_message": "initiate_payment",
-                    "order_id": str(order_id),
-                    "total_amount": total_amount,
-                    "phone_number": phone_number
-                }
-            else:
-                logger.error(f"Paystack payment service not available for session {session_id}")
-                state["current_state"] = "payment_pending"
-                state["current_handler"] = "order_handler"
-                self.session_manager.update_session_state(session_id, state)
+                logger.error(f"Failed to process order for session {session_id}: {e}", exc_info=True)
                 return self.whatsapp_service.create_text_message(
                     session_id,
-                    f"🎉 *Order Confirmed!*\n\n"
-                    f"📋 Order ID: {order_id}\n"
-                    f"💰 Total Amount: ₦{total_amount:,.2f}\n\n"
-                    f"⚠️ Payment service is currently unavailable. Please try again later or contact support."
+                    "❌ Sorry, there was an error processing your order. Please try again or contact support."
                 )
-        
-        elif message_strip == "update_address":
-            logger.info(f"User chose to update address for session {session_id}")
-            state["current_state"] = "get_new_name_address"
-            state["update_context"] = "update_address"
-            self.session_manager.update_session_state(session_id, state)
-            
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "Please provide your new delivery address (e.g., 123 Main St, Lagos)."
-            )
-        
-        elif message_strip == "cancel_order":
-            logger.info(f"User cancelled order for session {session_id}")
-            state["cart"] = {}
-            return self.handle_back_to_main(
-                state,
-                session_id,
-                message="Order cancelled. How can I help you today?"
-            )
-        
-        else:
-            logger.debug(f"Invalid input '{message}' in confirm order state for session {session_id}")
-            return self._show_order_confirmation(state, session_id)
 
     def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle user providing new name and address or just address based on context."""

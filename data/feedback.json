@@ -61,5 +61,14 @@
     "comment": "",
     "timestamp": "2025-08-14T02:33:58.471836",
     "session_duration": 14.4
+  },
+  {
+    "phone_number": "2348055614455",
+    "user_name": "Ziga",
+    "order_id": 179,
+    "rating": "excellent",
+    "comment": "",
+    "timestamp": "2025-08-14T23:23:36.455964",
+    "session_duration": 15.3
   }
 ]

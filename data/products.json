@@ -1,144 +1,182 @@
 {
-  "Rice": [
+  "Main Dish": [
     {
-      "id": "100",
-      "name": "Fried Rice",
-      "variant": null,
-      "price": 1700.0,
-      "currency": null,
-      "availability_status": true,
-      "description": "Fried Rice with Vegetables",
-      "quantity": 6
-    },
-    {
-      "id": "99",
+      "id": "112",
       "name": "Jollof Rice",
       "variant": null,
-      "price": 1500.0,
-      "currency": null,
+      "price": 2000.0,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Red, Spicy, Smokey, fully flavored Nigerian Rice",
-      "quantity": 5
+      "description": "Delicious Nigerian-style jollof rice",
+      "quantity": 98
     },
     {
-      "id": "111",
-      "name": "Teriyaki Rice",
+      "id": "113",
+      "name": "Fried Rice",
       "variant": null,
       "price": 2000.0,
-      "currency": null,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Basmati Rice",
-      "quantity": 0
-    }
-  ],
-  "Nepo": [
+      "description": "Fried rice with vegetables and seasoning",
+      "quantity": 98
+    },
     {
-      "id": "98",
-      "name": "Nepo",
+      "id": "114",
+      "name": "Ghana Whakhey Rice",
       "variant": null,
       "price": 2000.0,
-      "currency": null,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Nepo",
-      "quantity": 5
+      "description": "Ghana-style waakye rice",
+      "quantity": 100
+    },
+    {
+      "id": "115",
+      "name": "White Spaghetti & Sauce",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "White spaghetti served with sauce",
+      "quantity": 100
+    },
+    {
+      "id": "116",
+      "name": "Fried Potatoes & Fish Sauce",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Crispy fried potatoes served with fish sauce",
+      "quantity": 100
     }
   ],
   "Protein": [
     {
-      "id": "109",
-      "name": "Beef",
-      "variant": null,
-      "price": 250.0,
-      "currency": null,
-      "availability_status": true,
-      "description": "Fried Beef",
-      "quantity": 7
-    },
-    {
-      "id": "102",
-      "name": "Fish",
-      "variant": null,
-      "price": 1100.0,
-      "currency": null,
-      "availability_status": true,
-      "description": "Grilled Fish",
-      "quantity": 9
-    },
-    {
-      "id": "110",
-      "name": "Ponmo",
-      "variant": null,
-      "price": 50.0,
-      "currency": null,
-      "availability_status": true,
-      "description": "Ponmo",
-      "quantity": 10
-    },
-    {
-      "id": "108",
+      "id": "124",
       "name": "Egg",
       "variant": null,
-      "price": 100.0,
-      "currency": null,
+      "price": 2000.0,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Boiled Egg",
-      "quantity": 1
-    }
-  ],
-  "Swallow": [
+      "description": "Boiled or fried egg",
+      "quantity": 96
+    },
     {
-      "id": "103",
-      "name": "Fufu",
+      "id": "121",
+      "name": "Chicken",
       "variant": null,
-      "price": 150.0,
-      "currency": null,
+      "price": 2000.0,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Heavy Swallow",
-      "quantity": 5
+      "description": "Grilled or fried chicken portion",
+      "quantity": 100
+    },
+    {
+      "id": "122",
+      "name": "Fish",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Fried or grilled fish portion",
+      "quantity": 100
+    },
+    {
+      "id": "123",
+      "name": "Beef",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Beef portion cooked to perfection",
+      "quantity": 100
+    },
+    {
+      "id": "125",
+      "name": "Ponmo",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Cooked cow skin",
+      "quantity": 100
     }
   ],
   "Soup": [
     {
-      "id": "104",
-      "name": "Afang",
+      "id": "117",
+      "name": "Edikangikong Soup",
       "variant": null,
-      "price": 900.0,
-      "currency": null,
+      "price": 2000.0,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Green Vegetable, Calabar Delicacy",
-      "quantity": 4
+      "description": "Traditional Nigerian vegetable soup",
+      "quantity": 100
+    },
+    {
+      "id": "118",
+      "name": "Bitterleaf Soup",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Soup made with bitterleaf and spices",
+      "quantity": 100
     }
   ],
-  "Sides": [
+  "Swallow": [
     {
-      "id": "105",
+      "id": "119",
+      "name": "Semo",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Swallow dish made from semolina flour",
+      "quantity": 100
+    },
+    {
+      "id": "120",
+      "name": "Fufu",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Cassava-based swallow dish",
+      "quantity": 100
+    }
+  ],
+  "Side Dish": [
+    {
+      "id": "126",
       "name": "Salad",
       "variant": null,
-      "price": 300.0,
-      "currency": null,
+      "price": 2000.0,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Cold Vegetables",
-      "quantity": 3
+      "description": "Fresh vegetable salad",
+      "quantity": 100
     },
     {
-      "id": "107",
+      "id": "127",
+      "name": "Moi-Moi",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Steamed bean pudding",
+      "quantity": 100
+    },
+    {
+      "id": "128",
       "name": "Plantain",
       "variant": null,
-      "price": 100.0,
-      "currency": null,
+      "price": 2000.0,
+      "currency": "NGN",
       "availability_status": true,
-      "description": "Fried Plantain",
-      "quantity": 10
-    },
-    {
-      "id": "106",
-      "name": "Moi Moi",
-      "variant": null,
-      "price": 200.0,
-      "currency": null,
-      "availability_status": true,
-      "description": "Moimoi",
-      "quantity": 1
+      "description": "Fried plantain slices",
+      "quantity": 100
     }
   ]
 }

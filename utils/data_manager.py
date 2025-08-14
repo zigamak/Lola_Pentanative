@@ -664,6 +664,11 @@ class DataManager:
     def get_order_by_id(self, order_id: str) -> Optional[Dict]:
         """Retrieve order by ID."""
         try:
+            # Validate order_id first
+            if not order_id or str(order_id).lower() == "none":
+                logger.error(f"Invalid order_id provided: {order_id}")
+                return None
+                
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute(
@@ -698,7 +703,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error retrieving order {order_id}: {e}", exc_info=True)
             return None
-    
+        
     def get_order_by_payment_reference(self, payment_reference: str) -> Optional[Dict]:
         """Retrieve order by payment reference."""
         try:
