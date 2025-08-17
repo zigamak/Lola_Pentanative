@@ -1,56 +1,4 @@
 {
-  "Main Dish": [
-    {
-      "id": "112",
-      "name": "Jollof Rice",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Delicious Nigerian-style jollof rice",
-      "quantity": 98
-    },
-    {
-      "id": "113",
-      "name": "Fried Rice",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Fried rice with vegetables and seasoning",
-      "quantity": 98
-    },
-    {
-      "id": "114",
-      "name": "Ghana Whakhey Rice",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Ghana-style waakye rice",
-      "quantity": 100
-    },
-    {
-      "id": "115",
-      "name": "White Spaghetti & Sauce",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "White spaghetti served with sauce",
-      "quantity": 100
-    },
-    {
-      "id": "116",
-      "name": "Fried Potatoes & Fish Sauce",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Crispy fried potatoes served with fish sauce",
-      "quantity": 100
-    }
-  ],
   "Protein": [
     {
       "id": "124",
@@ -100,6 +48,58 @@
       "currency": "NGN",
       "availability_status": true,
       "description": "Cooked cow skin",
+      "quantity": 100
+    }
+  ],
+  "Main Dish": [
+    {
+      "id": "112",
+      "name": "Jollof Rice",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Delicious Nigerian-style jollof rice",
+      "quantity": 96
+    },
+    {
+      "id": "113",
+      "name": "Fried Rice",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Fried rice with vegetables and seasoning",
+      "quantity": 96
+    },
+    {
+      "id": "114",
+      "name": "Ghana Whakhey Rice",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Ghana-style waakye rice",
+      "quantity": 100
+    },
+    {
+      "id": "115",
+      "name": "White Spaghetti & Sauce",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "White spaghetti served with sauce",
+      "quantity": 100
+    },
+    {
+      "id": "116",
+      "name": "Fried Potatoes & Fish Sauce",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Crispy fried potatoes served with fish sauce",
       "quantity": 100
     }
   ],

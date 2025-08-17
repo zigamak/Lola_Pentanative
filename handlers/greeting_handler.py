@@ -121,7 +121,7 @@ class GreetingHandler(BaseHandler):
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id} entering complaint state.")
         return self.whatsapp_service.create_text_message(
-            session_id, 
+            session_id,
             "We're sorry to hear you're having an issue. Please tell us about your complaint and we'll address it promptly."
         )
 
@@ -131,8 +131,8 @@ class GreetingHandler(BaseHandler):
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
         self.logger.warning(f"Session {session_id}: Invalid option '{message_received}' in greeting state for non-paid user.")
         return self.send_main_menu(
-            session_id, 
-            user_name, 
+            session_id,
+            user_name,
             f"Invalid option, {user_name}. Please choose from the options below:"
         )
 
@@ -142,8 +142,8 @@ class GreetingHandler(BaseHandler):
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
         self.logger.warning(f"Session {session_id}: Invalid option '{message_received}' in greeting state for paid user.")
         return self.send_main_menu_paid(
-            session_id, 
-            user_name, 
+            session_id,
+            user_name,
             f"Invalid option, {user_name}. Please choose from the options below:"
         )
 
@@ -154,15 +154,15 @@ class GreetingHandler(BaseHandler):
         For paid users, shows customized menu.
         """
         user_data = self.data_manager.get_user_data(session_id)
-        
+
         if not user_data or not user_data.get("user_perferred_name") or not user_data.get("address"):
             username_display = user_data.get("name", "Guest") if user_data else "Guest"
             self.logger.info(f"Session {session_id}: New user or missing details. Initiating onboarding.")
-            
+
             state["current_state"] = "collect_preferred_name"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
-            
+
             return self.whatsapp_service.create_text_message(
                 session_id,
                 f"Hello {username_display}, welcome to Lola!\nPlease enter your preferred name."
@@ -175,19 +175,12 @@ class GreetingHandler(BaseHandler):
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
-            
+
+            message = f"Hello {username}!\nWelcome to Ganador Express!\n🍱🥘🍛 🎉\nMy name is Lola👩‍🦱 what would you like to do."
             if self._has_user_made_payment(session_id):
-                return self.send_main_menu_paid(
-                    session_id, 
-                    username, 
-                    f"Welcome Back {username}\nWhat would you like to do?"
-                )
+                return self._send_greeting_with_image(session_id, username, "paid", message)
             else:
-                return self.send_main_menu(
-                    session_id, 
-                    username, 
-                    f"Hello {username}, What would you like to do?"
-                )
+                return self._send_greeting_with_image(session_id, username, "guest", message)
 
     def handle_collect_preferred_name_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """
@@ -199,22 +192,22 @@ class GreetingHandler(BaseHandler):
                 session_id,
                 "It looks like you didn't enter a name. Please enter your preferred name."
             )
-        
+
         self.logger.info(f"Session {session_id}: Preferred name received: '{preferred_name}'.")
-        
+
         user_data = self.data_manager.get_user_data(session_id) or {}
         user_data["user_perferred_name"] = preferred_name
-        user_data["display_name"] = preferred_name 
-        
+        user_data["display_name"] = preferred_name
+
         user_data["user_id"] = session_id
         user_data["user_number"] = session_id
         self.data_manager.save_user_details(session_id, user_data)
-        
+
         state["user_name"] = preferred_name
         state["current_state"] = "collect_delivery_address"
         state["current_handler"] = "greeting_handler"
         self.session_manager.update_session_state(session_id, state)
-        
+
         return self.whatsapp_service.create_text_message(
             session_id,
             f"Thanks, {preferred_name}! Now, please enter your delivery address."
@@ -230,61 +223,54 @@ class GreetingHandler(BaseHandler):
                 session_id,
                 "It looks like you didn't enter an address. Please enter your delivery address."
             )
-        
+
         self.logger.info(f"Session {session_id}: Delivery address received: '{delivery_address}'.")
-        
+
         user_data = self.data_manager.get_user_data(session_id) or {}
         user_data["address"] = delivery_address
-        
+
         user_data["user_id"] = session_id
         user_data["user_number"] = session_id
         self.data_manager.save_user_details(session_id, user_data)
-        
+
         state["delivery_address"] = delivery_address
         state["current_state"] = "greeting"
         state["current_handler"] = "greeting_handler"
         self.session_manager.update_session_state(session_id, state)
-        
+
         username = state.get("user_name", "Guest")
         self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
-        
+
+        message = f"Hello {username}!\nWelcome to Ganador Express!\n🍱🥘🍛 🎉\nMy name is Lola👩‍🦱 what would you like to do."
         if self._has_user_made_payment(session_id):
-            return self.send_main_menu_paid(
-                session_id, 
-                username, 
-                f"Welcome Back {username}\nWhat would you like to do?"
-            )
+            return self._send_greeting_with_image(session_id, username, "paid", message)
         else:
-            return self.send_main_menu(
-                session_id, 
-                username, 
-                f"Thank you! Hello {username}, What would you like to do?"
-            )
+            return self._send_greeting_with_image(session_id, username, "guest", message)
 
     def send_main_menu(self, session_id: str, user_name: str, message: str = "How can I help you today?") -> Dict[str, Any]:
         """Send main menu with buttons for non-paid users (max 3 buttons for WhatsApp)."""
         greeting = f"{message}"
-        
+
         buttons = [
             {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
             {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-            {"type": "reply", "reply": {"id": "complFain", "title": "📝 Complain"}}
+            {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
         ]
-        
+
         return self.whatsapp_service.create_button_message(session_id, greeting, buttons)
-    
+
     def send_main_menu_paid(self, session_id: str, user_name: str, message: str = "How can I help you today?") -> Dict[str, Any]:
         """Send main menu with buttons for paid users (max 3 buttons for WhatsApp)."""
         greeting = f"{message}"
-        
+
         buttons = [
             {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
             {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
             {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
         ]
-        
+
         return self.whatsapp_service.create_button_message(session_id, greeting, buttons)
-    
+
     def handle_back_to_main(self, state: Dict, session_id: str, message: str = "Welcome back! How can I help you today?") -> Dict[str, Any]:
         """Handle back to main menu navigation."""
         user_data = self.data_manager.get_user_data(session_id)
@@ -297,11 +283,32 @@ class GreetingHandler(BaseHandler):
             del state["selected_category"]
         if "selected_item" in state:
             del state["selected_item"]
-            
+
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
-        
+
+        message = f"Hello {user_name}!\nWelcome to Ganador Express!\n🍱🥘🍛 🎉\nMy name is Lola👩‍🦱 what would you like to do."
         if self._has_user_made_payment(session_id):
-            return self.send_main_menu_paid(session_id, user_name, f"Welcome Back {user_name}\nWhat would you like to do?")
+            return self._send_greeting_with_image(session_id, user_name, "paid", message)
         else:
-            return self.send_main_menu(session_id, user_name, message)
+            return self._send_greeting_with_image(session_id, user_name, "guest", message)
+
+
+    def _send_greeting_with_image(self, session_id: str, user_name: str, user_type: str, text_message: str) -> Dict[str, Any]:
+        """
+        Sends a greeting message along with a contextual image and menu buttons.
+        """
+        image_url = "https://eventio.africa/wp-content/uploads/2025/08/LOLA-3.jpg" if user_type == "guest" else "https://eventio.africa/wp-content/uploads/2025/08/LOLA-4.jpg"
+
+        response = self.whatsapp_service.create_image_message(
+            session_id,
+            image_url,
+            caption=text_message
+        )
+        # Append the main menu buttons to the response
+        if user_type == "paid":
+            response.update(self.send_main_menu_paid(session_id, user_name, "How can I help you today?"))
+        else:
+            response.update(self.send_main_menu(session_id, user_name, "How can I help you today?"))
+
+        return response

@@ -286,9 +286,8 @@ class OrderHandler(BaseHandler):
 
         if message_strip == "back":
             if state.get("from_ai_order", False):
-                # Return to prompt_add_note state if coming from AI order
                 state["current_state"] = "prompt_add_note"
-                state.pop("from_order_summary", None)  # Clear flag if present
+                state.pop("from_order_summary", None)
                 self.session_manager.update_session_state(session_id, state)
                 logger.info(f"User typed 'back' from add note state for AI order for session {session_id}.")
                 buttons = [
@@ -301,9 +300,8 @@ class OrderHandler(BaseHandler):
                     buttons
                 )
             elif state.get("from_order_summary", False):
-                # Return to order_summary state if coming from order summary
                 state["current_state"] = "order_summary"
-                state.pop("from_order_summary", None)  # Clear flag
+                state.pop("from_order_summary", None)
                 self.session_manager.update_session_state(session_id, state)
                 logger.info(f"User typed 'back' from add note state to order summary for session {session_id}.")
                 return self.whatsapp_service.create_button_message(
@@ -312,7 +310,6 @@ class OrderHandler(BaseHandler):
                     self._get_order_summary_buttons()
                 )
             else:
-                # Fallback to main menu if no specific origin
                 state["current_state"] = "greeting"
                 state["current_handler"] = "greeting_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -322,10 +319,9 @@ class OrderHandler(BaseHandler):
                     "🔙 Back to main menu. How can I assist you today?"
                 )
 
-        # Save the note to the state
         state["order_note"] = message_strip
         state["current_state"] = "confirm_order"
-        state.pop("from_order_summary", None)  # Clear flag if present
+        state.pop("from_order_summary", None)
         self.session_manager.update_session_state(session_id, state)
         logger.info(f"Note '{message_strip}' added for session {session_id}.")
 
@@ -357,10 +353,11 @@ class OrderHandler(BaseHandler):
                 logger.info(f"Address not set after AI order, redirecting to location handler for session {session_id}.")
                 state["current_state"] = "address_collection_menu"
                 state["current_handler"] = "location_handler"
+                state["from_confirm_details"] = True  # Flag to return to confirm_details
                 self.session_manager.update_session_state(session_id, state)
                 return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
             else:
-                state["from_ai_order"] = True  # Flag to indicate AI order
+                state["from_ai_order"] = True
                 state["current_state"] = "prompt_add_note"
                 self.session_manager.update_session_state(session_id, state)
                 logger.info(f"Prompting for note after AI order confirmation for session {session_id}.")
@@ -390,6 +387,7 @@ class OrderHandler(BaseHandler):
                 logger.info(f"Address not set, redirecting to location handler for session {session_id}.")
                 state["current_state"] = "address_collection_menu"
                 state["current_handler"] = "location_handler"
+                state["from_confirm_details"] = True  # Flag to return to confirm_details
                 self.session_manager.update_session_state(session_id, state)
                 return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
             else:
@@ -411,7 +409,7 @@ class OrderHandler(BaseHandler):
                         "❌ Sorry, there was an error saving your details. Please try again."
                     )
 
-                state["current_state"] = "prompt_add_note"  # Transition to prompt_add_note instead of confirm_order
+                state["current_state"] = "prompt_add_note"
                 self.session_manager.update_session_state(session_id, state)
                 logger.info(f"Address set, prompting for note for manual session {session_id}.")
                 buttons = [
@@ -426,13 +424,11 @@ class OrderHandler(BaseHandler):
         
         elif message_strip == "change_all_details":
             logger.info(f"User opted to change details for session {session_id}.")
-            state["current_state"] = "get_new_name_address"
-            state["update_context"] = "change_all_details"
+            state["current_state"] = "address_collection_menu"
+            state["current_handler"] = "location_handler"
+            state["from_confirm_details"] = True  # Flag to return to confirm_details
             self.session_manager.update_session_state(session_id, state)
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "Please provide your new name and delivery address (e.g., John Doe, 123 Main St)."
-            )
+            return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
         else:
             logger.debug(f"Invalid input '{message}' in confirm details state for session {session_id}. Re-presenting details prompt.")
             buttons = [
@@ -559,7 +555,6 @@ class OrderHandler(BaseHandler):
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
             
-            # Validate session_id (user's phone number) as customer_id
             if not session_id or session_id.strip() == "":
                 logger.error(f"Invalid or missing session_id for order confirmation: {session_id}")
                 state["current_state"] = "greeting"
@@ -580,10 +575,8 @@ class OrderHandler(BaseHandler):
             phone_number = user_data.get("phone_number", session_id) if user_data else session_id
             address = state.get("address", user_data.get("address", "") if user_data else "")
             
-            # Prepare order items with product_id validation
             items = []
             for item_name, item_data in cart.items():
-                # Get product_id from menu data or inventory
                 product_id = item_data.get("product_id")
                 if not product_id:
                     product_id = self.data_manager._get_product_id_by_name(item_name)
@@ -607,11 +600,11 @@ class OrderHandler(BaseHandler):
             
             order_data = {
                 "customer_id": session_id,
-                "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "1"),  # Default to "1" if not set
+                "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "1"),
                 "address": address,
-                "status": "pending_payment",  # Initial status before payment
+                "status": "pending_payment",
                 "total_amount": total_amount,
-                "payment_reference": f"TEMP-{uuid.uuid4().hex[:8]}",  # Temporary reference
+                "payment_reference": f"TEMP-{uuid.uuid4().hex[:8]}",
                 "payment_method_type": "paystack",
                 "timestamp": datetime.datetime.now(datetime.timezone.utc),
                 "customers_note": state.get("order_note", ""),
@@ -630,7 +623,6 @@ class OrderHandler(BaseHandler):
                 state["order_status"] = "pending_payment"
                 state["order_timestamp"] = order_data["timestamp"].isoformat()
                 
-                # Save user details if not already saved
                 user_data_to_save = {
                     "name": user_name,
                     "phone_number": phone_number,
@@ -641,11 +633,9 @@ class OrderHandler(BaseHandler):
                 }
                 self.data_manager.save_user_details(session_id, user_data_to_save)
                 
-                # Track conversion
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
                     self.lead_tracking_handler.track_order_conversion(session_id, str(order_id), total_amount)
                 
-                # Proceed to payment
                 if hasattr(self, 'payment_service') and self.payment_service:
                     state["current_state"] = "payment_processing"
                     state["current_handler"] = "payment_handler"
@@ -672,102 +662,42 @@ class OrderHandler(BaseHandler):
                     session_id,
                     "❌ Sorry, there was an error processing your order. Please try again or contact support."
                 )
-
-    def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
-        """Handle user providing new name and address or just address based on context."""
-        logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
         
-        try:
-            update_context = state.get("update_context", "change_all_details")
-            user_data = self.data_manager.get_user_data(session_id)
-            current_name = state.get("user_name", user_data.get("display_name", "Guest") if user_data else "Guest")
-            current_phone = state.get("phone_number", user_data.get("phone_number", session_id) if user_data else session_id)
-
-            if update_context == "update_address":
-                # Only update the address, keep the existing name
-                new_address = message.strip()
-                state["address"] = new_address
-                user_data_to_save = {
-                    "name": current_name,
-                    "phone_number": current_phone,
-                    "address": new_address,
-                    "user_perferred_name": current_name,
-                    "address2": user_data.get("address2", "") if user_data else "",
-                    "address3": user_data.get("address3", "") if user_data else ""
-                }
-            else:
-                # Update both name and address (for 'change_all_details' context)
-                if "," in message:
-                    parts = [part.strip() for part in message.split(",", 1)]
-                    if len(parts) == 2:
-                        new_name, new_address = parts
-                        state["user_name"] = new_name
-                        state["address"] = new_address
-                        user_data_to_save = {
-                            "name": new_name,
-                            "phone_number": current_phone,
-                            "address": new_address,
-                            "user_perferred_name": new_name,
-                            "address2": user_data.get("address2", "") if user_data else "",
-                            "address3": user_data.get("address3", "") if user_data else ""
-                        }
-                    else:
-                        new_address = parts[0]
-                        state["address"] = new_address
-                        user_data_to_save = {
-                            "name": current_name,
-                            "phone_number": current_phone,
-                            "address": new_address,
-                            "user_perferred_name": current_name,
-                            "address2": user_data.get("address2", "") if user_data else "",
-                            "address3": user_data.get("address3", "") if user_data else ""
-                        }
-                else:
-                    new_address = message.strip()
-                    state["address"] = new_address
-                    user_data_to_save = {
-                        "name": current_name,
-                        "phone_number": current_phone,
-                        "address": new_address,
-                        "user_perferred_name": current_name,
-                        "address2": user_data.get("address2", "") if user_data else "",
-                        "address3": user_data.get("address3", "") if user_data else ""
-                    }
-
-            try:
-                self.data_manager.save_user_details(session_id, user_data_to_save)
-                logger.info(f"Updated details for session {session_id}: Name={user_data_to_save['name']}, Address={new_address}")
-            except Exception as e:
-                logger.error(f"Failed to save user details for session {session_id}: {e}")
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ Sorry, there was an error saving your details. Please try again."
-                )
-
-            state["current_state"] = "confirm_details"
-            state.pop("update_context", None)  # Clear context after processing
+        elif message_strip == "update_address":
+            logger.info(f"User opted to update address for session {session_id}.")
+            state["current_state"] = "address_collection_menu"
+            state["current_handler"] = "location_handler"
+            state["from_confirm_order"] = True  # Flag to return to confirm_order
             self.session_manager.update_session_state(session_id, state)
-            
-            buttons = [
-                {"type": "reply", "reply": {"id": "details_correct", "title": "✅ Correct"}},
-                {"type": "reply", "reply": {"id": "change_all_details", "title": "✏️ Change Again"}}
-            ]
-            
-            return self.whatsapp_service.create_button_message(
-                session_id,
-                f"📋 **Updated Delivery Details:**\n\n"
-                f"👤 **Name:** {state.get('user_name', current_name)}\n"
-                f"📱 **Phone:** {current_phone}\n"
-                f"📍 **Address:** {new_address}\n\n"
-                f"Is this information correct?",
-                buttons
-            )
-        except Exception as e:
-            logger.error(f"Error handling new address for session {session_id}: {e}", exc_info=True)
+            return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+        
+        elif message_strip == "cancel_order":
+            logger.info(f"User cancelled order for session {session_id}.")
+            state["cart"] = {}
+            state["current_state"] = "greeting"
+            state["current_handler"] = "greeting_handler"
+            self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "There was an error updating your details. Please try again with format: Address or Name, Address"
+                "Your order has been cancelled. How can I help you today?"
             )
+        
+        else:
+            logger.debug(f"Invalid input '{message}' in confirm order state for session {session_id}.")
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "Please select 'Confirm & Pay', 'Update Address', or 'Cancel Order'."
+            )
+
+    def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
+        """Handle user providing new name and address via LocationAddressHandler."""
+        logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
+        
+        state["current_state"] = "address_collection_menu"
+        state["current_handler"] = "location_handler"
+        state["from_confirm_details"] = True  # Flag to return to confirm_details
+        self.session_manager.update_session_state(session_id, state)
+        return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
 
     def handle_payment_pending_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle messages when payment is pending with Paystack."""

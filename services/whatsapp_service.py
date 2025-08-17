@@ -166,13 +166,13 @@ class WhatsAppService:
             logger.error("Error creating list message for %s: %s", to, e, exc_info=True)
             return self.create_text_message(to, text)
     
-    def send_image_message(self, to: str, image_url: str, caption: str = "") -> Optional[Dict]:
-        """Sends an image message with an optional caption."""
+    def create_image_message(self, to: str, image_url: str, caption: str = "") -> Optional[Dict]:
+        """Creates an image message payload."""
         try:
             if not to or not image_url:
                 logger.error("Invalid parameters for image message: to='%s', image_url='%s'", to, image_url)
                 return None
-
+            
             payload = {
                 "messaging_product": "whatsapp",
                 "recipient_type": "individual",
@@ -186,11 +186,23 @@ class WhatsAppService:
                 payload["image"]["caption"] = str(caption)
             
             logger.debug("Created image message payload for %s", to)
-            return self.send_message(payload)
+            return payload
         except Exception as e:
-            logger.error("Error creating image message for %s: %s", to, e, exc_info=True)
+            logger.error("Error creating image message payload for %s: %s", to, e, exc_info=True)
             return None
 
+    def send_image_message(self, to: str, image_url: str, caption: str = "") -> Optional[Dict]:
+        """Sends an image message with an optional caption."""
+        try:
+            payload = self.create_image_message(to, image_url, caption)
+            if not payload:
+                return None
+            
+            return self.send_message(payload)
+        except Exception as e:
+            logger.error("Error sending image message for %s: %s", to, e, exc_info=True)
+            return None
+    
     def send_timeout_message(self, session_id: str) -> Optional[Dict]:
         """Send timeout message to user."""
         try:
