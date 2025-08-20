@@ -1,3 +1,4 @@
+#Order Handler
 import datetime
 import logging
 import uuid
@@ -538,6 +539,7 @@ class OrderHandler(BaseHandler):
                 "❌ Sorry, there was an error processing your order confirmation. Please try again or contact support."
             )
 
+    
     def handle_confirm_order_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle the final order confirmation state."""
         logger.debug(f"Handling confirm order state for session {session_id}, message: {message}")
@@ -583,7 +585,7 @@ class OrderHandler(BaseHandler):
                     if not product_id:
                         logger.error(f"Could not find product_id for item: {item_name}")
                         continue
-                
+                    
                 items.append({
                     "item_name": item_name,
                     "quantity": item_data.get("quantity", 1),
@@ -669,7 +671,19 @@ class OrderHandler(BaseHandler):
             state["current_handler"] = "location_handler"
             state["from_confirm_order"] = True  # Flag to return to confirm_order
             self.session_manager.update_session_state(session_id, state)
-            return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+            return {
+                "redirect": "location_handler",
+                "redirect_message": "initiate_address_collection"
+            }
+        
+        elif message_strip == "add_note":
+            logger.info(f"User chose to add a note after confirmation for session {session_id}.")
+            state["current_state"] = "add_note"
+            self.session_manager.update_session_state(session_id, state)
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to skip adding a note."
+            )
         
         elif message_strip == "cancel_order":
             logger.info(f"User cancelled order for session {session_id}.")
@@ -686,7 +700,7 @@ class OrderHandler(BaseHandler):
             logger.debug(f"Invalid input '{message}' in confirm order state for session {session_id}.")
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "Please select 'Confirm & Pay', 'Update Address', or 'Cancel Order'."
+                "Please select 'Confirm & Pay', 'Update Address', 'Add Note', or 'Cancel Order'."
             )
 
     def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:

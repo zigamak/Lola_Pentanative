@@ -63,7 +63,7 @@ class MessageProcessor:
         self.payment_handler.lead_tracking_handler = self.lead_tracking_handler
         
         self.location_handler = LocationAddressHandler(
-            config, whatsapp_service, location_service, data_manager
+            config, session_manager, data_manager, whatsapp_service, location_service
         )
         self.ai_handler = AIHandler(config, session_manager, data_manager, whatsapp_service)
 
@@ -176,11 +176,10 @@ class MessageProcessor:
             # Add a global escape command to handle messages like "menu" or "start"
             if message in ["menu", "back", "start", "hello"]:
                 logger.info(f"Session {session_id}: Global escape keyword '{message}' detected. Resetting to greeting.")
-                # This will reset the state and send the main menu
                 return self.greeting_handler.handle_back_to_main(state, session_id, "Let's start fresh. What can I do for you?")
             
             # Handle redirect messages explicitly
-            if message in ["show_enquiry_menu", "show_faq_categories", "start_track_order"]:
+            if message in ["show_enquiry_menu", "show_faq_categories", "start_track_order", "handle_confirm_order_state"]:
                 return self._handle_redirect_message(state, message, original_message, session_id, user_name)
 
             # Route based on current handler and state
@@ -296,8 +295,7 @@ class MessageProcessor:
             elif current_handler_name == "location_handler":
                 response = self._handle_location_states(state, message, original_message, session_id)
             
-            # Handle global 'menu' command - This is now redundant due to the new global escape.
-            # I am keeping it for now to avoid breaking other parts of your code.
+            # Handle global 'menu' command
             if message == "menu" and current_handler_name != "greeting_handler":
                 return self.greeting_handler.handle_back_to_main(state, session_id)
 
@@ -308,6 +306,16 @@ class MessageProcessor:
                 logger.info(f"Session {session_id}: Redirecting to handler '{redirect_target_handler_name}' with message '{redirect_message_for_target}'.")
                 state["current_handler"] = redirect_target_handler_name
                 self.session_manager.update_session_state(session_id, state)
+                if redirect_target_handler_name == "order_handler" and redirect_message_for_target == "handle_confirm_order_state":
+                    additional_message = response.get("additional_message")
+                    buttons = response.get("buttons")
+                    if additional_message and buttons:
+                        return self.whatsapp_service.create_button_message(
+                            session_id,
+                            additional_message,
+                            buttons
+                        )
+                    return self.order_handler._show_order_confirmation(state, session_id)
                 return self._route_to_handler(state, redirect_message_for_target, original_message, session_id, user_name)
 
             # Fallback for no response
@@ -344,6 +352,11 @@ class MessageProcessor:
             state["current_handler"] = "track_order_handler"
             self.session_manager.update_session_state(session_id, state)
             return self.track_order_handler.handle_track_order_state(state, message, session_id)
+        elif message == "handle_confirm_order_state":
+            state["current_state"] = "confirm_order"
+            state["current_handler"] = "order_handler"
+            self.session_manager.update_session_state(session_id, state)
+            return self.order_handler._show_order_confirmation(state, session_id)
         else:
             logger.warning(f"Session {session_id}: Unhandled redirect message '{message}'. Resetting to greeting.")
             state["current_state"] = "greeting"
@@ -361,8 +374,8 @@ class MessageProcessor:
             return self.location_handler.handle_awaiting_live_location_timeout(state, original_message, session_id)
         elif current_state == "maps_search_input":
             return self.location_handler.handle_maps_search_input(state, original_message, session_id)
-        elif current_state == "manual_address_entry":
-            return self.location_handler.handle_manual_address_entry(state, original_message, session_id)
+        elif current_state == "manual_address_input":
+            return self.location_handler.handle_manual_address_input(state, original_message, session_id)
         elif current_state == "confirm_detected_location":
             return self.location_handler.handle_confirm_detected_location(state, message, session_id)
         elif current_state == "confirm_maps_result":
@@ -407,7 +420,7 @@ class MessageProcessor:
             )
 
         if state["current_handler"] == "location_handler" and \
-           state["current_state"] in ["awaiting_live_location", "address_collection_menu", "manual_address_entry", "maps_search_input"]:
+           state["current_state"] in ["awaiting_live_location", "address_collection_menu", "manual_address_input", "maps_search_input"]:
             return self.location_handler.handle_live_location(
                 state, session_id, latitude, longitude, location_name, location_address
             )

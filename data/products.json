@@ -53,16 +53,6 @@
   ],
   "Main Dish": [
     {
-      "id": "112",
-      "name": "Jollof Rice",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Delicious Nigerian-style jollof rice",
-      "quantity": 96
-    },
-    {
       "id": "113",
       "name": "Fried Rice",
       "variant": null,
@@ -71,6 +61,16 @@
       "availability_status": true,
       "description": "Fried rice with vegetables and seasoning",
       "quantity": 96
+    },
+    {
+      "id": "112",
+      "name": "Jollof Rice",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Delicious Nigerian-style jollof rice",
+      "quantity": 95
     },
     {
       "id": "114",
