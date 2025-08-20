@@ -33,7 +33,6 @@ class WhatsAppService:
                 logger.error("Payload is None or not a dictionary: %s", payload)
                 return None
             
-            # This is the primary validation for outgoing messages
             if "to" not in payload:
                 logger.error("Missing 'to' parameter in payload: %s", payload)
                 return None
@@ -42,12 +41,10 @@ class WhatsAppService:
                 logger.error("Missing 'type' parameter in payload: %s", payload)
                 return None
             
-            # Ensure messaging_product is always present for outgoing messages
             if "messaging_product" not in payload:
                 payload["messaging_product"] = "whatsapp"
                 logger.warning("Added missing 'messaging_product' to payload: %s", payload)
             
-            # Log the payload for debugging
             logger.info("Sending WhatsApp payload to %s: %s", payload.get("to"), payload)
             
             response = requests.post(self.base_url, json=payload, headers=self.headers)
@@ -72,7 +69,6 @@ class WhatsAppService:
         try:
             clean_payload = payload.copy() if isinstance(payload, dict) else {}
             
-            # Attempt to extract 'to' from the incoming 'contacts' list
             if not clean_payload.get("to") and payload.get("contacts"):
                 try:
                     contacts = payload.get("contacts", [])
@@ -84,7 +80,6 @@ class WhatsAppService:
                 except Exception as e:
                     logger.error("Failed to recover 'to' from contacts: %s", e)
             
-            # Remove fields from incoming payload that are not part of a valid outgoing message
             unwanted_fields = ['contacts', 'messages', 'input', 'wa_id', 'status']
             for field in unwanted_fields:
                 clean_payload.pop(field, None)
@@ -92,7 +87,7 @@ class WhatsAppService:
             return clean_payload
         except Exception as e:
             logger.error("Error cleaning incoming payload: %s, original payload: %s", e, payload)
-            return {}  # Return an empty dictionary on error
+            return {}
 
     def create_text_message(self, to: str, text: str) -> Optional[Dict]:
         """Create and send a text message."""
@@ -114,8 +109,8 @@ class WhatsAppService:
             logger.error("Error creating text message for %s: %s", to, e, exc_info=True)
             return None
     
-    def create_button_message(self, to: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
-        """Create and send a button message."""
+    def create_button_message_payload(self, to: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
+        """Creates a button message payload without sending."""
         try:
             if not to or not text or not buttons:
                 logger.error("Invalid parameters: to='%s', text='%s', buttons='%s'", to, text, buttons)
@@ -123,7 +118,7 @@ class WhatsAppService:
             
             if not isinstance(buttons, list) or len(buttons) > 3:
                 logger.error("Invalid buttons format or too many buttons: %s", buttons)
-                return self.create_text_message(to, text)
+                return None
             
             payload = {
                 "messaging_product": "whatsapp",
@@ -137,10 +132,22 @@ class WhatsAppService:
                 }
             }
             logger.debug("Created button message payload for %s", to)
-            return self.send_message(payload)
+            return payload
         except Exception as e:
-            logger.error("Error creating button message for %s: %s", to, e, exc_info=True)
+            logger.error("Error creating button message payload for %s: %s", to, e, exc_info=True)
+            return None
+
+    def send_button_message(self, to: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
+        """Sends a button message."""
+        payload = self.create_button_message_payload(to, text, buttons)
+        if not payload:
             return self.create_text_message(to, text)
+        return self.send_message(payload)
+    
+    def create_button_message(self, to: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
+        """Creates and sends a button message (alias for send_button_message for compatibility)."""
+        logger.debug("Creating button message for %s with text: %s, buttons: %s", to, text, buttons)
+        return self.send_button_message(to, text, buttons)
     
     def create_list_message(self, to: str, text: str, button_text: str, sections: List[Dict]) -> Optional[Dict]:
         """Create and send a list message."""
@@ -167,7 +174,7 @@ class WhatsAppService:
             return self.create_text_message(to, text)
     
     def create_image_message(self, to: str, image_url: str, caption: str = "") -> Optional[Dict]:
-        """Creates an image message payload."""
+        """Creates an image message payload without sending."""
         try:
             if not to or not image_url:
                 logger.error("Invalid parameters for image message: to='%s', image_url='%s'", to, image_url)
@@ -202,6 +209,28 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Error sending image message for %s: %s", to, e, exc_info=True)
             return None
+
+    def send_image_with_buttons(self, to: str, image_url: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
+        """
+        Sends an image message followed by a button message.
+        This is the correct way to send both an image and a menu to the user.
+        """
+        try:
+            # 1. Send the image message
+            image_response = self.send_image_message(to, image_url, caption=text)
+            
+            # 2. Check if the image sent successfully before sending the buttons
+            if not image_response:
+                logger.error(f"Failed to send image to {to}. Aborting button message.")
+                return None
+
+            # 3. Send the button message
+            return self.send_button_message(to, text, buttons)
+            
+        except Exception as e:
+            logger.error("Error sending image with buttons for %s: %s", to, e, exc_info=True)
+            # Fallback to a simple text message in case of failure
+            return self.create_text_message(to, text)
     
     def send_timeout_message(self, session_id: str) -> Optional[Dict]:
         """Send timeout message to user."""

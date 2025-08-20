@@ -53,8 +53,8 @@ class DataManager:
         # Retrieve merchant_id from config
         self.merchant_id = getattr(self.config, 'MERCHANT_ID', None)
         if not self.merchant_id:
-            logger.error("MERCHANT_ID is not set in config. Using default value '18'.")
-            self.merchant_id = '18'  # Default value if not set
+            logger.error("MERCHANT_ID is not set in config. Using default value '20'.")
+            self.merchant_id = '20'  # Default value if not set
         self.db_params = {
             'dbname': self.config.DB_NAME,
             'user': self.config.DB_USER,
@@ -999,7 +999,7 @@ class DataManager:
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', '18')
+                    merchant_id = getattr(self.config, 'MERCHANT_ID', '20')
                     query = """
                         SELECT 
                             merchant_details_id, user_id, user_name, phone_number, source,
@@ -1029,7 +1029,7 @@ class DataManager:
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', '18')
+                    merchant_id = getattr(self.config, 'MERCHANT_ID', '2')
                     query = """
                         SELECT 
                             merchant_details_id, user_id, user_name, phone_number, source,
@@ -1057,7 +1057,7 @@ class DataManager:
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', '18')
+                    merchant_id = getattr(self.config, 'MERCHANT_ID', '20')
                     cutoff_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours_ago)
                     
                     query = """
