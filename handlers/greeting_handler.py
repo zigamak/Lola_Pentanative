@@ -1,8 +1,15 @@
 from .base_handler import BaseHandler
 import logging
 from typing import Dict, Any, List, Optional
+import sys
 
+# Configure logging with UTF-8 encoding to fix the UnicodeEncodeError
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(stream=sys.stdout)
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+handler.stream.reconfigure(encoding='utf-8')
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 class GreetingHandler(BaseHandler):
     """Handles greeting and main menu interactions, including new user onboarding and customized menus for paid users."""
@@ -42,13 +49,16 @@ class GreetingHandler(BaseHandler):
 
     def _has_user_made_payment(self, session_id: str) -> bool:
         """
-        Check if the user has made a payment using SessionManager's paid status.
+        Checks if the user has made a payment by looking at the session state.
+        A user is considered 'paid' if they have a non-null order ID or payment reference.
+        This adapts the logic to the new SessionManager's state-centric approach.
         """
         try:
-            is_paid = self.session_manager.is_paid_user_session(session_id)
-            if is_paid:
-                self.logger.info(f"Session {session_id}: User has an active paid session.")
-            return is_paid
+            session_state = self.session_manager.get_session_state(session_id)
+            has_paid = session_state.get("payment_reference") is not None or session_state.get("order_id") is not None
+            if has_paid:
+                self.logger.info(f"Session {session_id}: User has a paid session.")
+            return has_paid
         except Exception as e:
             self.logger.error(f"Error checking payment status for session {session_id}: {e}")
             return False
@@ -69,7 +79,7 @@ class GreetingHandler(BaseHandler):
             return self.send_main_menu_paid(
                 session_id,
                 user_name,
-                "No orders found. What would you like to do?"
+                "No orders found."
             )
 
         status = order.get("status", "unknown").lower()
@@ -87,7 +97,7 @@ class GreetingHandler(BaseHandler):
         return self.send_main_menu_paid(
             session_id,
             user_name,
-            f"{message}\n\nWhat would you like to do?"
+            f"{message}"
         )
 
     def _handle_order_again(self, state: Dict, session_id: str) -> Dict[str, Any]:
@@ -99,8 +109,8 @@ class GreetingHandler(BaseHandler):
         return {"redirect": "ai_handler", "redirect_message": "start_ai_bulk_order"}
 
     def _handle_ai_bulk_order_direct(self, state: Dict, session_id: str) -> Dict[str, Any]:
-        """Handle direct AI Bulk Order entry from main menu (Let Lola Order)."""
-        self.logger.info(f"Session {session_id} redirecting to AIHandler for AI Bulk Order (Let Lola Order).")
+        """Handle direct AI Bulk Order entry from main menu (Make an Order)."""
+        self.logger.info(f"Session {session_id} redirecting to AIHandler for AI Bulk Order (Make an Order).")
         state["current_state"] = "ai_bulk_order"
         state["current_handler"] = "ai_handler"
         self.session_manager.update_session_state(session_id, state)
@@ -133,7 +143,7 @@ class GreetingHandler(BaseHandler):
         return self.send_main_menu(
             session_id,
             user_name,
-            f"Invalid option, {user_name}. Please choose from the options below:"
+            f"Invalid option, {user_name}."
         )
 
     def _handle_invalid_option_paid(self, state: Dict, session_id: str, message_received: str) -> Dict[str, Any]:
@@ -144,7 +154,7 @@ class GreetingHandler(BaseHandler):
         return self.send_main_menu_paid(
             session_id,
             user_name,
-            f"Invalid option, {user_name}. Please choose from the options below:"
+            f"Invalid option, {user_name}."
         )
 
     def generate_initial_greeting(self, state: Dict, session_id: str, user_name: Optional[str] = None) -> Dict[str, Any]:
@@ -175,12 +185,12 @@ class GreetingHandler(BaseHandler):
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
-
-            message = f"Hello {username}!\nWelcome to Ganador Express!\n🍱🥘🍛 🎉\nMy name is Lola👩‍🦱 what would you like to do."
+            
+            # Use the new dynamic greeting with the capitalized username
             if self._has_user_made_payment(session_id):
-                return self._send_greeting_with_image(session_id, username, "paid", message)
+                return self._send_greeting_with_image(session_id, username, "paid")
             else:
-                return self._send_greeting_with_image(session_id, username, "guest", message)
+                return self._send_greeting_with_image(session_id, username, "guest")
 
     def handle_collect_preferred_name_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """
@@ -210,7 +220,7 @@ class GreetingHandler(BaseHandler):
 
         return self.whatsapp_service.create_text_message(
             session_id,
-            f"Thanks, {preferred_name}! Now, please enter your delivery address."
+            f"Thanks, {preferred_name.capitalize()}! Now, please enter your delivery address."
         )
 
     def handle_collect_delivery_address_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
@@ -241,37 +251,35 @@ class GreetingHandler(BaseHandler):
         username = state.get("user_name", "Guest")
         self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
 
-        message = f"Hello {username}!\nWelcome to Ganador Express!\n🍱🥘🍛 🎉\nMy name is Lola👩‍🦱 what would you like to do."
+        # Use the new dynamic greeting with the capitalized username
         if self._has_user_made_payment(session_id):
-            return self._send_greeting_with_image(session_id, username, "paid", message)
+            return self._send_greeting_with_image(session_id, username, "paid")
         else:
-            return self._send_greeting_with_image(session_id, username, "guest", message)
+            return self._send_greeting_with_image(session_id, username, "guest")
 
-    def send_main_menu(self, session_id: str, user_name: str, message: str = "How can I help you today?") -> Dict[str, Any]:
+    def send_main_menu(self, session_id: str, user_name: str, message: str = "") -> Dict[str, Any]:
         """Send main menu with buttons for non-paid users (max 3 buttons for WhatsApp)."""
-        greeting = f"{message}"
-
         buttons = [
-            {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Let Lola Order"}},
+            {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
             {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
             {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
         ]
+        
+        # Use the new send_button_message method without additional text
+        return self.whatsapp_service.send_button_message(session_id, "", buttons)
 
-        return self.whatsapp_service.create_button_message(session_id, greeting, buttons)
-
-    def send_main_menu_paid(self, session_id: str, user_name: str, message: str = "How can I help you today?") -> Dict[str, Any]:
+    def send_main_menu_paid(self, session_id: str, user_name: str, message: str = "") -> Dict[str, Any]:
         """Send main menu with buttons for paid users (max 3 buttons for WhatsApp)."""
-        greeting = f"{message}"
-
         buttons = [
             {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
             {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
             {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
         ]
+        
+        # Use the new send_button_message method without additional text
+        return self.whatsapp_service.send_button_message(session_id, "", buttons)
 
-        return self.whatsapp_service.create_button_message(session_id, greeting, buttons)
-
-    def handle_back_to_main(self, state: Dict, session_id: str, message: str = "Welcome back! How can I help you today?") -> Dict[str, Any]:
+    def handle_back_to_main(self, state: Dict, session_id: str, message: str = "") -> Dict[str, Any]:
         """Handle back to main menu navigation."""
         user_data = self.data_manager.get_user_data(session_id)
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
@@ -287,28 +295,49 @@ class GreetingHandler(BaseHandler):
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
 
-        message = f"Hello {user_name}!\nWelcome to Ganador Express!\n🍱🥘🍛 🎉\nMy name is Lola👩‍🦱 what would you like to do."
+        # Use the new dynamic greeting with the capitalized username
         if self._has_user_made_payment(session_id):
-            return self._send_greeting_with_image(session_id, user_name, "paid", message)
+            return self._send_greeting_with_image(session_id, user_name, "paid")
         else:
-            return self._send_greeting_with_image(session_id, user_name, "guest", message)
+            return self._send_greeting_with_image(session_id, user_name, "guest")
 
-
-    def _send_greeting_with_image(self, session_id: str, user_name: str, user_type: str, text_message: str) -> Dict[str, Any]:
+    def _send_greeting_with_image(self, session_id: str, user_name: str, user_type: str) -> Dict[str, Any]:
         """
         Sends a greeting message along with a contextual image and menu buttons.
+        The message text is now dynamically generated within this method.
         """
-        image_url = "https://eventio.africa/wp-content/uploads/2025/08/LOLA-3.jpg" if user_type == "guest" else "https://eventio.africa/wp-content/uploads/2025/08/LOLA-4.jpg"
-
-        response = self.whatsapp_service.create_image_message(
-            session_id,
-            image_url,
-            caption=text_message
+        image_url = "https://eventio.africa/wp-content/uploads/2025/08/img.jpg"
+        
+        # Construct the dynamic message with a capitalized username
+        greeting_text = (
+            f"Hello {user_name.capitalize()}!\n"
+            "Welcome to Ganador Express!\n�🥘🍛 🎉\n"
+            "My name is Lola👩‍🦱 \n\n"
+            "What would you like to do?"
         )
-        # Append the main menu buttons to the response
-        if user_type == "paid":
-            response.update(self.send_main_menu_paid(session_id, user_name, "How can I help you today?"))
-        else:
-            response.update(self.send_main_menu(session_id, user_name, "How can I help you today?"))
 
-        return response
+        # Correctly use the new WhatsAppService method to send both the image and the buttons
+        if user_type == "paid":
+            buttons = [
+                {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            ]
+            return self.whatsapp_service.send_image_with_buttons(
+                session_id,
+                image_url,
+                greeting_text,
+                buttons
+            )
+        else:
+            buttons = [
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
+                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            ]
+            return self.whatsapp_service.send_image_with_buttons(
+                session_id,
+                image_url,
+                greeting_text,
+                buttons
+            )
