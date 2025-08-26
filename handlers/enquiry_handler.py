@@ -9,6 +9,14 @@ logger = logging.getLogger(__name__)
 class EnquiryHandler(BaseHandler):
     """Handles enquiry-related interactions, including FAQ navigation and question submission."""
     
+    def __init__(self, config, session_manager, data_manager, whatsapp_service):
+        super().__init__(config, session_manager, data_manager, whatsapp_service)
+        self.merchant_phone_number = getattr(config, 'MERCHANT_PHONE_NUMBER', None)
+        if not self.merchant_phone_number:
+            logger.warning("MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped")
+        else:
+            logger.info(f"EnquiryHandler initialized with merchant phone {self.merchant_phone_number}")
+
     def handle(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict[str, Any]:
         """
         Top-level handler for enquiry-related states and redirects.
@@ -73,7 +81,7 @@ class EnquiryHandler(BaseHandler):
             )
     
     def handle_enquiry_state(self, state: Dict, original_message: str, session_id: str) -> Dict[str, Any]:
-        """Handle enquiry submission and return to main menu."""
+        """Handle enquiry submission, notify merchant, and return to main menu."""
         try:
             enquiry_text = original_message.strip()
             if not enquiry_text:
@@ -83,16 +91,21 @@ class EnquiryHandler(BaseHandler):
                     "It looks like you didn't enter a question. Please type your question or select 'Back' to return to the main menu."
                 )
             
+            user_data = self.data_manager.get_user_data(session_id)
+            user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
+            phone_number = user_data.get("phone_number", session_id) if user_data else session_id
+            
             enquiry_data = {
-                "user_name": state.get("user_name", "Guest"),
+                "user_name": user_name,
                 "user_id": session_id,
+                "phone_number": phone_number,
                 "enquiry_text": enquiry_text,
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "enquiry_categories": self._assess_enquiry_priority(enquiry_text), # Using priority as category
+                "timestamp": datetime.datetime.now(datetime.timezone.utc),
+                "enquiry_categories": self._assess_enquiry_priority(enquiry_text),
                 "channel": "whatsapp"
             }
             
-            # The data_manager.save_enquiry method returns the refId on success, or None on failure.
+            # Save the enquiry and get the refId
             enquiry_id = self.data_manager.save_enquiry(enquiry_data)
             
             if enquiry_id is None:
@@ -102,17 +115,32 @@ class EnquiryHandler(BaseHandler):
                     "⚠️ Sorry, there was an issue saving your enquiry. Please try again or contact support."
                 )
             
-            self.logger.info(f"Session {session_id}: Enquiry with ID {enquiry_id} saved successfully.")
+            self.logger.info(f"Session {session_id}: Enquiry with ID {enquiry_id} saved for user {user_name} (phone: {phone_number}) with text: {enquiry_text[:50]}{'...' if len(enquiry_text) > 50 else ''}")
+            
+            # Send merchant notification
+            if self.merchant_phone_number:
+                merchant_message = (
+                    f"🔔 *New Enquiry Alert*\n\n"
+                    f"📋 *Enquiry ID:* {enquiry_id}\n"
+                    f"👤 *Customer Name:* {user_name}\n"
+                    f"📞 *Customer Phone:* {phone_number}\n"
+                    f"❓ *Enquiry:* {enquiry_text[:100]}{'...' if len(enquiry_text) > 100 else ''}\n"
+                    f"⚠️ *Priority:* {enquiry_data['enquiry_categories'].capitalize()}\n"
+                    f"⏰ *Timestamp:* {enquiry_data['timestamp'].strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+                    f"Please review and respond within 24 hours."
+                )
+                self.whatsapp_service.create_text_message(self.merchant_phone_number, merchant_message)
+                self.logger.info(f"Sent merchant notification for enquiry {enquiry_id} to {self.merchant_phone_number}")
+            else:
+                self.logger.warning(f"Merchant phone number not configured, skipping notification for enquiry {enquiry_id}")
             
             # Reset session state to greeting
-            user_data = self.data_manager.get_user_data(session_id)
-            user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             
             # Prepare confirmation message
             confirmation_message = (
-                f"✅ Thank you for your enquiry!\n\n"
+                f"✅ Thank you for your enquiry, {user_name}!\n\n"
                 f"*Enquiry ID:* {enquiry_id}\n\n"
                 f"We've received your question: \"{enquiry_text[:50]}{'...' if len(enquiry_text) > 50 else ''}\"\n\n"
                 f"Our team will respond within 24 hours. "
@@ -124,6 +152,22 @@ class EnquiryHandler(BaseHandler):
         
         except Exception as e:
             self.logger.error(f"Session {session_id}: Error handling enquiry submission: {e}", exc_info=True)
+            
+            # Send fallback merchant notification if possible
+            if self.merchant_phone_number:
+                fallback_message = (
+                    f"⚠️ *New Enquiry Alert (Fallback)*\n\n"
+                    f"📋 *Enquiry ID:* {enquiry_id if 'enquiry_id' in locals() else 'N/A'}\n"
+                    f"👤 *Customer Name:* {user_name if 'user_name' in locals() else 'Guest'}\n"
+                    f"📞 *Customer Phone:* {phone_number if 'phone_number' in locals() else session_id}\n"
+                    f"❓ *Enquiry:* {enquiry_text[:100] if 'enquiry_text' in locals() else 'N/A'}{'...' if 'enquiry_text' in locals() and len(enquiry_text) > 100 else ''}\n"
+                    f"⚠️ *Priority:* {enquiry_data['enquiry_categories'].capitalize() if 'enquiry_data' in locals() else 'N/A'}\n"
+                    f"⏰ *Timestamp:* {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+                    f"Please review and respond within 24 hours."
+                )
+                self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
+                self.logger.info(f"Sent fallback merchant notification for enquiry {enquiry_id if 'enquiry_id' in locals() else 'N/A'} to {self.merchant_phone_number}")
+            
             return self.whatsapp_service.create_text_message(
                 session_id,
                 "⚠️ An error occurred while processing your enquiry. Please try again or contact support."

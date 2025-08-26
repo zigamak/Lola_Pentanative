@@ -210,10 +210,11 @@ class WhatsAppService:
             logger.error("Error sending image message for %s: %s", to, e, exc_info=True)
             return None
 
-    def send_image_with_buttons(self, to: str, image_url: str, text: str, buttons: List[Dict]) -> Optional[Dict]:
+    def send_image_with_buttons(self, to: str, image_url: str, text: str, buttons: List[Dict], button_prompt: str = "") -> Optional[Dict]:
         """
         Sends an image message followed by a button message.
-        This is the correct way to send both an image and a menu to the user.
+        The image message uses the provided text as the caption.
+        The button message uses button_prompt if provided, otherwise falls back to text.
         """
         try:
             # 1. Send the image message
@@ -224,14 +225,15 @@ class WhatsAppService:
                 logger.error(f"Failed to send image to {to}. Aborting button message.")
                 return None
 
-            # 3. Send the button message
-            return self.send_button_message(to, text, buttons)
+            # 3. Send the button message with button_prompt or fallback to text
+            button_text = button_prompt if button_prompt else text
+            return self.send_button_message(to, button_text, buttons)
             
         except Exception as e:
             logger.error("Error sending image with buttons for %s: %s", to, e, exc_info=True)
             # Fallback to a simple text message in case of failure
             return self.create_text_message(to, text)
-    
+
     def send_timeout_message(self, session_id: str) -> Optional[Dict]:
         """Send timeout message to user."""
         try:

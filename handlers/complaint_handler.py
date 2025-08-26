@@ -10,11 +10,17 @@ class ComplaintHandler(BaseHandler):
     """
     Handles complaint-related interactions, including submission and state reset to main menu.
     This version is updated to work with the `whatsapp_complaint_details` table schema.
+    Sends merchant notifications for new complaints.
     """
     
     def __init__(self, config, session_manager, data_manager, whatsapp_service):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
-    
+        self.merchant_phone_number = getattr(config, 'MERCHANT_PHONE_NUMBER', None)
+        if not self.merchant_phone_number:
+            logger.warning("MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped")
+        else:
+            logger.info(f"ComplaintHandler initialized with merchant phone {self.merchant_phone_number}")
+
     def handle(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict[str, Any]:
         """
         Top-level handler for complaint-related states.
@@ -47,7 +53,7 @@ class ComplaintHandler(BaseHandler):
     def handle_complaint_state(self, state: Dict, original_message: str, session_id: str) -> Dict[str, Any]:
         """
         Handles the 'complain' state where the user provides their complaint.
-        Saves the complaint to the database and returns to the main menu.
+        Saves the complaint to the database, notifies the merchant, and returns to the main menu.
         """
         try:
             complaint_text = original_message.strip()
@@ -75,7 +81,7 @@ class ComplaintHandler(BaseHandler):
                 "user_name": user_name,
                 "user_id": session_id,  # Corresponds to the user_id column
                 "phone_number": phone_number,
-                "complaint_categories": json.dumps(["General"]), # JSONB column requires JSON string
+                "complaint_categories": json.dumps(["General"]),  # JSONB column requires JSON string
                 "complaint_text": complaint_text,
                 "timestamp": datetime.datetime.now(datetime.timezone.utc),
                 "channel": "whatsapp",
@@ -94,6 +100,24 @@ class ComplaintHandler(BaseHandler):
             
             self.logger.info(f"Session {session_id}: Complaint {ref_id} saved for user {user_name} (phone: {phone_number}) with text: {complaint_text[:50]}{'...' if len(complaint_text) > 50 else ''}")
             
+            # Send merchant notification
+            if self.merchant_phone_number:
+                merchant_message = (
+                    f"🔔 *New Complaint Alert*\n\n"
+                    f"📋 *Complaint ID:* {ref_id}\n"
+                    f"👤 *Customer Name:* {user_name}\n"
+                    f"📞 *Customer Phone:* {phone_number}\n"
+                    f"📝 *Complaint:* {complaint_text[:100]}{'...' if len(complaint_text) > 100 else ''}\n"
+                    f"⚠️ *Priority:* {priority.capitalize()}\n"
+                    f"📌 *Status:* {status.capitalize()}\n"
+                    f"⏰ *Timestamp:* {complaint_data['timestamp'].strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+                    f"Please review and respond within 24 hours."
+                )
+                self.whatsapp_service.create_text_message(self.merchant_phone_number, merchant_message)
+                self.logger.info(f"Sent merchant notification for complaint {ref_id} to {self.merchant_phone_number}")
+            else:
+                self.logger.warning(f"Merchant phone number not configured, skipping notification for complaint {ref_id}")
+            
             # Reset session state to greeting
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
@@ -111,6 +135,23 @@ class ComplaintHandler(BaseHandler):
         
         except Exception as e:
             self.logger.error(f"Session {session_id}: Error handling complaint submission: {e}", exc_info=True)
+            
+            # Send fallback merchant notification if primary fails and merchant_phone_number is configured
+            if self.merchant_phone_number:
+                fallback_message = (
+                    f"⚠️ *New Complaint Alert (Fallback)*\n\n"
+                    f"📋 *Complaint ID:* {ref_id if 'ref_id' in locals() else 'N/A'}\n"
+                    f"👤 *Customer Name:* {user_name}\n"
+                    f"📞 *Customer Phone:* {phone_number}\n"
+                    f"📝 *Complaint:* {complaint_text[:100]}{'...' if len(complaint_text) > 100 else ''}\n"
+                    f"⚠️ *Priority:* {priority.capitalize() if 'priority' in locals() else 'N/A'}\n"
+                    f"📌 *Status:* {status.capitalize() if 'status' in locals() else 'N/A'}\n"
+                    f"⏰ *Timestamp:* {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+                    f"Please review and respond within 24 hours."
+                )
+                self.whatsapp_service.create_text_message(self.merchant_phone_number, fallback_message)
+                self.logger.info(f"Sent fallback merchant notification for complaint {ref_id if 'ref_id' in locals() else 'N/A'} to {self.merchant_phone_number}")
+            
             return self.whatsapp_service.create_text_message(
                 session_id,
                 "⚠️ An error occurred while processing your complaint. Please try again or contact support."
@@ -127,7 +168,7 @@ class ComplaintHandler(BaseHandler):
         if any(keyword in complaint_lower for keyword in urgent_keywords):
             self.logger.debug(f"Complaint contains urgent keywords: {complaint_lower}")
             return "high"
-        return "medium" # Changed default to 'medium' to align with schema
+        return "medium"
     
     def _handle_invalid_state(self, state: Dict, session_id: str) -> Dict[str, Any]:
         """Handle invalid or unexpected states."""

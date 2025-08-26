@@ -1,4 +1,3 @@
-#Order Handler
 import datetime
 import logging
 import uuid
@@ -356,7 +355,10 @@ class OrderHandler(BaseHandler):
                 state["current_handler"] = "location_handler"
                 state["from_confirm_details"] = True  # Flag to return to confirm_details
                 self.session_manager.update_session_state(session_id, state)
-                return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+                return {
+                    "redirect": "location_handler",
+                    "redirect_message": "initiate_address_collection"
+                }
             else:
                 state["from_ai_order"] = True
                 state["current_state"] = "prompt_add_note"
@@ -390,7 +392,10 @@ class OrderHandler(BaseHandler):
                 state["current_handler"] = "location_handler"
                 state["from_confirm_details"] = True  # Flag to return to confirm_details
                 self.session_manager.update_session_state(session_id, state)
-                return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+                return {
+                    "redirect": "location_handler",
+                    "redirect_message": "initiate_address_collection"
+                }
             else:
                 user_data_to_save = {
                     "name": state.get("user_name", "Guest"),
@@ -429,7 +434,10 @@ class OrderHandler(BaseHandler):
             state["current_handler"] = "location_handler"
             state["from_confirm_details"] = True  # Flag to return to confirm_details
             self.session_manager.update_session_state(session_id, state)
-            return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+            return {
+                "redirect": "location_handler",
+                "redirect_message": "initiate_address_collection"
+            }
         else:
             logger.debug(f"Invalid input '{message}' in confirm details state for session {session_id}. Re-presenting details prompt.")
             buttons = [
@@ -480,7 +488,7 @@ class OrderHandler(BaseHandler):
             )
 
     def _show_order_confirmation(self, state: Dict, session_id: str) -> Dict:
-        """Show final order confirmation with cart details and payment options."""
+        """Show final order confirmation with cart details, delivery fee, service charge, and payment options."""
         try:
             cart = state.get("cart", {})
             if not cart:
@@ -492,6 +500,10 @@ class OrderHandler(BaseHandler):
                     session_id,
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
+            
+            # Define delivery fee and service charge
+            delivery_fee = 500.00  # Example flat delivery fee
+            service_charge = 200.00  # Example flat service charge
             
             total_amount = 0
             order_details = "🛒 *Final Order Confirmation*\n\n"
@@ -505,6 +517,9 @@ class OrderHandler(BaseHandler):
                 order_details += f"• {quantity}x {item_name} - ₦{total_price:,.2f}\n"
                 total_amount += total_price
             
+            # Add delivery fee and service charge to total
+            total_amount += delivery_fee + service_charge
+            
             user_data = self.data_manager.get_user_data(session_id)
             user_name = user_data.get("display_name", state.get("user_name", "Guest")) if user_data else state.get("user_name", "Guest")
             phone_number = user_data.get("phone_number", session_id) if user_data else session_id
@@ -515,8 +530,11 @@ class OrderHandler(BaseHandler):
             order_details += f"📱 Phone: {phone_number}\n"
             order_details += f"🏠 Address: {address}\n"
             order_details += f"📝 Note: {state.get('order_note', 'None')}\n"
-            order_details += f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
-            order_details += "Please confirm to proceed with payment via Paystack or update your address."
+            order_details += f"\n💰 *Cost Breakdown:*\n"
+            order_details += f"Subtotal: ₦{total_amount - delivery_fee - service_charge:,.2f}\n"
+            order_details += f"Delivery Fee: ₦{delivery_fee:,.2f}\n"
+            order_details += f"Service Charge: ₦{service_charge:,.2f}\n"
+            order_details += f"Total Amount: ₦{total_amount:,.2f}\n\n"
             
             buttons = [
                 {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},
@@ -524,13 +542,50 @@ class OrderHandler(BaseHandler):
                 {"type": "reply", "reply": {"id": "cancel_order", "title": "❌ Cancel Order"}}
             ]
             
-            logger.info(f"Showing final order confirmation for session {session_id}. Total: ₦{total_amount:,.2f}")
-            
-            return self.whatsapp_service.create_button_message(
-                session_id,
-                order_details,
-                buttons
-            )
+            # Check if message length exceeds WhatsApp's limit (4096 characters)
+            MAX_MESSAGE_LENGTH = 4096
+            if len(order_details) > MAX_MESSAGE_LENGTH - 100:  # Reserve space for buttons
+                # Split into main message and follow-up
+                main_message = "🛒 *Final Order Confirmation*\n\n"
+                main_message += "📋 *Items Ordered:*\n"
+                for item_name, item_data in cart.items():
+                    quantity = item_data.get("quantity", 1)
+                    price = item_data.get("price", 0.0)
+                    total_price = item_data.get("total_price", quantity * price)
+                    main_message += f"• {quantity}x {item_name} - ₦{total_price:,.2f}\n"
+                
+                main_message += f"\n💰 *Cost Breakdown:*\n"
+                main_message += f"Subtotal: ₦{total_amount - delivery_fee - service_charge:,.2f}\n"
+                main_message += f"Delivery Fee: ₦{delivery_fee:,.2f}\n"
+                main_message += f"Service Charge: ₦{service_charge:,.2f}\n"
+                main_message += f"Total Amount: ₦{total_amount:,.2f}\n\n"
+                main_message += "Please wait for delivery details and options..."
+
+                # Send main message first
+                self.whatsapp_service.create_text_message(session_id, main_message)
+                
+                # Send delivery details and buttons as follow-up
+                delivery_message = f"📍 *Delivery Details:*\n"
+                delivery_message += f"👤 Name: {user_name}\n"
+                delivery_message += f"📱 Phone: {phone_number}\n"
+                delivery_message += f"🏠 Address: {address}\n"
+                delivery_message += f"📝 Note: {state.get('order_note', 'None')}\n\n"
+                delivery_message += "Please confirm to proceed with payment via Paystack or update your address."
+                
+                logger.info(f"Showing split order confirmation for session {session_id}. Total: ₦{total_amount:,.2f}")
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    delivery_message,
+                    buttons
+                )
+            else:
+                order_details += "Please confirm to proceed with payment via Paystack or update your address."
+                logger.info(f"Showing final order confirmation for session {session_id}. Total: ₦{total_amount:,.2f}")
+                return self.whatsapp_service.create_button_message(
+                    session_id,
+                    order_details,
+                    buttons
+                )
             
         except Exception as e:
             logger.error(f"Error showing order confirmation for session {session_id}: {e}", exc_info=True)
@@ -539,7 +594,8 @@ class OrderHandler(BaseHandler):
                 "❌ Sorry, there was an error processing your order confirmation. Please try again or contact support."
             )
 
-    
+        
+        
     def handle_confirm_order_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle the final order confirmation state."""
         logger.debug(f"Handling confirm order state for session {session_id}, message: {message}")
@@ -567,10 +623,13 @@ class OrderHandler(BaseHandler):
                     "❌ Sorry, there was an error processing your order due to an invalid session. Please try again or contact support."
                 )
             
+            # Calculate total including fees
+            delivery_fee = 500.00  # Example flat delivery fee
+            service_charge = 200.00  # Example flat service charge
             total_amount = sum(
                 item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
                 for item_data in cart.values()
-            )
+            ) + delivery_fee + service_charge
             
             user_data = self.data_manager.get_user_data(session_id)
             user_name = user_data.get("display_name", state.get("user_name", "Guest")) if user_data else state.get("user_name", "Guest")
@@ -606,6 +665,8 @@ class OrderHandler(BaseHandler):
                 "address": address,
                 "status": "pending_payment",
                 "total_amount": total_amount,
+                "delivery_fee": delivery_fee,
+                "service_charge": service_charge,
                 "payment_reference": f"TEMP-{uuid.uuid4().hex[:8]}",
                 "payment_method_type": "paystack",
                 "timestamp": datetime.datetime.now(datetime.timezone.utc),
@@ -622,6 +683,8 @@ class OrderHandler(BaseHandler):
                 logger.info(f"Order {order_id} saved to database for session {session_id}")
                 state["order_id"] = str(order_id)
                 state["total_amount"] = total_amount
+                state["delivery_fee"] = delivery_fee
+                state["service_charge"] = service_charge
                 state["order_status"] = "pending_payment"
                 state["order_timestamp"] = order_data["timestamp"].isoformat()
                 
@@ -698,10 +761,8 @@ class OrderHandler(BaseHandler):
         
         else:
             logger.debug(f"Invalid input '{message}' in confirm order state for session {session_id}.")
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "Please select 'Confirm & Pay', 'Update Address', 'Add Note', or 'Cancel Order'."
-            )
+            # Re-show the order confirmation if invalid input
+            return self._show_order_confirmation(state, session_id)
 
     def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle user providing new name and address via LocationAddressHandler."""

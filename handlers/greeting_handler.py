@@ -186,7 +186,6 @@ class GreetingHandler(BaseHandler):
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
             
-            # Use the new dynamic greeting with the capitalized username
             if self._has_user_made_payment(session_id):
                 return self._send_greeting_with_image(session_id, username, "paid")
             else:
@@ -208,7 +207,6 @@ class GreetingHandler(BaseHandler):
         user_data = self.data_manager.get_user_data(session_id) or {}
         user_data["user_perferred_name"] = preferred_name
         user_data["display_name"] = preferred_name
-
         user_data["user_id"] = session_id
         user_data["user_number"] = session_id
         self.data_manager.save_user_details(session_id, user_data)
@@ -238,7 +236,6 @@ class GreetingHandler(BaseHandler):
 
         user_data = self.data_manager.get_user_data(session_id) or {}
         user_data["address"] = delivery_address
-
         user_data["user_id"] = session_id
         user_data["user_number"] = session_id
         self.data_manager.save_user_details(session_id, user_data)
@@ -251,7 +248,6 @@ class GreetingHandler(BaseHandler):
         username = state.get("user_name", "Guest")
         self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
 
-        # Use the new dynamic greeting with the capitalized username
         if self._has_user_made_payment(session_id):
             return self._send_greeting_with_image(session_id, username, "paid")
         else:
@@ -262,11 +258,10 @@ class GreetingHandler(BaseHandler):
         buttons = [
             {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
             {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-            {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+            {"type": "reply", "replace": {"id": "complain", "title": "📝 Complain"}}
         ]
         
-        # Use the new send_button_message method without additional text
-        return self.whatsapp_service.send_button_message(session_id, "", buttons)
+        return self.whatsapp_service.send_button_message(session_id, message or "What would you like to do?", buttons)
 
     def send_main_menu_paid(self, session_id: str, user_name: str, message: str = "") -> Dict[str, Any]:
         """Send main menu with buttons for paid users (max 3 buttons for WhatsApp)."""
@@ -276,8 +271,7 @@ class GreetingHandler(BaseHandler):
             {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
         ]
         
-        # Use the new send_button_message method without additional text
-        return self.whatsapp_service.send_button_message(session_id, "", buttons)
+        return self.whatsapp_service.send_button_message(session_id, message or "What would you like to do?", buttons)
 
     def handle_back_to_main(self, state: Dict, session_id: str, message: str = "") -> Dict[str, Any]:
         """Handle back to main menu navigation."""
@@ -295,7 +289,6 @@ class GreetingHandler(BaseHandler):
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
 
-        # Use the new dynamic greeting with the capitalized username
         if self._has_user_made_payment(session_id):
             return self._send_greeting_with_image(session_id, user_name, "paid")
         else:
@@ -303,41 +296,39 @@ class GreetingHandler(BaseHandler):
 
     def _send_greeting_with_image(self, session_id: str, user_name: str, user_type: str) -> Dict[str, Any]:
         """
-        Sends a greeting message along with a contextual image and menu buttons.
-        The message text is now dynamically generated within this method.
+        Sends a greeting message with an image, followed by a button message with a prompt.
         """
         image_url = "https://eventio.africa/wp-content/uploads/2025/08/img.jpg"
         
-        # Construct the dynamic message with a capitalized username
+        # Greeting text for the image caption
         greeting_text = (
             f"Hello {user_name.capitalize()}!\n"
-            "Welcome to Ganador Express!\n�🥘🍛 🎉\n"
-            "My name is Lola👩‍🦱 \n\n"
-            "What would you like to do?"
+            "Welcome to Ganador Express!\n🥘🍛 🎉\n"
+            "My name is Lola👩‍🦱"
         )
 
-        # Correctly use the new WhatsAppService method to send both the image and the buttons
+        # Prompt text for the button message
+        button_prompt = "What would you like to do?"
+
+        # Define buttons based on user type
         if user_type == "paid":
             buttons = [
                 {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
                 {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
-            return self.whatsapp_service.send_image_with_buttons(
-                session_id,
-                image_url,
-                greeting_text,
-                buttons
-            )
         else:
             buttons = [
                 {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
-            return self.whatsapp_service.send_image_with_buttons(
-                session_id,
-                image_url,
-                greeting_text,
-                buttons
-            )
+
+        # Send image with greeting and buttons with prompt
+        return self.whatsapp_service.send_image_with_buttons(
+            session_id,
+            image_url,
+            greeting_text,
+            buttons,
+            button_prompt
+        )
