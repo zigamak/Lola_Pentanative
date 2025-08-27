@@ -173,10 +173,7 @@ class GreetingHandler(BaseHandler):
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
 
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                f"Hello {username_display}, welcome to Lola!\nPlease enter your preferred name."
-            )
+            return self._send_greeting_with_image(session_id, username_display, "onboarding")
         else:
             username = user_data.get("display_name", "Guest")
             state["user_name"] = username
@@ -298,20 +295,35 @@ class GreetingHandler(BaseHandler):
         """
         Sends a greeting message with an image, followed by a button message with a prompt.
         """
+        # Determine the image URL based on user type
         image_url = "https://eventio.africa/wp-content/uploads/2025/08/img.jpg"
-        
+        if user_type == "onboarding":
+            image_url = "https://eventio.africa/wp-content/uploads/2025/08/lola-1.jpg"
+
         # Greeting text for the image caption
-        greeting_text = (
-            f"Hello {user_name.capitalize()}!\n"
-            "Welcome to Ganador Express!\n🥘🍛 🎉\n"
-            "My name is Lola👩‍🦱"
-        )
+        if user_type == "onboarding":
+            greeting_text = (
+                f"Hello {user_name.capitalize()}, welcome to Lola!\n"
+                "Please enter your preferred name."
+            )
+        else:
+            greeting_text = (
+                f"Hello {user_name.capitalize()}!\n"
+                "Welcome to Ganador Express!\n🥘🍛 🎉\n"
+                "My name is Lola👩‍🦱"
+            )
 
-        # Prompt text for the button message
+        # Prompt text for the button message (only for non-onboarding flows)
         button_prompt = "What would you like to do?"
+        buttons = []
 
-        # Define buttons based on user type
-        if user_type == "paid":
+        if user_type == "onboarding":
+            # For onboarding, we don't send buttons, just the image and text prompt
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                greeting_text
+            )
+        elif user_type == "paid":
             buttons = [
                 {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
                 {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},

@@ -8219,3 +8219,63 @@ TypeError: WhatsAppService.send_image_with_buttons() takes 5 positional argument
 2025-08-26 16:40:37,622 - werkzeug - INFO - 127.0.0.1 - - [26/Aug/2025 16:40:37] "POST /webhook HTTP/1.1" 200 -
 2025-08-26 16:40:38,150 - werkzeug - INFO - 127.0.0.1 - - [26/Aug/2025 16:40:38] "POST /webhook HTTP/1.1" 200 -
 2025-08-26 16:40:38,152 - werkzeug - INFO - 127.0.0.1 - - [26/Aug/2025 16:40:38] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:01:06,779 - __main__ - INFO - Starting WhatsApp bot server...
+2025-08-27 14:01:10,623 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-27 14:01:13,078 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-08-27 14:01:13,287 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-08-27 14:01:15,136 - utils.data_manager - INFO - Successfully loaded 54 user details from database
+2025-08-27 14:01:15,344 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-08-27 14:01:15,344 - services.payment_service - INFO - PaymentService initialized
+2025-08-27 14:01:16,925 - handlers.product_sync_handler - INFO - Successfully synced 17 products for merchant 20 to data\products.json
+2025-08-27 14:01:17,130 - app - INFO - Initial product sync successful on startup
+2025-08-27 14:01:17,131 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-08-27 14:01:17,131 - app - INFO - GreetingHandler and FeedbackHandler initialized.
+2025-08-27 14:01:17,132 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-08-27 14:01:17,132 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-08-27 14:01:17,143 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-08-27 14:01:18,732 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-08-27 14:01:18,943 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-08-27 14:01:20,704 - utils.data_manager - INFO - Successfully loaded 54 user details from database
+2025-08-27 14:01:20,903 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-08-27 14:01:20,903 - services.payment_service - INFO - PaymentService initialized
+2025-08-27 14:01:20,904 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-08-27 14:01:20,904 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-08-27 14:01:20,904 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-08-27 14:01:20,905 - handlers.enquiry_handler - INFO - EnquiryHandler initialized with merchant phone 2347082345056
+2025-08-27 14:01:20,906 - handlers.complaint_handler - INFO - ComplaintHandler initialized with merchant phone 2347082345056
+2025-08-27 14:01:20,907 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-08-27 14:01:20,907 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-08-27 14:01:20,907 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-08-27 14:01:21,813 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-08-27 14:01:21,814 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-08-27 14:01:21,814 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-08-27 14:01:21,814 - handlers.payment_handler - WARNING - FeedbackHandler not provided, feedback collection will be manual
+2025-08-27 14:01:21,815 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-08-27 14:01:21,852 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-08-27 14:01:21,853 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-27 14:05:20,275 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-08-27 14:05:20,276 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-08-27 14:05:21,922 - utils.data_manager - INFO - Retrieved lead by phone number 2348055614455 from whatsapp_leads
+2025-08-27 14:05:23,311 - utils.data_manager - DEBUG - Saving lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-08-26 14:00:28.590908+00:00, last_interaction=2025-08-27 13:05:22.101000+00:00, interaction_count=28, status=new_lead, has_added_to_cart=True, has_placed_order=False, total_cart_value=2150.0, conversion_stage=cart_added, final_order_value=0.0, converted_at=None
+2025-08-27 14:05:23,886 - utils.data_manager - INFO - Lead 2348055614455 saved to whatsapp_leads table
+2025-08-27 14:05:23,887 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455
+2025-08-27 14:05:25,433 - utils.data_manager - DEBUG - No address found in whatsapp_orders for phone number 2348055614455. Trying whatsapp_user_details.
+2025-08-27 14:05:25,637 - utils.data_manager - DEBUG - Found address 'Location: 6.5864785, 3.3744879' for phone number 2348055614455 in whatsapp_user_details
+2025-08-27 14:05:25,826 - handlers.message_processor - INFO - Session 2348055614455: Global escape keyword 'hello' detected. Resetting to greeting.
+2025-08-27 14:05:25,826 - utils.data_manager - DEBUG - Retrieved user data for 2348055614455: {'name': 'Ziga', 'phone_number': '2348055614455', 'address': 'Location: 6.5864785, 3.3744879', 'user_perferred_name': 'Ziga', 'address2': '', 'address3': '', 'display_name': 'Ziga'}
+2025-08-27 14:05:25,827 - handlers.base_handler - INFO - Session 2348055614455 returned to main menu (greeting state).
+2025-08-27 14:05:25,828 - services.whatsapp_service - DEBUG - Created image message payload for 2348055614455
+2025-08-27 14:05:27,712 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjRCMjUxODc3MDhDMTIwQUVGQgA="}]}
+2025-08-27 14:05:27,722 - services.whatsapp_service - DEBUG - Created button message payload for 2348055614455
+2025-08-27 14:05:28,811 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjBDODhBQzY4MzAwQzAwOTYwMgA="}]}
+2025-08-27 14:05:28,812 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjBDODhBQzY4MzAwQzAwOTYwMgA='}]}
+2025-08-27 14:05:28,814 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:28] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:30,702 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:30] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:31,171 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:31] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:31,265 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:31] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:31,594 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:31] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:31,872 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:31] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:31,955 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:31] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:36,088 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:36] "POST /webhook HTTP/1.1" 200 -
+2025-08-27 14:05:36,322 - werkzeug - INFO - 127.0.0.1 - - [27/Aug/2025 14:05:36] "POST /webhook HTTP/1.1" 200 -

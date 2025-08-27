@@ -10,6 +10,10 @@ logger = logging.getLogger(__name__)
 class OrderHandler(BaseHandler):
     """Handles order processing and cart management, integrated with DataManager for database operations."""
 
+    # Configurable charges
+    DELIVERY_FEE = 500.00  # Flat delivery fee
+    SERVICE_CHARGE_PERCENTAGE = 0.10  # 10% of subtotal
+
     def __init__(self, config, session_manager, data_manager, whatsapp_service, payment_service=None, location_service=None, lead_tracking_handler=None):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
         self.payment_service = payment_service
@@ -462,7 +466,7 @@ class OrderHandler(BaseHandler):
 
         if message_strip == "add_note":
             logger.info(f"User chose to add a note after confirmation for session {session_id}.")
-            state["current_state"] = "add_note"
+            state["current_state"] = added_note
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -488,7 +492,7 @@ class OrderHandler(BaseHandler):
             )
 
     def _show_order_confirmation(self, state: Dict, session_id: str) -> Dict:
-        """Show final order confirmation with cart details, delivery fee, service charge, and payment options."""
+        """Show final order confirmation with cart details, charges, and payment options."""
         try:
             cart = state.get("cart", {})
             if not cart:
@@ -501,11 +505,15 @@ class OrderHandler(BaseHandler):
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
             
-            # Define delivery fee and service charge
-            delivery_fee = 500.00  # Example flat delivery fee
-            service_charge = 200.00  # Example flat service charge
+            # Calculate charges
+            subtotal = sum(
+                item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
+                for item_data in cart.values()
+            )
+            service_charge = subtotal * self.SERVICE_CHARGE_PERCENTAGE
+            charges = self.DELIVERY_FEE + service_charge
+            total_amount = subtotal + charges
             
-            total_amount = 0
             order_details = "🛒 *Final Order Confirmation*\n\n"
             order_details += "📋 *Items Ordered:*\n"
             
@@ -515,10 +523,6 @@ class OrderHandler(BaseHandler):
                 total_price = item_data.get("total_price", quantity * price)
                 
                 order_details += f"• {quantity}x {item_name} - ₦{total_price:,.2f}\n"
-                total_amount += total_price
-            
-            # Add delivery fee and service charge to total
-            total_amount += delivery_fee + service_charge
             
             user_data = self.data_manager.get_user_data(session_id)
             user_name = user_data.get("display_name", state.get("user_name", "Guest")) if user_data else state.get("user_name", "Guest")
@@ -531,9 +535,8 @@ class OrderHandler(BaseHandler):
             order_details += f"🏠 Address: {address}\n"
             order_details += f"📝 Note: {state.get('order_note', 'None')}\n"
             order_details += f"\n💰 *Cost Breakdown:*\n"
-            order_details += f"Subtotal: ₦{total_amount - delivery_fee - service_charge:,.2f}\n"
-            order_details += f"Delivery Fee: ₦{delivery_fee:,.2f}\n"
-            order_details += f"Service Charge: ₦{service_charge:,.2f}\n"
+            order_details += f"Subtotal: ₦{subtotal:,.2f}\n"
+            order_details += f"Charges (Delivery + {self.SERVICE_CHARGE_PERCENTAGE*100:.0f}% Service): ₦{charges:,.2f}\n"
             order_details += f"Total Amount: ₦{total_amount:,.2f}\n\n"
             
             buttons = [
@@ -555,9 +558,8 @@ class OrderHandler(BaseHandler):
                     main_message += f"• {quantity}x {item_name} - ₦{total_price:,.2f}\n"
                 
                 main_message += f"\n💰 *Cost Breakdown:*\n"
-                main_message += f"Subtotal: ₦{total_amount - delivery_fee - service_charge:,.2f}\n"
-                main_message += f"Delivery Fee: ₦{delivery_fee:,.2f}\n"
-                main_message += f"Service Charge: ₦{service_charge:,.2f}\n"
+                main_message += f"Subtotal: ₦{subtotal:,.2f}\n"
+                main_message += f"Charges (Delivery + {self.SERVICE_CHARGE_PERCENTAGE*100:.0f}% Service): ₦{charges:,.2f}\n"
                 main_message += f"Total Amount: ₦{total_amount:,.2f}\n\n"
                 main_message += "Please wait for delivery details and options..."
 
@@ -594,8 +596,6 @@ class OrderHandler(BaseHandler):
                 "❌ Sorry, there was an error processing your order confirmation. Please try again or contact support."
             )
 
-        
-        
     def handle_confirm_order_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle the final order confirmation state."""
         logger.debug(f"Handling confirm order state for session {session_id}, message: {message}")
@@ -623,13 +623,14 @@ class OrderHandler(BaseHandler):
                     "❌ Sorry, there was an error processing your order due to an invalid session. Please try again or contact support."
                 )
             
-            # Calculate total including fees
-            delivery_fee = 500.00  # Example flat delivery fee
-            service_charge = 200.00  # Example flat service charge
-            total_amount = sum(
+            # Calculate total including charges
+            subtotal = sum(
                 item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
                 for item_data in cart.values()
-            ) + delivery_fee + service_charge
+            )
+            service_charge = subtotal * self.SERVICE_CHARGE_PERCENTAGE
+            charges = self.DELIVERY_FEE + service_charge
+            total_amount = subtotal + charges
             
             user_data = self.data_manager.get_user_data(session_id)
             user_name = user_data.get("display_name", state.get("user_name", "Guest")) if user_data else state.get("user_name", "Guest")
@@ -665,8 +666,7 @@ class OrderHandler(BaseHandler):
                 "address": address,
                 "status": "pending_payment",
                 "total_amount": total_amount,
-                "delivery_fee": delivery_fee,
-                "service_charge": service_charge,
+                "charges": charges,
                 "payment_reference": f"TEMP-{uuid.uuid4().hex[:8]}",
                 "payment_method_type": "paystack",
                 "timestamp": datetime.datetime.now(datetime.timezone.utc),
@@ -683,8 +683,7 @@ class OrderHandler(BaseHandler):
                 logger.info(f"Order {order_id} saved to database for session {session_id}")
                 state["order_id"] = str(order_id)
                 state["total_amount"] = total_amount
-                state["delivery_fee"] = delivery_fee
-                state["service_charge"] = service_charge
+                state["charges"] = charges
                 state["order_status"] = "pending_payment"
                 state["order_timestamp"] = order_data["timestamp"].isoformat()
                 
