@@ -30,8 +30,6 @@ class PaymentHandler(BaseHandler):
         self.product_sync_handler = product_sync_handler or ProductSyncHandler(config)
         self.subaccount_code = getattr(config, 'SUBACCOUNT_CODE', None)
         self.subaccount_percentage = getattr(config, 'SUBACCOUNT_PERCENTAGE', 30)
-        self.delivery_fee = 1000
-        self.service_charge_percentage = 2.5
         self.merchant_phone_number = getattr(config, 'MERCHANT_PHONE_NUMBER', None)
         self.payment_timers = {}
         self.db_params = {
@@ -51,7 +49,7 @@ class PaymentHandler(BaseHandler):
             logger.warning("ProductSyncHandler not provided, product syncing will be skipped")
         else:
             logger.info("ProductSyncHandler successfully provided to PaymentHandler")
-        logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, delivery fee ₦{self.delivery_fee}, service charge {self.service_charge_percentage}%, merchant phone {self.merchant_phone_number}")
+        logger.info(f"PaymentHandler initialized with subaccount {self.subaccount_code}, split percentage {self.subaccount_percentage}%, merchant phone {self.merchant_phone_number}")
 
     def _save_feedback_to_db(self, feedback_data: Dict) -> bool:
         """Save feedback data to the whatsapp_feedback table."""
@@ -177,7 +175,7 @@ class PaymentHandler(BaseHandler):
             )
     
     def create_payment_link(self, state, session_id):
-        """Create payment link for an existing order with subaccount splitting, delivery fee, service charge, and automatic monitoring."""
+        """Create payment link for an existing order with subaccount splitting and automatic monitoring."""
         try:
             logger.info(f"Creating payment link for session {session_id}")
             
@@ -225,9 +223,13 @@ class PaymentHandler(BaseHandler):
                     "⚠️ Order not found. Please try checking out again."
                 )
             
+            # Get order totals from the existing order data (calculated by OrderHandler)
             subtotal = order_data.get("total_amount", 0)
-            if subtotal <= 0:
-                logger.warning(f"Invalid subtotal amount {subtotal} for session {session_id}")
+            charges = order_data.get("charges", 0)
+            total_amount_ngn = subtotal + charges
+            
+            if total_amount_ngn <= 0:
+                logger.warning(f"Invalid total amount {total_amount_ngn} for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -235,9 +237,6 @@ class PaymentHandler(BaseHandler):
                     session_id,
                     "⚠️ Invalid order total. Please check your cart and try again."
                 )
-            
-            service_charge = subtotal * (self.service_charge_percentage / 100)
-            total_amount_ngn = subtotal + self.delivery_fee + service_charge
             
             payment_reference = f"PAY-{order_id}"
             state["payment_reference"] = payment_reference
@@ -247,8 +246,6 @@ class PaymentHandler(BaseHandler):
             payment_data = {
                 "payment_reference": payment_reference,
                 "payment_method_type": "paystack",
-                "delivery_fee": self.delivery_fee,
-                "service_charge": service_charge,
                 "phone_number": state.get("phone_number", session_id),
                 "subaccount_split": {
                     "subaccount_code": self.subaccount_code,
@@ -280,8 +277,7 @@ class PaymentHandler(BaseHandler):
                 metadata={
                     "order_id": order_id,
                     "delivery_address": state.get("address", "Not provided"),
-                    "delivery_fee": self.delivery_fee,
-                    "service_charge": service_charge,
+                    "charges": charges,
                     "phone_number": state.get("phone_number", session_id)
                 },
                 subaccount_code=self.subaccount_code,
@@ -304,9 +300,7 @@ class PaymentHandler(BaseHandler):
                     session_id,
                     f"🛒 *Order Created Successfully!*\n\n"
                     f"📋 *Order ID:* {order_id}\n"
-                    f"💰 *Subtotal:* ₦{subtotal:,}\n"
-                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                    f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                 
                     f"💰 *Total:* ₦{total_amount_ngn:,.2f}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
@@ -360,14 +354,14 @@ class PaymentHandler(BaseHandler):
         try:
             # Customer notification
             order_data = self.data_manager.get_order_by_id(order_id)
-            service_charge = order_data.get("service_charge", 0) if order_data else 0
+            charges = order_data.get("charges", 0) if order_data else 0
+            subtotal = order_data.get("total_amount", 0) if order_data else 0
             formatted_items = self._format_order_items(items, for_template=False)
             customer_message = (
                 f"✅ *Payment Successful!*\n\n"
                 f"📋 *Order ID:* {order_id}\n"
-                f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
-                f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                f"💰 *Subtotal:* ₦{subtotal:,}\n"
+                f"💸 *Charges:* ₦{charges:,}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:*\n{formatted_items}\n"
                 f"📍 *Delivery Address:* {delivery_address}{maps_info}\n\n"
@@ -394,8 +388,7 @@ class PaymentHandler(BaseHandler):
                     f"📞 *Customer Phone:* {customer_phone}\n"
                     f"📍 *Delivery Address:* {delivery_address}{maps_info}\n"
                     f"🛒 *Items:*\n{formatted_items}\n"
-                    f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0):,}\n"
-                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+               
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"📝 *Customer Notes:* {customer_notes}\n"
                     f"📌 Please process this order promptly."
@@ -421,8 +414,8 @@ class PaymentHandler(BaseHandler):
                     f"📞 *Customer Phone:* {customer_phone}\n"
                     f"📍 *Delivery Address:* {delivery_address}\n"
                     f"🛒 *Items:*\n{formatted_items}\n"
-                    f"💰 *Subtotal:* ₦{order_data.get('total_amount', 0) if order_data else 0:,}\n"
-                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+                    f"💰 *Subtotal:* ₦{subtotal if order_data else 0:,}\n"
+                    f"💸 *Charges:* ₦{charges:,}\n"
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"📝 *Customer Notes:* {customer_notes}\n"
                     f"📌 Please process this order promptly."
@@ -487,19 +480,16 @@ class PaymentHandler(BaseHandler):
                 logger.error(f"Order data not found for payment reference {payment_reference} during auto-payment handling.")
                 return
             
-            service_charge = order_data.get("service_charge", 0)
-            if service_charge == 0 and order_data.get("total_amount", 0) > 0:
-                service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
-                
+            # Get charges from the existing order data (calculated by OrderHandler)
+            charges = order_data.get("charges", 0)
+            
             success = self.data_manager.update_order_status(
                 order_id,
                 "confirmed",
                 {
                     "payment_reference": payment_reference,
                     "payment_method_type": payment_data.get("payment_method_type", "paystack"),
-                    "delivery_fee": self.delivery_fee,
-                    "service_charge": service_charge,
+                    "charges": charges,
                     "subaccount_split": {
                         "subaccount_code": self.subaccount_code,
                         "percentage": self.subaccount_percentage
@@ -562,7 +552,8 @@ class PaymentHandler(BaseHandler):
             
             try:
                 if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                    self.lead_tracking_handler.track_order_conversion(session_id, order_id, order_data["total_amount"] + self.delivery_fee + service_charge)
+                    total_amount = order_data["total_amount"] + charges
+                    self.lead_tracking_handler.track_order_conversion(session_id, order_id, total_amount)
                 else:
                     logger.debug("Lead tracking handler not available for order conversion tracking")
             except Exception as e:
@@ -585,7 +576,7 @@ class PaymentHandler(BaseHandler):
                 logger.error(f"Error initializing order status: {e}", exc_info=True)
             
             maps_info = self._generate_maps_info(state)
-            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
+            total_amount = order_data.get("total_amount", 0) + charges
             self._send_payment_success_message(
                 session_id,
                 order_id,
@@ -612,11 +603,10 @@ class PaymentHandler(BaseHandler):
                 logger.error(f"Order data not found for reminder for order {order_id}.")
                 return
             
+            # Get totals from existing order data
             subtotal = order_data.get("total_amount", 0)
-            service_charge = order_data.get("service_charge", subtotal * (self.service_charge_percentage / 100))
-            if service_charge == 0 and subtotal > 0:
-                logger.warning(f"Service charge was 0 for order {order_id}, recalculated to ₦{service_charge:,.2f}")
-            total_amount = subtotal + self.delivery_fee + service_charge
+            charges = order_data.get("charges", 0)
+            total_amount = subtotal + charges
             
             customer_email = self.payment_service.generate_customer_email(
                 state.get("phone_number", session_id), 
@@ -632,8 +622,7 @@ class PaymentHandler(BaseHandler):
                 metadata={
                     "order_id": order_id,
                     "delivery_address": state.get("address", "Not provided"),
-                    "delivery_fee": self.delivery_fee,
-                    "service_charge": service_charge,
+                    "charges": charges,
                     "phone_number": state.get("phone_number", session_id),
                     "reminder": True
                 },
@@ -648,8 +637,7 @@ class PaymentHandler(BaseHandler):
                 reminder_message = (
                     f"⏰ *Payment Reminder*\n\n"
                     f"We notice your payment for Order #{order_id} hasn't been completed yet.\n\n"
-                    f"💰 *Subtotal:* ₦{subtotal:,}\n"
-                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
+             
                     f"💰 *Total Amount:* ₦{total_amount:,.2f}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
@@ -682,16 +670,15 @@ class PaymentHandler(BaseHandler):
             order_items = self.data_manager.get_order_items(order_id)
             formatted_items = self._format_order_items(order_items)
             order_data = self.data_manager.get_order_by_id(order_id)
-            service_charge = order_data.get("service_charge", 0) if order_data else 0
+            charges = order_data.get("charges", 0) if order_data else 0
             subtotal = order_data.get("total_amount", 0) if order_data else 0
-            total_amount = subtotal + self.delivery_fee + service_charge
+            total_amount = subtotal + charges
             
             timeout_message = (
                 f"⏰ *Payment Expired*\n\n"
                 f"Your payment for Order #{order_id} has expired after 15 minutes.\n\n"
                 f"💰 *Subtotal:* ₦{subtotal:,}\n"
-                f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                f"💸 *Charges:* ₦{charges:,}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:* {formatted_items}\n"
                 f"❌ The order has been automatically cancelled.\n"
@@ -751,10 +738,8 @@ class PaymentHandler(BaseHandler):
                 logger.info(f"Manual payment verification successful for order {order_data['id']}")
                 self.stop_payment_monitoring(session_id)
                 
-                service_charge = order_data.get("service_charge", 0)
-                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
-                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_data['id']}, recalculated to ₦{service_charge:,.2f}")
+                # Get charges from existing order data
+                charges = order_data.get("charges", 0)
                 
                 success = self.data_manager.update_order_status(
                     order_data["id"],
@@ -762,8 +747,7 @@ class PaymentHandler(BaseHandler):
                     {
                         "payment_reference": payment_reference,
                         "payment_method_type": payment_data.get("payment_method_type", "paystack"),
-                        "delivery_fee": self.delivery_fee,
-                        "service_charge": service_charge,
+                        "charges": charges,
                         "subaccount_split": {
                             "subaccount_code": self.subaccount_code,
                             "percentage": self.subaccount_percentage
@@ -824,7 +808,8 @@ class PaymentHandler(BaseHandler):
                 
                 try:
                     if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                        self.lead_tracking_handler.track_order_conversion(session_id, order_data["id"], order_data["total_amount"] + self.delivery_fee + service_charge)
+                        total_amount = order_data["total_amount"] + charges
+                        self.lead_tracking_handler.track_order_conversion(session_id, order_data["id"], total_amount)
                     else:
                         logger.debug("Lead tracking handler not available for order conversion tracking")
                 except Exception as e:
@@ -832,7 +817,7 @@ class PaymentHandler(BaseHandler):
                 
                 order_items = self.data_manager.get_order_items(order_data["id"])
                 maps_info = self._generate_maps_info(state)
-                total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
+                total_amount = order_data.get("total_amount", 0) + charges
                 self._send_payment_success_message(
                     session_id,
                     order_data["id"],
@@ -848,16 +833,14 @@ class PaymentHandler(BaseHandler):
                 logger.info(f"Manual payment verification failed for reference {payment_reference}. Paystack status: {payment_data.get('status', 'N/A') if payment_data else 'N/A'}")
                 order_items = self.data_manager.get_order_items(order_data["id"] if order_data else "0")
                 formatted_items = self._format_order_items(order_items)
-                service_charge = order_data.get("service_charge", 0) if order_data else 0
+                charges = order_data.get("charges", 0) if order_data else 0
                 subtotal = order_data.get("total_amount", 0) if order_data else 0
-                total_amount = subtotal + self.delivery_fee + service_charge
+                total_amount = subtotal + charges
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"⏳ *Payment Not Yet Received*\n\n"
                     f"📋 *Order ID:* {order_data['id'] if order_data else 'N/A'}\n"
-                    f"💰 *Subtotal:* ₦{subtotal:,}\n"
-                    f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                    f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+            
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 Please:\n"
@@ -972,8 +955,8 @@ class PaymentHandler(BaseHandler):
             self.session_manager.update_session_state(session_id, state)
             
             maps_info = self._generate_maps_info(state)
-            service_charge = order_data.get("service_charge", 0)
-            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
+            charges = order_data.get("charges", 0)
+            total_amount = order_data.get("total_amount", 0) + charges
             self._send_payment_success_message(
                 session_id,
                 order_data["id"],
@@ -989,17 +972,16 @@ class PaymentHandler(BaseHandler):
             order_id = state.get("order_id", "0")
             order_items = self.data_manager.get_order_items(order_id)
             formatted_items = self._format_order_items(order_items)
-            service_charge = order_data.get("service_charge", 0) if order_data else 0
+            charges = order_data.get("charges", 0) if order_data else 0
             subtotal = order_data.get("total_amount", 0) if order_data else 0
-            total_amount = subtotal + self.delivery_fee + service_charge
+            total_amount = subtotal + charges
             
             return self.whatsapp_service.create_text_message(
                 session_id,
                 f"🔄 *Payment Monitoring Active*\n\n"
                 f"📋 *Order ID:* {state.get('order_id', 'N/A')}\n"
                 f"💰 *Subtotal:* ₦{subtotal:,}\n"
-                f"🚚 *Delivery Fee:* ₦{self.delivery_fee:,}\n"
-                f"💸 *Service Charge (2.5%):* ₦{service_charge:,.2f}\n"
+                f"💸 *Charges:* ₦{charges:,}\n"
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:* {formatted_items}\n\n"
                 f"✅ Once payment is confirmed, you'll receive an automatic confirmation.\n"
@@ -1078,8 +1060,8 @@ class PaymentHandler(BaseHandler):
             self.session_manager.update_session_state(session_id, state)
             
             maps_info = self._generate_maps_info(state)
-            service_charge = order_data.get("service_charge", 0)
-            total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
+            charges = order_data.get("charges", 0)
+            total_amount = order_data.get("total_amount", 0) + charges
             self._send_payment_success_message(
                 session_id,
                 order_id,
@@ -1119,10 +1101,8 @@ class PaymentHandler(BaseHandler):
                     if not session_id:
                         logger.warning(f"No customer_id found in order_data or webhook metadata for reference {payment_reference}. Processing order status update without user notifications.")
                 
-                service_charge = order_data.get("service_charge", 0)
-                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
-                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_data['id']}, recalculated to ₦{service_charge:,.2f}")
+                # Get charges from existing order data
+                charges = order_data.get("charges", 0)
                 
                 success = self.data_manager.update_order_status(
                     order_data["id"],
@@ -1130,8 +1110,7 @@ class PaymentHandler(BaseHandler):
                     {
                         "payment_reference": payment_reference,
                         "payment_method_type": webhook_data["data"].get("payment_method_type", "paystack"),
-                        "delivery_fee": self.delivery_fee,
-                        "service_charge": service_charge,
+                        "charges": charges,
                         "subaccount_split": {
                             "subaccount_code": self.subaccount_code,
                             "percentage": self.subaccount_percentage
@@ -1175,14 +1154,15 @@ class PaymentHandler(BaseHandler):
                     
                     try:
                         if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                            self.lead_tracking_handler.track_order_conversion(session_id, order_data["id"], order_data["total_amount"] + self.delivery_fee + service_charge)
+                            total_amount = order_data["total_amount"] + charges
+                            self.lead_tracking_handler.track_order_conversion(session_id, order_data["id"], total_amount)
                         else:
                             logger.debug("Lead tracking handler not available for order conversion tracking")
                     except Exception as e:
                         logger.error(f"Error tracking order conversion: {e}", exc_info=True)
                     
                     maps_info = self._generate_maps_info(state)
-                    total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
+                    total_amount = order_data["total_amount"] + charges
                     self._send_payment_success_message(
                         session_id,
                         order_data["id"],
@@ -1193,7 +1173,7 @@ class PaymentHandler(BaseHandler):
                     )
                 else:
                     logger.info(f"Order {order_data['id']} confirmed, but no session_id available. Sending merchant notification only.")
-                    total_amount = order_data["total_amount"] + self.delivery_fee + service_charge
+                    total_amount = order_data["total_amount"] + charges
                     self._send_payment_success_message(
                         session_id or order_data.get("customer_id", ""),
                         order_data["id"],
@@ -1206,7 +1186,7 @@ class PaymentHandler(BaseHandler):
                 logger.info(f"Ignored webhook event: {event}")
                 
         except Exception as e:
-            logger.error(f"Error handling payment webhook for reference {payment_reference}: {e}", exc_info=True)
+            logger.error(f"Error handling payment webhook: {e}", exc_info=True)
     
     def cleanup_expired_monitoring(self):
         """Clean up expired payment monitoring timers."""
@@ -1262,10 +1242,7 @@ class PaymentHandler(BaseHandler):
 
             if payment_verified:
                 logger.info(f"Payment callback verified for reference {reference}, order {order_data['id']}")
-                service_charge = order_data.get("service_charge", 0)
-                if service_charge == 0 and order_data.get("total_amount", 0) > 0:
-                    service_charge = order_data["total_amount"] * (self.service_charge_percentage / 100)
-                    logger.warning(f"Service charge was 0 for order {order_data['id']}, recalculated to ₦{service_charge:,.2f}")
+                charges = order_data.get("charges", 0)
 
                 success = self.data_manager.update_order_status(
                     order_data["id"],
@@ -1273,8 +1250,7 @@ class PaymentHandler(BaseHandler):
                     {
                         "payment_reference": reference,
                         "payment_method_type": payment_data.get("payment_method_type", "paystack"),
-                        "delivery_fee": self.delivery_fee,
-                        "service_charge": service_charge,
+                        "charges": charges,
                         "subaccount_split": {
                             "subaccount_code": self.subaccount_code,
                             "percentage": self.subaccount_percentage
@@ -1332,7 +1308,7 @@ class PaymentHandler(BaseHandler):
                 self.session_manager.update_session_state(session_id, state)
 
                 maps_info = self._generate_maps_info(state)
-                total_amount = order_data.get("total_amount", 0) + self.delivery_fee + service_charge
+                total_amount = order_data.get("total_amount", 0) + charges
                 self._send_payment_success_message(
                     session_id,
                     order_data["id"],
