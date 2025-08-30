@@ -60,6 +60,14 @@ class LocationAddressHandler(BaseHandler):
         Handles user's selection from the address collection menu.
         """
         logger.debug("Handling address collection menu for session %s, message: %s", session_id, message)
+        
+        # Handle the case where user comes from order handler with "update_address"
+        if message == "update_address":
+            logger.info("Received update_address redirect from order handler for session %s", session_id)
+            # Show the address collection menu instead of processing as invalid option
+            return self.initiate_address_collection(state, session_id)
+        
+        # Handle normal address collection menu options
         if message == "share_current_location":
             return self._request_live_location(state, session_id)
         elif message == "search_on_maps":
@@ -71,6 +79,12 @@ class LocationAddressHandler(BaseHandler):
             return self._request_manual_address(state, session_id)
         elif message == "use_saved_address":
             return self._use_saved_address(state, session_id)
+        elif message == "back_to_menu":
+            # Handle back to menu option when coming from awaiting live location
+            return self.initiate_address_collection(state, session_id)
+        elif message == "share_location":
+            # Alternative way to trigger location sharing
+            return self._request_live_location(state, session_id)
         else:
             logger.debug("Invalid option '%s' for session %s", message, session_id)
             buttons = [
@@ -82,12 +96,12 @@ class LocationAddressHandler(BaseHandler):
                     buttons.append({"type": "reply", "reply": {"id": "search_on_maps", "title": "🗺️ Search Maps"}})
                 if state.get("address"):
                     buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})
+            
             return self.whatsapp_service.create_button_message(
                 session_id,
                 f"❌ *Invalid option: '{message}'*\n\nPlease select an option below:",
                 buttons
             )
-
     def _request_live_location(self, state: dict, session_id: str):
         """
         Prompts user to share live location via WhatsApp.

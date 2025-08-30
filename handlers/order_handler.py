@@ -536,7 +536,7 @@ class OrderHandler(BaseHandler):
             order_details += f"📝 Note: {state.get('order_note', 'None')}\n"
             order_details += f"\n💰 *Cost Breakdown:*\n"
             order_details += f"Subtotal: ₦{subtotal:,.2f}\n"
-            order_details += f"Charges (Delivery + {self.SERVICE_CHARGE_PERCENTAGE*100:.0f}% Service): ₦{charges:,.2f}\n"
+            order_details += f"Charges: ₦{charges:,.2f}\n"
             order_details += f"Total Amount: ₦{total_amount:,.2f}\n\n"
             
             buttons = [
@@ -735,7 +735,7 @@ class OrderHandler(BaseHandler):
             self.session_manager.update_session_state(session_id, state)
             return {
                 "redirect": "location_handler",
-                "redirect_message": "initiate_address_collection"
+                "redirect_message": "update_address"  # This will be handled by the location handler
             }
         
         elif message_strip == "add_note":
