@@ -1,67 +1,5 @@
 {
-  "Protein": [
-    {
-      "id": "124",
-      "name": "Egg",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Boiled or fried egg",
-      "quantity": 96
-    },
-    {
-      "id": "121",
-      "name": "Chicken",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Grilled or fried chicken portion",
-      "quantity": 100
-    },
-    {
-      "id": "122",
-      "name": "Fish",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Fried or grilled fish portion",
-      "quantity": 100
-    },
-    {
-      "id": "123",
-      "name": "Beef",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Beef portion cooked to perfection",
-      "quantity": 100
-    },
-    {
-      "id": "125",
-      "name": "Ponmo",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Cooked cow skin",
-      "quantity": 100
-    }
-  ],
   "Main Dish": [
-    {
-      "id": "112",
-      "name": "Jollof Rice",
-      "variant": null,
-      "price": 150.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Delicious Nigerian-style jollof rice",
-      "quantity": 87
-    },
     {
       "id": "113",
       "name": "Fried Rice",
@@ -81,6 +19,16 @@
       "availability_status": true,
       "description": "White spaghetti served with sauce",
       "quantity": 101
+    },
+    {
+      "id": "112",
+      "name": "Jollof Rice",
+      "variant": null,
+      "price": 150.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Delicious Nigerian-style jollof rice",
+      "quantity": 85
     },
     {
       "id": "114",
@@ -132,6 +80,58 @@
       "currency": "NGN",
       "availability_status": true,
       "description": "Fried plantain slices",
+      "quantity": 100
+    }
+  ],
+  "Protein": [
+    {
+      "id": "124",
+      "name": "Egg",
+      "variant": null,
+      "price": 50.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Boiled or fried egg",
+      "quantity": 97
+    },
+    {
+      "id": "121",
+      "name": "Chicken",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Grilled or fried chicken portion",
+      "quantity": 100
+    },
+    {
+      "id": "122",
+      "name": "Fish",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Fried or grilled fish portion",
+      "quantity": 100
+    },
+    {
+      "id": "123",
+      "name": "Beef",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Beef portion cooked to perfection",
+      "quantity": 100
+    },
+    {
+      "id": "125",
+      "name": "Ponmo",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Cooked cow skin",
       "quantity": 100
     }
   ],

@@ -2,6 +2,7 @@ import json
 import logging
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
+import atexit
 
 from config import Config
 from handlers.webhook_handler import WebhookHandler
@@ -43,12 +44,13 @@ try:
     payment_service = PaymentService(config)
     location_service = LocationService(config)
     product_sync_handler = ProductSyncHandler(config)
-    # Trigger initial sync on startup
-    success = product_sync_handler.sync_products_to_json()
-    if success:
-        logger.info("Initial product sync successful on startup")
-    else:
-        logger.warning("Initial product sync failed on startup")
+
+    # Start the continuous product sync thread
+    product_sync_handler.start_sync()
+
+    # Register a function to stop the thread on application shutdown
+    atexit.register(product_sync_handler.stop_sync)
+    
 except Exception as e:
     logger.error(f"Error initializing a core service: {e}", exc_info=True)
     exit(1)
@@ -71,7 +73,7 @@ try:
         whatsapp_service,
         payment_service,
         location_service,
-        feedback_handler=feedback_handler  # Pass FeedbackHandler
+        feedback_handler=feedback_handler
     )
 except Exception as e:
     logger.error(f"Error initializing PaymentHandler: {e}", exc_info=True)

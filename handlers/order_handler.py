@@ -466,7 +466,7 @@ class OrderHandler(BaseHandler):
 
         if message_strip == "add_note":
             logger.info(f"User chose to add a note after confirmation for session {session_id}.")
-            state["current_state"] = added_note
+            state["current_state"] = "add_note"
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,

@@ -2,6 +2,8 @@ from .base_handler import BaseHandler
 import logging
 from typing import Dict, Any, List, Optional
 import sys
+import uuid
+import time # Import the time module
 
 # Configure logging with UTF-8 encoding to fix the UnicodeEncodeError
 logger = logging.getLogger(__name__)
@@ -24,6 +26,8 @@ class GreetingHandler(BaseHandler):
         if state.get("current_state") == "collect_preferred_name":
             return self.handle_collect_preferred_name_state(state, message, session_id)
         elif state.get("current_state") == "collect_delivery_address":
+            return self.handle_collect_delivery_address_state(state, message, session_id)
+        elif state.get("current_state") == "waiting_for_address_input":
             return self.handle_collect_delivery_address_state(state, message, session_id)
 
         if self._has_user_made_payment(session_id):
@@ -157,11 +161,11 @@ class GreetingHandler(BaseHandler):
             f"Invalid option, {user_name}."
         )
 
-    def generate_initial_greeting(self, state: Dict, session_id: str, user_name: Optional[str] = None) -> Dict[str, Any]:
+    def generate_initial_greeting(self, session_id: str, user_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate initial greeting message and set initial state.
         For new users, asks for preferred name and delivery address.
-        For paid users, shows customized menu.
+        For existing users, shows customized menu.
         """
         user_data = self.data_manager.get_user_data(session_id)
 
@@ -169,28 +173,31 @@ class GreetingHandler(BaseHandler):
             username_display = user_data.get("name", "Guest") if user_data else "Guest"
             self.logger.info(f"Session {session_id}: New user or missing details. Initiating onboarding.")
 
-            state["current_state"] = "collect_preferred_name"
-            state["current_handler"] = "greeting_handler"
+            state = {
+                "current_state": "collect_preferred_name",
+                "current_handler": "greeting_handler"
+            }
             self.session_manager.update_session_state(session_id, state)
 
             return self._send_greeting_with_image(session_id, username_display, "onboarding")
         else:
             username = user_data.get("display_name", "Guest")
-            state["user_name"] = username
-            state["delivery_address"] = user_data.get("address", "")
-            state["current_state"] = "greeting"
-            state["current_handler"] = "greeting_handler"
+            state = {
+                "user_name": username,
+                "delivery_address": user_data.get("address", ""),
+                "current_state": "greeting",
+                "current_handler": "greeting_handler"
+            }
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
             
-            if self._has_user_made_payment(session_id):
-                return self._send_greeting_with_image(session_id, username, "paid")
-            else:
-                return self._send_greeting_with_image(session_id, username, "guest")
+            user_type = "paid" if self._has_user_made_payment(session_id) else "guest"
+            return self._send_greeting_with_image(session_id, username, user_type)
 
     def handle_collect_preferred_name_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """
-        Handles the user's preferred name input and then asks for the delivery address.
+        Handles the user's preferred name input and then asks for the delivery address
+        with a button menu.
         """
         preferred_name = message.strip()
         if not preferred_name:
@@ -213,21 +220,49 @@ class GreetingHandler(BaseHandler):
         state["current_handler"] = "greeting_handler"
         self.session_manager.update_session_state(session_id, state)
 
-        return self.whatsapp_service.create_text_message(
+        # Send a button message for the delivery address
+        return self._send_address_menu(session_id, preferred_name)
+
+    def _send_address_menu(self, session_id: str, user_name: str) -> Dict[str, Any]:
+        """
+        Sends a button message for the delivery address options.
+        """
+        buttons = [
+            {"type": "reply", "reply": {"id": "palmpay_salvation_address", "title": "Palmpay Salvation Howson Wright Estate"}},
+            {"type": "reply", "reply": {"id": "enter_custom_address", "title": "✍️ Enter my address manually"}},
+            {"type": "reply", "reply": {"id": "back_to_main_menu", "title": "⬅️ Go back"}}
+        ]
+        
+        return self.whatsapp_service.send_button_message(
             session_id,
-            f"Thanks, {preferred_name.capitalize()}! Now, please enter your delivery address."
+            f"Thanks, {user_name}! To make sure your orders get to you safely, could you share your delivery address?",
+            buttons
         )
 
     def handle_collect_delivery_address_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """
-        Handles the user's delivery address input and then sends the main menu.
+        Handles the user's delivery address input from a button selection or free text.
         """
-        delivery_address = message.strip()
-        if not delivery_address:
+        if message == "back_to_main_menu":
+            return self.handle_back_to_main(state, session_id)
+
+        delivery_address = None
+        if message == "palmpay_salvation_address":
+            delivery_address = "Palmpay Salvation Howson Wright Estate"
+        elif message == "enter_custom_address":
+            # Change state to a temporary "waiting_for_address" state to prompt the user
+            state["current_state"] = "waiting_for_address_input"
+            self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "It looks like you didn't enter an address. Please enter your delivery address."
+                "Please enter your full delivery address."
             )
+        elif state.get("current_state") == "waiting_for_address_input":
+            delivery_address = message.strip()
+        
+        if not delivery_address:
+            user_name = state.get("user_name", "Guest")
+            return self._send_address_menu(session_id, user_name)
 
         self.logger.info(f"Session {session_id}: Delivery address received: '{delivery_address}'.")
 
@@ -245,17 +280,15 @@ class GreetingHandler(BaseHandler):
         username = state.get("user_name", "Guest")
         self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
 
-        if self._has_user_made_payment(session_id):
-            return self._send_greeting_with_image(session_id, username, "paid")
-        else:
-            return self._send_greeting_with_image(session_id, username, "guest")
+        user_type = "paid" if self._has_user_made_payment(session_id) else "guest"
+        return self._send_greeting_with_image(session_id, username, user_type)
 
     def send_main_menu(self, session_id: str, user_name: str, message: str = "") -> Dict[str, Any]:
         """Send main menu with buttons for non-paid users (max 3 buttons for WhatsApp)."""
         buttons = [
             {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
             {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-            {"type": "reply", "replace": {"id": "complain", "title": "📝 Complain"}}
+            {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
         ]
         
         return self.whatsapp_service.send_button_message(session_id, message or "What would you like to do?", buttons)
@@ -286,61 +319,60 @@ class GreetingHandler(BaseHandler):
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
 
-        if self._has_user_made_payment(session_id):
-            return self._send_greeting_with_image(session_id, user_name, "paid")
-        else:
-            return self._send_greeting_with_image(session_id, user_name, "guest")
+        user_type = "paid" if self._has_user_made_payment(session_id) else "guest"
+        return self._send_greeting_with_image(session_id, user_name, user_type)
 
     def _send_greeting_with_image(self, session_id: str, user_name: str, user_type: str) -> Dict[str, Any]:
         """
         Sends a greeting message with an image, followed by a button message with a prompt.
         """
-        # Determine the image URL based on user type
         image_url = "https://eventio.africa/wp-content/uploads/2025/08/img.jpg"
         if user_type == "onboarding":
             image_url = "https://eventio.africa/wp-content/uploads/2025/08/lola-1.jpg"
-
-        # Greeting text for the image caption
-        if user_type == "onboarding":
             greeting_text = (
-                f"Hello {user_name.capitalize()}, welcome to Lola!\n"
-                "Please enter your preferred name."
+                f"Hi {user_name}! Welcome to Lola - your personal shopping assistant for "
+                "discovering and ordering from your favorite stores. What name would you like me to call you?"
             )
-        else:
-            greeting_text = (
-                f"Hello {user_name.capitalize()}!\n"
-                "Welcome to Ganador Express!\n🥘🍛 🎉\n"
-                "My name is Lola👩‍🦱"
-            )
-
-        # Prompt text for the button message (only for non-onboarding flows)
-        button_prompt = "What would you like to do?"
-        buttons = []
-
-        if user_type == "onboarding":
-            # For onboarding, we don't send buttons, just the image and text prompt
-            return self.whatsapp_service.create_text_message(
+            return self.whatsapp_service.send_image_message(
                 session_id,
-                greeting_text
+                image_url,
+                caption=greeting_text
             )
-        elif user_type == "paid":
-            buttons = [
-                {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
-                {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
-                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
-            ]
         else:
-            buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
-                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-                {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
-            ]
+            # First, send the image message
+            self.whatsapp_service.send_image_message(
+                session_id,
+                image_url
+            )
+            
+            # Add a short delay to ensure the image arrives first
+            time.sleep(2)
 
-        # Send image with greeting and buttons with prompt
-        return self.whatsapp_service.send_image_with_buttons(
-            session_id,
-            image_url,
-            greeting_text,
-            buttons,
-            button_prompt
-        )
+            # Then, send the text message with buttons
+            greeting_text = (
+                f"Hello {user_name}!\n"
+                "Welcome to Ganador Express!\n"
+                "🥘🍛 🎉\n"
+                "My name is Lola"
+            )
+            button_prompt = "What would you like to do?"
+            buttons = []
+            if user_type == "paid":
+                buttons = [
+                    {"type": "reply", "reply": {"id": "track_order", "title": "📍 Track Order"}},
+                    {"type": "reply", "reply": {"id": "order_again", "title": "🛒 Order Again"}},
+                    {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+                ]
+            else:
+                buttons = [
+                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏼‍🍳 Make an Order"}},
+                    {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
+                    {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
+                ]
+
+            # Send the button message separately
+            return self.whatsapp_service.send_button_message(
+                session_id,
+                f"{greeting_text}\n\n{button_prompt}",
+                buttons
+            )

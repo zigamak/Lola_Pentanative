@@ -1,11 +1,22 @@
 import logging
 import os
 import json
+import time
 from typing import Dict, List
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import threading
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure logging with UTF-8 encoding
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 class ProductSyncHandler:
     """Handles syncing product data for a specific merchant from PostgreSQL database to a JSON file."""
@@ -21,7 +32,10 @@ class ProductSyncHandler:
         }
         self.merchant_id = self.config.MERCHANT_ID
         self.json_file_path = self.config.PRODUCTS_FILE
+        self.sync_interval = int(os.getenv('PRODUCT_SYNC_INTERVAL_MINUTES', 5)) * 60  # Sync interval in seconds
         self._ensure_directory_exists()
+        self._stop_event = threading.Event()
+        self._sync_thread = None
 
     def _ensure_directory_exists(self):
         """Ensures the directory for the JSON file exists."""
@@ -30,8 +44,32 @@ class ProductSyncHandler:
             os.makedirs(directory)
             logger.info(f"Created directory: {directory}")
 
+    def _sync_products_loop(self):
+        """The main loop for syncing products at a set interval."""
+        while not self._stop_event.is_set():
+            self.sync_products_to_json()
+            # Wait for the next sync interval or until the stop event is set
+            self._stop_event.wait(self.sync_interval)
+        logger.info("Product sync thread stopped.")
+
+    def start_sync(self):
+        """Starts the product sync thread."""
+        if self._sync_thread is None or not self._sync_thread.is_alive():
+            logger.info(f"Starting product sync thread. Sync interval: {self.sync_interval/60} minutes.")
+            self._sync_thread = threading.Thread(target=self._sync_products_loop)
+            self._sync_thread.daemon = True  # Allows the thread to exit when the main program exits
+            self._sync_thread.start()
+
+    def stop_sync(self):
+        """Stops the product sync thread."""
+        if self._sync_thread and self._sync_thread.is_alive():
+            logger.info("Stopping product sync thread...")
+            self._stop_event.set()
+            self._sync_thread.join()
+
     def sync_products_to_json(self) -> bool:
         """Fetches products for a specific merchant from the database and saves them to products.json."""
+        logger.info(f"Initiating product sync for merchant {self.merchant_id}...")
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -88,3 +126,4 @@ class ProductSyncHandler:
         except Exception as e:
             logger.error(f"Unexpected error while syncing products: {e}")
             return False
+
