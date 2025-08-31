@@ -3,7 +3,6 @@ import logging
 from typing import Dict, Any, List, Optional
 import sys
 import uuid
-import time # Import the time module
 
 # Configure logging with UTF-8 encoding to fix the UnicodeEncodeError
 logger = logging.getLogger(__name__)
@@ -100,8 +99,8 @@ class GreetingHandler(BaseHandler):
         message = status_messages.get(status, f"Your order #{order_id} has an unknown status. Please contact support.")
         return self.send_main_menu_paid(
             session_id,
-            user_name,
-            f"{message}"
+                user_name,
+                f"{message}"
         )
 
     def _handle_order_again(self, state: Dict, session_id: str) -> Dict[str, Any]:
@@ -326,9 +325,13 @@ class GreetingHandler(BaseHandler):
         """
         Sends a greeting message with an image, followed by a button message with a prompt.
         """
+        # Determine the image URL based on user type
         image_url = "https://eventio.africa/wp-content/uploads/2025/08/img.jpg"
         if user_type == "onboarding":
             image_url = "https://eventio.africa/wp-content/uploads/2025/08/lola-1.jpg"
+
+        # Greeting text for the image caption
+        if user_type == "onboarding":
             greeting_text = (
                 f"Hi {user_name}! Welcome to Lola - your personal shopping assistant for "
                 "discovering and ordering from your favorite stores. What name would you like me to call you?"
@@ -339,16 +342,6 @@ class GreetingHandler(BaseHandler):
                 caption=greeting_text
             )
         else:
-            # First, send the image message
-            self.whatsapp_service.send_image_message(
-                session_id,
-                image_url
-            )
-            
-            # Add a short delay to ensure the image arrives first
-            time.sleep(2)
-
-            # Then, send the text message with buttons
             greeting_text = (
                 f"Hello {user_name}!\n"
                 "Welcome to Ganador Express!\n"
@@ -370,9 +363,11 @@ class GreetingHandler(BaseHandler):
                     {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
                 ]
 
-            # Send the button message separately
-            return self.whatsapp_service.send_button_message(
+            # Send image with greeting and buttons with prompt
+            return self.whatsapp_service.send_image_with_buttons(
                 session_id,
-                f"{greeting_text}\n\n{button_prompt}",
-                buttons
+                image_url,
+                greeting_text,
+                buttons,
+                button_prompt
             )
