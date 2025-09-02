@@ -706,7 +706,7 @@ class LocationAddressHandler(BaseHandler):
             {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},  # 14 chars
             {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},  # 15 chars
             {"type": "reply", "reply": {"id": "add_note", "title": "📝 Add Note"}},  # 11 chars
-            {"type": "reply", "reply": {"id": "cancel_order", "title": "❌ Cancel Order"}}  # 14 chars
+           
         ]
         
         return {

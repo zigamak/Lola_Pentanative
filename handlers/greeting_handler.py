@@ -99,8 +99,8 @@ class GreetingHandler(BaseHandler):
         message = status_messages.get(status, f"Your order #{order_id} has an unknown status. Please contact support.")
         return self.send_main_menu_paid(
             session_id,
-                user_name,
-                f"{message}"
+            user_name,
+            f"{message}"
         )
 
     def _handle_order_again(self, state: Dict, session_id: str) -> Dict[str, Any]:
@@ -160,7 +160,7 @@ class GreetingHandler(BaseHandler):
             f"Invalid option, {user_name}."
         )
 
-    def generate_initial_greeting(self, session_id: str, user_name: Optional[str] = None) -> Dict[str, Any]:
+    def generate_initial_greeting(self, state: Dict, session_id: str, user_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate initial greeting message and set initial state.
         For new users, asks for preferred name and delivery address.
@@ -172,21 +172,17 @@ class GreetingHandler(BaseHandler):
             username_display = user_data.get("name", "Guest") if user_data else "Guest"
             self.logger.info(f"Session {session_id}: New user or missing details. Initiating onboarding.")
 
-            state = {
-                "current_state": "collect_preferred_name",
-                "current_handler": "greeting_handler"
-            }
+            state["current_state"] = "collect_preferred_name"
+            state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
 
             return self._send_greeting_with_image(session_id, username_display, "onboarding")
         else:
             username = user_data.get("display_name", "Guest")
-            state = {
-                "user_name": username,
-                "delivery_address": user_data.get("address", ""),
-                "current_state": "greeting",
-                "current_handler": "greeting_handler"
-            }
+            state["user_name"] = username
+            state["delivery_address"] = user_data.get("address", "")
+            state["current_state"] = "greeting"
+            state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"Session {session_id} greeted returning user '{username}'.")
             
@@ -227,9 +223,9 @@ class GreetingHandler(BaseHandler):
         Sends a button message for the delivery address options.
         """
         buttons = [
-            {"type": "reply", "reply": {"id": "palmpay_salvation_address", "title": "Palmpay Salvation Howson Wright Estate"}},
-            {"type": "reply", "reply": {"id": "enter_custom_address", "title": "✍️ Enter my address manually"}},
-            {"type": "reply", "reply": {"id": "back_to_main_menu", "title": "⬅️ Go back"}}
+            {"type": "reply", "reply": {"id": "palmpay_address", "title": "Palmpay Salvation"}},
+            {"type": "reply", "reply": {"id": "howson_wright_address", "title": "Howson Wright Estate"}},
+            {"type": "reply", "reply": {"id": "enter_custom_address", "title": "✍️ Enter my address"}}
         ]
         
         return self.whatsapp_service.send_button_message(
@@ -242,12 +238,11 @@ class GreetingHandler(BaseHandler):
         """
         Handles the user's delivery address input from a button selection or free text.
         """
-        if message == "back_to_main_menu":
-            return self.handle_back_to_main(state, session_id)
-
         delivery_address = None
-        if message == "palmpay_salvation_address":
-            delivery_address = "Palmpay Salvation Howson Wright Estate"
+        if message == "palmpay_address":
+            delivery_address = "Palmpay Salvation"
+        elif message == "howson_wright_address":
+            delivery_address = "Howson Wright Estate"
         elif message == "enter_custom_address":
             # Change state to a temporary "waiting_for_address" state to prompt the user
             state["current_state"] = "waiting_for_address_input"

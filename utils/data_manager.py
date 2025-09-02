@@ -775,11 +775,14 @@ class DataManager:
             return []
 
 
+   
+
     def save_lead(self, lead: Lead):
         """Save or update a lead in the whatsapp_leads table."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor() as cur:
+                    # Use ON CONFLICT to handle duplicates
                     query = """
                         INSERT INTO whatsapp_leads (
                             merchant_details_id, user_id, user_name, phone_number, source,
@@ -788,14 +791,11 @@ class DataManager:
                             conversion_stage, final_order_value, converted_at
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (merchant_details_id, user_id) DO UPDATE
+                        ON CONFLICT (phone_number) DO UPDATE
                         SET 
                             user_name = EXCLUDED.user_name,
-                            phone_number = EXCLUDED.phone_number,
-                            source = EXCLUDED.source,
-                            first_contact = EXCLUDED.first_contact,
                             last_interaction = EXCLUDED.last_interaction,
-                            interaction_count = EXCLUDED.interaction_count,
+                            interaction_count = whatsapp_leads.interaction_count + 1,
                             status = EXCLUDED.status,
                             has_added_to_cart = EXCLUDED.has_added_to_cart,
                             has_placed_order = EXCLUDED.has_placed_order,
@@ -803,14 +803,12 @@ class DataManager:
                             conversion_stage = EXCLUDED.conversion_stage,
                             final_order_value = EXCLUDED.final_order_value,
                             converted_at = EXCLUDED.converted_at
-                    """
-                    # Ensure correct types for database insertion
+                        """
                     total_cart_value = float(lead.total_cart_value) if lead.total_cart_value is not None else 0.0
                     final_order_value = float(lead.final_order_value) if lead.final_order_value is not None else 0.0
                     converted_at = lead.converted_at if lead.converted_at else None
 
-                    # Log values for debugging
-                    logger.debug(f"Saving lead {lead.user_id}: "
+                    logger.debug(f"Saving or updating lead {lead.user_id}: "
                                 f"merchant_details_id={lead.merchant_details_id}, "
                                 f"user_id={lead.user_id}, user_name={lead.user_name}, "
                                 f"phone_number={lead.phone_number}, source={lead.source}, "
@@ -838,13 +836,15 @@ class DataManager:
                         converted_at
                     ))
                     conn.commit()
-                    logger.info(f"Lead {lead.user_id} saved to whatsapp_leads table")
+                    logger.info(f"Lead {lead.user_id} saved or updated in whatsapp_leads table")
         except psycopg2.Error as e:
             logger.error(f"Database error while saving lead {lead.user_id} to whatsapp_leads: {e}", exc_info=True)
             raise
         except Exception as e:
             logger.error(f"Unexpected error while saving lead {lead.user_id} to whatsapp_leads: {e}", exc_info=True)
             raise
+        
+    
     def get_lead(self, merchant_details_id: str, user_id: str) -> Optional[Lead]:
         """Retrieve a lead from the whatsapp_leads table."""
         try:
@@ -993,36 +993,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Error getting feedback analytics: {str(e)}", exc_info=True)
             return {"error": "Failed to load feedback analytics"}
-        
-    def get_lead_by_phone_number(self, phone_number: str) -> Optional[Lead]:
-        """Retrieve a lead by phone number from the whatsapp_leads table."""
-        try:
-            with psycopg2.connect(**self.db_params) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    merchant_id = getattr(self.config, 'MERCHANT_ID', '20')
-                    query = """
-                        SELECT 
-                            merchant_details_id, user_id, user_name, phone_number, source,
-                            first_contact, last_interaction, interaction_count, status,
-                            has_added_to_cart, has_placed_order, total_cart_value,
-                            conversion_stage, final_order_value, converted_at
-                        FROM whatsapp_leads
-                        WHERE merchant_details_id = %s AND phone_number = %s
-                    """
-                    cur.execute(query, (merchant_id, phone_number))
-                    result = cur.fetchone()
-                    if result:
-                        logger.info(f"Retrieved lead by phone number {phone_number} from whatsapp_leads")
-                        return Lead(**result)
-                    else:
-                        logger.debug(f"No lead found for phone number {phone_number} in whatsapp_leads")
-                        return None
-        except psycopg2.Error as e:
-            logger.error(f"Database error while retrieving lead by phone {phone_number} from whatsapp_leads: {e}", exc_info=True)
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error while retrieving lead by phone {phone_number} from whatsapp_leads: {e}", exc_info=True)
-            return None
+    
 
     def get_leads_by_status(self, status: str) -> List[Lead]:
         """Retrieve leads by status from the whatsapp_leads table."""
