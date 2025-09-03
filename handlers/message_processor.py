@@ -190,6 +190,8 @@ class MessageProcessor:
                     response = self.greeting_handler.handle_collect_preferred_name_state(state, message, session_id)
                 elif current_state == "collect_delivery_address":
                     response = self.greeting_handler.handle_collect_delivery_address_state(state, message, session_id)
+                elif current_state == "waiting_for_address_input":
+                    response = self.greeting_handler.handle_collect_delivery_address_state(state, message, session_id)
                 elif current_state == "greeting":
                     response = self.greeting_handler.handle_greeting_state(state, message, original_message, session_id)
                 else:
@@ -293,7 +295,21 @@ class MessageProcessor:
                     response = self.feedback_handler.handle_back_to_main(state, session_id)
             
             elif current_handler_name == "location_handler":
-                response = self._handle_location_states(state, message, original_message, session_id)
+                if current_state == "address_collection_menu":
+                    response = self.location_handler.handle_address_collection_menu(state, message, session_id)
+                elif current_state == "address_entry_submenu":
+                    response = self.location_handler.handle_address_entry_submenu(state, message, session_id)
+                elif current_state == "awaiting_live_location":
+                    response = self.location_handler.handle_awaiting_live_location_timeout(state, original_message, session_id)
+                elif current_state == "manual_address_input":
+                    response = self.location_handler.handle_manual_address_input(state, original_message, session_id)
+                elif current_state == "confirm_detected_location":
+                    response = self.location_handler.handle_confirm_detected_location(state, message, session_id)
+                elif current_state == "confirm_coordinates":
+                    response = self.location_handler.handle_confirm_coordinates(state, message, session_id)
+                else:
+                    logger.warning(f"Session {session_id}: Unhandled location_handler state '{current_state}'. Attempting to initiate address collection.")
+                    response = self.location_handler.initiate_address_collection(state, session_id)
             
             # Handle global 'menu' command
             if message == "menu" and current_handler_name != "greeting_handler":
@@ -306,16 +322,54 @@ class MessageProcessor:
                 logger.info(f"Session {session_id}: Redirecting to handler '{redirect_target_handler_name}' with message '{redirect_message_for_target}'.")
                 state["current_handler"] = redirect_target_handler_name
                 self.session_manager.update_session_state(session_id, state)
-                if redirect_target_handler_name == "order_handler" and redirect_message_for_target == "handle_confirm_order_state":
-                    additional_message = response.get("additional_message")
-                    buttons = response.get("buttons")
-                    if additional_message and buttons:
-                        return self.whatsapp_service.create_button_message(
-                            session_id,
-                            additional_message,
-                            buttons
-                        )
-                    return self.order_handler._show_order_confirmation(state, session_id)
+                
+                # Handle specific redirect cases
+                if redirect_target_handler_name == "order_handler":
+                    if redirect_message_for_target == "handle_confirm_order_state":
+                        additional_message = response.get("additional_message")
+                        buttons = response.get("buttons")
+                        if additional_message and buttons:
+                            return self.whatsapp_service.create_button_message(
+                                session_id,
+                                additional_message,
+                                buttons
+                            )
+                        return self.order_handler._show_order_confirmation(state, session_id)
+                    elif redirect_message_for_target == "show_order_confirmation":
+                        return self.order_handler._show_order_confirmation(state, session_id)
+                    elif redirect_message_for_target == "show_order_confirmation_after_address_update":
+                        return self.order_handler.handle_show_order_confirmation_after_address_update(state, session_id)
+                
+                elif redirect_target_handler_name == "location_handler":
+                    if redirect_message_for_target == "update_address":
+                        return self.location_handler.initiate_address_collection(state, session_id)
+                    elif redirect_message_for_target == "initiate_address_collection":
+                        return self.location_handler.initiate_address_collection(state, session_id)
+                
+                elif redirect_target_handler_name == "greeting_handler":
+                    if redirect_message_for_target == "handle_back_to_main":
+                        additional_message = response.get("additional_message", "")
+                        return self.greeting_handler.handle_back_to_main(state, session_id, additional_message)
+                
+                elif redirect_target_handler_name == "ai_handler":
+                    if redirect_message_for_target == "start_ai_bulk_order":
+                        return self.ai_handler.handle_ai_bulk_order_state(state, "start_ai_bulk_order", original_message, session_id)
+                    elif redirect_message_for_target == "handle_ai_bulk_order":
+                        additional_message = response.get("additional_message", "")
+                        if additional_message:
+                            # Send the additional message first
+                            self.whatsapp_service.create_text_message(session_id, additional_message)
+                        return self.ai_handler.handle_ai_bulk_order_state(state, "continue_ordering", original_message, session_id)
+                
+                elif redirect_target_handler_name == "enquiry_handler":
+                    if redirect_message_for_target == "show_enquiry_menu":
+                        return self.enquiry_handler.show_enquiry_menu(state, session_id)
+                
+                elif redirect_target_handler_name == "payment_handler":
+                    if redirect_message_for_target == "initiate_payment":
+                        return self.payment_handler.handle_payment_processing_state(state, "initiate_payment", session_id)
+                
+                # For other cases, use the standard routing
                 return self._route_to_handler(state, redirect_message_for_target, original_message, session_id, user_name)
 
             # Fallback for no response
@@ -363,48 +417,6 @@ class MessageProcessor:
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             return self.greeting_handler.generate_initial_greeting(state, session_id, user_name)
-
-    def _handle_location_states(self, state, message, original_message, session_id):
-        """Handle location-related states."""
-        current_state = state["current_state"]
-
-        if current_state == "address_collection_menu":
-            return self.location_handler.handle_address_collection_menu(state, message, session_id)
-        elif current_state == "awaiting_live_location":
-            return self.location_handler.handle_awaiting_live_location_timeout(state, original_message, session_id)
-        elif current_state == "maps_search_input":
-            return self.location_handler.handle_maps_search_input(state, original_message, session_id)
-        elif current_state == "manual_address_input":
-            return self.location_handler.handle_manual_address_input(state, original_message, session_id)
-        elif current_state == "confirm_detected_location":
-            return self.location_handler.handle_confirm_detected_location(state, message, session_id)
-        elif current_state == "confirm_maps_result":
-            return self.location_handler.handle_confirm_maps_result(state, message, session_id)
-        elif current_state == "confirm_coordinates":
-            return self.location_handler.handle_confirm_coordinates(state, message, session_id)
-        else:
-            logger.warning(f"Session {session_id}: Unexpected location state '{current_state}'. Attempting legacy handling.")
-            return self._handle_legacy_location_states(state, original_message, session_id)
-
-    def _handle_legacy_location_states(self, state, original_message, session_id):
-        """Handle legacy location states for backward compatibility."""
-        if original_message.strip():
-            state["address"] = original_message.strip()
-            self.data_manager.user_details.setdefault(state["phone_number"], {})
-            self.data_manager.user_details[state["phone_number"]]["name"] = state.get("user_name", "Guest")
-            self.data_manager.user_details[state["phone_number"]]["address"] = state["address"]
-            self.data_manager.save_user_details(state["phone_number"], self.data_manager.user_details[state["phone_number"]])
-
-            state["current_state"] = "confirm_order"
-            state["current_handler"] = "order_handler"
-            self.session_manager.update_session_state(session_id, state)
-
-            return self.order_handler._show_order_confirmation(state, session_id)
-        else:
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "Please provide a valid delivery address."
-            )
 
     def _handle_location_message(self, message_data, state, session_id, user_name):
         """Handle incoming location messages (WhatsApp 'location' type)."""

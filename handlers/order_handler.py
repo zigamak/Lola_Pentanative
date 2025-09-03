@@ -597,14 +597,16 @@ class OrderHandler(BaseHandler):
             )
 
     def handle_confirm_order_state(self, state: Dict, message: str, session_id: str) -> Dict:
-        """Handle the final order confirmation state."""
+        """Handle final order confirmation state."""
         logger.debug(f"Handling confirm order state for session {session_id}, message: {message}")
         message_strip = message.strip()
-        
+
         if message_strip == "final_confirm":
-            cart = state.get("cart", {})
-            if not cart:
-                logger.warning(f"Cannot proceed to payment - cart is empty for session {session_id}")
+            logger.info(f"User confirmed final order for session {session_id}.")
+            
+            # Validate cart is not empty
+            if not state.get("cart"):
+                logger.warning(f"Cart is empty during final confirmation for session {session_id}.")
                 state["current_state"] = "greeting"
                 state["current_handler"] = "greeting_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -612,18 +614,9 @@ class OrderHandler(BaseHandler):
                     session_id,
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
-            
-            if not session_id or session_id.strip() == "":
-                logger.error(f"Invalid or missing session_id for order confirmation: {session_id}")
-                state["current_state"] = "greeting"
-                state["current_handler"] = "greeting_handler"
-                self.session_manager.update_session_state(session_id, state)
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ Sorry, there was an error processing your order due to an invalid session. Please try again or contact support."
-                )
-            
-            # Calculate total including charges
+
+            # Calculate total amount
+            cart = state.get("cart", {})
             subtotal = sum(
                 item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
                 for item_data in cart.values()
@@ -631,147 +624,144 @@ class OrderHandler(BaseHandler):
             service_charge = subtotal * self.SERVICE_CHARGE_PERCENTAGE
             charges = self.DELIVERY_FEE + service_charge
             total_amount = subtotal + charges
-            
-            user_data = self.data_manager.get_user_data(session_id)
-            user_name = user_data.get("display_name", state.get("user_name", "Guest")) if user_data else state.get("user_name", "Guest")
-            phone_number = user_data.get("phone_number", session_id) if user_data else session_id
-            address = state.get("address", user_data.get("address", "") if user_data else "")
-            
-            items = []
-            for item_name, item_data in cart.items():
-                product_id = item_data.get("product_id")
-                if not product_id:
-                    product_id = self.data_manager._get_product_id_by_name(item_name)
-                    if not product_id:
-                        logger.error(f"Could not find product_id for item: {item_name}")
-                        continue
-                    
-                items.append({
-                    "item_name": item_name,
-                    "quantity": item_data.get("quantity", 1),
-                    "unit_price": item_data.get("price", 0.0),
-                    "product_id": product_id
-                })
-            
-            if not items:
-                logger.error(f"No valid items in cart for session {session_id}")
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "❌ Error: No valid items in your cart. Please try ordering again."
-                )
-            
+
+            # Generate order ID
+            order_id = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+            state["order_id"] = order_id
+
+            # Prepare order data
             order_data = {
+                "order_id": order_id,
                 "customer_id": session_id,
-                "business_type_id": getattr(self.config, 'BUSINESS_TYPE_ID', "1"),
-                "address": address,
-                "status": "pending_payment",
-                "total_amount": total_amount,
-                "charges": charges,
-                "payment_reference": f"TEMP-{uuid.uuid4().hex[:8]}",
-                "payment_method_type": "paystack",
-                "timestamp": datetime.datetime.now(datetime.timezone.utc),
-                "customers_note": state.get("order_note", ""),
-                "items": items
-            }
-            
-            try:
-                order_id = self.data_manager.save_user_order(order_data)
-                if not order_id:
-                    logger.error(f"Failed to save order - no order_id returned for session {session_id}")
-                    raise Exception("No order_id returned from save_user_order")
-                    
-                logger.info(f"Order {order_id} saved to database for session {session_id}")
-                state["order_id"] = str(order_id)
-                state["total_amount"] = total_amount
-                state["charges"] = charges
-                state["order_status"] = "pending_payment"
-                state["order_timestamp"] = order_data["timestamp"].isoformat()
-                
-                user_data_to_save = {
-                    "name": user_name,
-                    "phone_number": phone_number,
-                    "address": address,
-                    "user_perferred_name": user_name,
-                    "address2": user_data.get("address2", "") if user_data else "",
-                    "address3": user_data.get("address3", "") if user_data else ""
-                }
-                self.data_manager.save_user_details(session_id, user_data_to_save)
-                
-                if hasattr(self, 'lead_tracking_handler') and self.lead_tracking_handler:
-                    self.lead_tracking_handler.track_order_conversion(session_id, str(order_id), total_amount)
-                
-                if hasattr(self, 'payment_service') and self.payment_service:
-                    state["current_state"] = "payment_processing"
-                    state["current_handler"] = "payment_handler"
-                    self.session_manager.update_session_state(session_id, state)
-                    return {
-                        "redirect": "payment_handler",
-                        "redirect_message": "initiate_payment",
-                        "order_id": str(order_id),
-                        "total_amount": total_amount,
-                        "phone_number": phone_number
+                "items": [
+                    {
+                        "name": item_name,
+                        "quantity": item_data.get("quantity", 1),
+                        "price": item_data.get("price", 0.0),
+                        "total_price": item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
                     }
-                else:
-                    logger.error(f"Payment service not available for session {session_id}")
-                    return self.whatsapp_service.create_text_message(
-                        session_id,
-                        f"🎉 Order #{order_id} created!\n\n"
-                        f"Total: ₦{total_amount:,.2f}\n\n"
-                        f"⚠️ Payment service is currently unavailable. Please contact support."
-                    )
-                    
+                    for item_name, item_data in cart.items()
+                ],
+                "subtotal": subtotal,
+                "delivery_fee": self.DELIVERY_FEE,
+                "service_charge": service_charge,
+                "total_amount": total_amount,
+                "delivery_address": state.get("address", ""),
+                "customer_name": state.get("user_name", "Guest"),
+                "customer_phone": state.get("phone_number", session_id),
+                "order_note": state.get("order_note", ""),
+                "status": "pending payment",
+                "created_at": datetime.datetime.now().isoformat()
+            }
+
+            # Save order to database
+            try:
+                self.data_manager.save_order(order_data)
+                logger.info(f"Order {order_id} saved to database for session {session_id}.")
             except Exception as e:
-                logger.error(f"Failed to process order for session {session_id}: {e}", exc_info=True)
+                logger.error(f"Failed to save order {order_id} for session {session_id}: {e}")
                 return self.whatsapp_service.create_text_message(
                     session_id,
-                    "❌ Sorry, there was an error processing your order. Please try again or contact support."
+                    "❌ Sorry, there was an error saving your order. Please try again."
                 )
-        
+
+            # Track order conversion
+            try:
+                user_data = self.data_manager.get_user_data(session_id)
+                user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
+                self.track_order_conversion(session_id, order_id, total_amount)
+            except Exception as e:
+                logger.error(f"Error tracking order conversion: {e}")
+
+            # Redirect to payment handler
+            state["current_state"] = "payment_processing"
+            state["current_handler"] = "payment_handler"
+            self.session_manager.update_session_state(session_id, state)
+
+            return {
+                "redirect": "payment_handler",
+                "redirect_message": "initiate_payment"
+            }
+
         elif message_strip == "update_address":
-            logger.info(f"User opted to update address for session {session_id}.")
+            logger.info(f"User chose to update address for session {session_id}.")
+            # FIXED: Proper redirect to location handler instead of going to main menu
             state["current_state"] = "address_collection_menu"
             state["current_handler"] = "location_handler"
-            state["from_confirm_order"] = True  # Flag to return to confirm_order
+            state["from_confirm_order"] = True  # Set flag to return to confirmation after address update
             self.session_manager.update_session_state(session_id, state)
+            
             return {
                 "redirect": "location_handler",
-                "redirect_message": "update_address"  # This will be handled by the location handler
+                "redirect_message": "update_address"  # This triggers the location handler's address collection
             }
-        
+
         elif message_strip == "add_note":
-            logger.info(f"User chose to add a note after confirmation for session {session_id}.")
+            logger.info(f"User chose to add a note for session {session_id}.")
             state["current_state"] = "add_note"
+            state["from_order_confirmation"] = True  # Flag to return to confirmation
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to skip adding a note."
+                "Please type your note for the order (e.g., 'Please deliver after 5 PM'). Type 'back' to return to order confirmation."
             )
-        
+
         elif message_strip == "cancel_order":
-            logger.info(f"User cancelled order for session {session_id}.")
+            logger.info(f"User chose to cancel order for session {session_id}.")
             state["cart"] = {}
+            return self.handle_back_to_main(
+                state,
+                session_id,
+                message="Your order has been cancelled. How can I help you today?"
+            )
+
+        else:
+            logger.debug(f"Invalid input '{message}' in confirm order state for session {session_id}.")
+            buttons = [
+                {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},
+                {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},
+                {"type": "reply", "reply": {"id": "cancel_order", "title": "❌ Cancel Order"}}
+            ]
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                "I didn't understand that. Please use the buttons to confirm your order, update your address, or cancel.",
+                buttons
+            )
+            
+        # Add this method to your OrderHandler class
+
+    def handle_show_order_confirmation_after_address_update(self, state: Dict, session_id: str) -> Dict:
+        """Handle returning to order confirmation after address update."""
+        logger.info(f"Showing order confirmation after address update for session {session_id}")
+        
+        # Ensure we have the necessary data
+        if not state.get("cart"):
+            logger.warning(f"Cart is empty after address update for session {session_id}")
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "Your order has been cancelled. How can I help you today?"
+                "Your cart appears to be empty. Let's start fresh. How can I help you today?"
             )
         
-        else:
-            logger.debug(f"Invalid input '{message}' in confirm order state for session {session_id}.")
-            # Re-show the order confirmation if invalid input
-            return self._show_order_confirmation(state, session_id)
-
-    def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
-        """Handle user providing new name and address via LocationAddressHandler."""
-        logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
-        
-        state["current_state"] = "address_collection_menu"
-        state["current_handler"] = "location_handler"
-        state["from_confirm_details"] = True  # Flag to return to confirm_details
+        # Update the state properly
+        state["current_state"] = "confirm_order"
+        state["current_handler"] = "order_handler"
         self.session_manager.update_session_state(session_id, state)
-        return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+        
+        # Show the updated order confirmation
+        return self._show_order_confirmation(state, session_id)
+
+        def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
+            """Handle user providing new name and address via LocationAddressHandler."""
+            logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
+            
+            state["current_state"] = "address_collection_menu"
+            state["current_handler"] = "location_handler"
+            state["from_confirm_details"] = True  # Flag to return to confirm_details
+            self.session_manager.update_session_state(session_id, state)
+            return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
 
     def handle_payment_pending_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle messages when payment is pending with Paystack."""

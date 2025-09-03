@@ -21,42 +21,34 @@ class LocationAddressHandler(BaseHandler):
         when called from confirm_order state, otherwise includes live location and manual entry.
         """
         state["current_state"] = "address_collection_menu"
-        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler is set
-        from_confirm_order = state.get("from_confirm_order", False)
+        state["current_handler"] = "location_handler"
+        
+        # Check if we're coming from order confirmation (address update)
+        from_confirm_order = state.get("from_confirm_order", False) or state.get("from_confirm_details", False)
 
         if from_confirm_order:
             buttons = [
-                {"type": "reply", "reply": {"id": "preset_palmpay_salvation", "title": "Palmpay Salvation"}},  # 19 chars
-                {"type": "reply", "reply": {"id": "preset_howson_wright", "title": "Howson Wright"}},      # 16 chars
-                {"type": "reply", "reply": {"id": "enter_your_address", "title": "Enter Your Address"}}   # 19 chars
+                {"type": "reply", "reply": {"id": "preset_palmpay_salvation", "title": "Palmpay Salvation"}},
+                {"type": "reply", "reply": {"id": "preset_howson_wright", "title": "Howson Wright"}},
+                {"type": "reply", "reply": {"id": "enter_your_address", "title": "Enter Your Address"}}
             ]
             message = "📍 *Select or Enter Delivery Address*\n\nPlease choose a preset location or enter your own address:"
         else:
             buttons = [
-                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
-                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
+                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},
+                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}
             ]
             # Only add saved address option if there's actually a saved address
             if state.get("address"):
-                buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})  # 14 chars
+                buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})
             
             saved_address_text = f"\n\n🏠 *Last address:* {state['address']}" if state.get("address") else ""
             message = f"📍 *Provide delivery address*{saved_address_text}\n\nPlease select an option below:"
 
-        # Validate button titles
-        for button in buttons:
-            title = button["reply"]["title"]
-            if len(title) > 20:
-                logger.error("Button title exceeds 20 chars: %s", title)
-                return self.whatsapp_service.create_text_message(
-                    session_id,
-                    "Error: Invalid button configuration. Please try again or contact support."
-                )
-
         # Update session state before returning
         self.session_manager.update_session_state(session_id, state)
         
-        logger.debug("Initiating address collection for session %s, from_confirm_order: %s, buttons: %s", session_id, from_confirm_order, buttons)
+        logger.debug("Initiating address collection for session %s, from_confirm_order: %s", session_id, from_confirm_order)
         return self.whatsapp_service.create_button_message(session_id, message, buttons)
 
     def handle_address_collection_menu(self, state: dict, message: str, session_id: str):
@@ -116,19 +108,19 @@ class LocationAddressHandler(BaseHandler):
         
         else:
             logger.debug("Invalid option '%s' for session %s", message, session_id)
-            # Fix: Rebuild buttons based on current context
-            from_confirm_order = state.get("from_confirm_order", False)
+            # Rebuild buttons based on current context
+            from_confirm_order = state.get("from_confirm_order", False) or state.get("from_confirm_details", False)
             
             if from_confirm_order:
                 buttons = [
-                    {"type": "reply", "reply": {"id": "preset_palmpay_salvation", "title": "Palmpay Salvation"}},  # 19 chars
-                    {"type": "reply", "reply": {"id": "preset_howson_wright", "title": "Howson Wright"}},      # 16 chars
-                    {"type": "reply", "reply": {"id": "enter_your_address", "title": "Enter Your Address"}}   # 19 chars
+                    {"type": "reply", "reply": {"id": "preset_palmpay_salvation", "title": "Palmpay Salvation"}},
+                    {"type": "reply", "reply": {"id": "preset_howson_wright", "title": "Howson Wright"}},
+                    {"type": "reply", "reply": {"id": "enter_your_address", "title": "Enter Your Address"}}
                 ]
             else:
                 buttons = [
-                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
-                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
+                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},
+                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}
                 ]
                 if state.get("address"):
                     buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})
@@ -144,13 +136,13 @@ class LocationAddressHandler(BaseHandler):
         Shows submenu for live location or manual address entry when 'Enter your address' is selected.
         """
         state["current_state"] = "address_entry_submenu"
-        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler stays consistent
+        state["current_handler"] = "location_handler"
         self.session_manager.update_session_state(session_id, state)
         logger.info("Showing address entry submenu for session %s", session_id)
         
         buttons = [
-            {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
-            {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
+            {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},
+            {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}
         ]
         
         return self.whatsapp_service.create_button_message(
@@ -172,8 +164,8 @@ class LocationAddressHandler(BaseHandler):
         else:
             logger.debug("Invalid option '%s' in address entry submenu for session %s", message, session_id)
             buttons = [
-                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
-                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
+                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},
+                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}
             ]
             return self.whatsapp_service.create_button_message(
                 session_id,
@@ -186,7 +178,7 @@ class LocationAddressHandler(BaseHandler):
         Prompts user to share live location via WhatsApp.
         """
         state["current_state"] = "awaiting_live_location"
-        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler is set
+        state["current_handler"] = "location_handler"
         self.session_manager.update_session_state(session_id, state)
         logger.info("Requested live location for session %s", session_id)
         return self.whatsapp_service.create_text_message(
@@ -204,7 +196,7 @@ class LocationAddressHandler(BaseHandler):
         Prompts user to manually type their delivery address.
         """
         state["current_state"] = "manual_address_input"
-        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler is set
+        state["current_handler"] = "location_handler"
         self.session_manager.update_session_state(session_id, state)
         logger.info("Requested manual address for session %s", session_id)
         return self.whatsapp_service.create_text_message(
@@ -238,23 +230,22 @@ class LocationAddressHandler(BaseHandler):
 
         if not latitude or not longitude:
             logger.warning("Invalid location data for session %s", session_id)
-            # Fix: Maintain current handler and state
             state["current_state"] = "address_collection_menu"
-            state["current_handler"] = "location_address_handler"
+            state["current_handler"] = "location_handler"
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_button_message(
                 session_id,
                 "❌ *Invalid location*\n\nPlease select an option below:",
                 [
-                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Try Share Again"}},  # 16 chars
-                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
+                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Try Share Again"}},
+                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}
                 ]
             )
 
         readable_address = location_address
         map_link = ""
         
-        # Fix: Better address handling
+        # Better address handling
         if (not readable_address or readable_address == "unknown" or len(readable_address.strip()) == 0) and self.config.ENABLE_LOCATION_FEATURES:
             try:
                 geocoded_address = self.location_service.get_address_from_coordinates(latitude, longitude)
@@ -275,13 +266,13 @@ class LocationAddressHandler(BaseHandler):
             state["longitude"] = longitude
             state["map_link"] = map_link
             state["current_state"] = "confirm_detected_location"
-            state["current_handler"] = "location_address_handler"
+            state["current_handler"] = "location_handler"
             self._save_address_to_user_details(state, readable_address, latitude, longitude, map_link, session_id)
 
             location_info = self.location_service.format_location_info(latitude, longitude, readable_address)
             buttons = [
-                {"type": "reply", "reply": {"id": "confirm_location", "title": "✅ Use Address"}},  # 12 chars
-                {"type": "reply", "reply": {"id": "choose_different", "title": "📍 Choose Another"}}  # 15 chars
+                {"type": "reply", "reply": {"id": "confirm_location", "title": "✅ Use Address"}},
+                {"type": "reply", "reply": {"id": "choose_different", "title": "📍 Choose Another"}}
             ]
 
             self.session_manager.update_session_state(session_id, state)
@@ -297,14 +288,14 @@ class LocationAddressHandler(BaseHandler):
             maps_link_info = f"\n🗺️ *View on Maps:* {map_link}" if map_link else ""
 
             buttons = [
-                {"type": "reply", "reply": {"id": "use_coordinates", "title": "✅ Use Coordinates"}},  # 16 chars
-                {"type": "reply", "reply": {"id": "type_address_instead", "title": "✏️ Type Address"}}  # 13 chars
+                {"type": "reply", "reply": {"id": "use_coordinates", "title": "✅ Use Coordinates"}},
+                {"type": "reply", "reply": {"id": "type_address_instead", "title": "✏️ Type Address"}}
             ]
 
             state["temp_coordinates"] = {"latitude": latitude, "longitude": longitude}
             state["map_link"] = map_link
             state["current_state"] = "confirm_coordinates"
-            state["current_handler"] = "location_address_handler"
+            state["current_handler"] = "location_handler"
             self.session_manager.update_session_state(session_id, state)
             logger.warning("No readable address for %s from %s,%s. Awaiting coordinates confirmation.", session_id, latitude, longitude)
             return self.whatsapp_service.create_button_message(
@@ -320,11 +311,10 @@ class LocationAddressHandler(BaseHandler):
         address = original_message.strip()
         logger.debug("Handling manual address for %s: '%s'", session_id, address)
 
-        # Fix: Better validation logic
+        # Better validation logic
         if len(address) < 5 or not any(char.isalpha() for char in address):
-            # Fix: Maintain current handler
             state["current_state"] = "manual_address_input"
-            state["current_handler"] = "location_address_handler"
+            state["current_handler"] = "location_handler"
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_button_message(
                 session_id,
@@ -332,8 +322,8 @@ class LocationAddressHandler(BaseHandler):
                 "• Street name/number\n• Area/District\n• City/State\n\n" +
                 "Example: 123 Main St, Wuse 2, Abuja\n\nPlease select an option below:",
                 [
-                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Try Again"}},  # 10 chars
-                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}}  # 15 chars
+                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Try Again"}},
+                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}}
                 ]
             )
 
@@ -352,7 +342,7 @@ class LocationAddressHandler(BaseHandler):
             except Exception as e:
                 logger.error("Error geocoding address '%s' for %s: %s", address, session_id, e)
 
-        # Fix: Update state properly
+        # Update state properly
         state["address"] = address
         state["latitude"] = location_coordinates.get("latitude") if location_coordinates else None
         state["longitude"] = location_coordinates.get("longitude") if location_coordinates else None
@@ -386,9 +376,8 @@ class LocationAddressHandler(BaseHandler):
             state.pop("longitude", None)
             state.pop("address", None)
             state.pop("map_link", None)
-            # Fix: Reset to appropriate state
             state["current_state"] = "address_collection_menu"
-            state["current_handler"] = "location_address_handler"
+            state["current_handler"] = "location_handler"
             self.session_manager.update_session_state(session_id, state)
             logger.info("User %s chose different address method", session_id)
             return self.initiate_address_collection(state, session_id)
@@ -404,8 +393,8 @@ class LocationAddressHandler(BaseHandler):
                 session_id,
                 f"❌ *Invalid option: '{message}'*\n\n{location_info}\n\nPlease select an option below:",
                 [
-                    {"type": "reply", "reply": {"id": "confirm_location", "title": "✅ Use Address"}},  # 12 chars
-                    {"type": "reply", "reply": {"id": "choose_different", "title": "📍 Choose Another"}}  # 15 chars
+                    {"type": "reply", "reply": {"id": "confirm_location", "title": "✅ Use Address"}},
+                    {"type": "reply", "reply": {"id": "choose_different", "title": "📍 Choose Another"}}
                 ]
             )
 
@@ -436,9 +425,8 @@ class LocationAddressHandler(BaseHandler):
         elif message == "type_address_instead":
             state.pop("temp_coordinates", None)
             state.pop("map_link", None)
-            # Fix: Set proper state for manual address input
             state["current_state"] = "manual_address_input"
-            state["current_handler"] = "location_address_handler"
+            state["current_handler"] = "location_handler"
             self.session_manager.update_session_state(session_id, state)
             logger.info("User %s chose to type address instead", session_id)
             return self._request_manual_address(state, session_id)
@@ -451,8 +439,8 @@ class LocationAddressHandler(BaseHandler):
                 session_id,
                 f"❌ *Invalid option: '{message}'*\n\n{coordinates_text}{maps_link_info}\n\nPlease select an option below:",
                 [
-                    {"type": "reply", "reply": {"id": "use_coordinates", "title": "✅ Use Coordinates"}},  # 16 chars
-                    {"type": "reply", "reply": {"id": "type_address_instead", "title": "✏️ Type Address"}}  # 13 chars
+                    {"type": "reply", "reply": {"id": "use_coordinates", "title": "✅ Use Coordinates"}},
+                    {"type": "reply", "reply": {"id": "type_address_instead", "title": "✏️ Type Address"}}
                 ]
             )
 
@@ -463,16 +451,15 @@ class LocationAddressHandler(BaseHandler):
         if original_message and original_message.strip():
             logger.info("User %s typed '%s' while awaiting live location", session_id, original_message)
             
-            # Fix: Check if the typed message is actually an address attempt
             stripped_message = original_message.strip()
             if len(stripped_message) >= 5 and any(char.isalpha() for char in stripped_message):
                 logger.info("Treating typed message as manual address input for %s", session_id)
                 return self.handle_manual_address_input(state, original_message, session_id)
             
             buttons = [
-                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Try Share Again"}},  # 16 chars
-                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}},    # 13 chars
-                {"type": "reply", "reply": {"id": "back_to_menu", "title": "⬅️ Back to Menu"}}          # 14 chars
+                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Try Share Again"}},
+                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}},
+                {"type": "reply", "reply": {"id": "back_to_menu", "title": "⬅️ Back to Menu"}}
             ]
             return self.whatsapp_service.create_button_message(
                 session_id,
@@ -510,13 +497,13 @@ class LocationAddressHandler(BaseHandler):
 
     def _proceed_to_order_confirmation(self, state: dict, session_id: str, address: str, maps_info: str = ""):
         """
-        Transitions to order confirmation, redirecting to OrderHandler if from confirm_order.
+        FIXED: Properly handles transitions back to order confirmation.
         """
-        if state.get("from_confirm_order", False):
-            logger.info("Redirecting to OrderHandler for session %s after address update", session_id)
-            state["address"] = address
-            state["map_link"] = maps_info.replace("\n🗺️ *View on Maps:* ", "") if maps_info and "🗺️ *View on Maps:* " in maps_info else ""
+        # Check if we're coming from order confirmation (address update scenario)
+        if state.get("from_confirm_order", False) or state.get("from_confirm_details", False):
+            logger.info("Redirecting back to order confirmation after address update for session %s", session_id)
             
+            # Save address to user details
             user_data = {
                 "name": state.get("user_name", "Guest"),
                 "phone_number": session_id,
@@ -526,7 +513,7 @@ class LocationAddressHandler(BaseHandler):
                 "address3": "",
                 "latitude": state.get("latitude"),
                 "longitude": state.get("longitude"),
-                "map_link": state["map_link"]
+                "map_link": state.get("map_link", "")
             }
             try:
                 self.data_manager.save_user_details(session_id, user_data)
@@ -534,94 +521,43 @@ class LocationAddressHandler(BaseHandler):
             except Exception as e:
                 logger.error("Failed to save address to user details for %s: %s", session_id, e)
             
+            # Update state to go back to order confirmation
             state["current_state"] = "confirm_order"
             state["current_handler"] = "order_handler"
+            state["address"] = address
+            
+            # Clean up flags
             state.pop("from_confirm_order", None)
+            state.pop("from_confirm_details", None)
+            
             self.session_manager.update_session_state(session_id, state)
             
-            cart_summary = format_cart(state.get("cart", {}))
-            total_amount = sum(
-                item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
-                for item_data in state.get("cart", {}).values()
-            )
-            user_name = state.get("user_name", "Guest")
-            phone_number = state.get("phone_number", session_id)
-            
-            confirmation_message = (
-                f"✅ *Address Updated Successfully!*\n\n"
-                f"🛒 *Order Confirmation*\n\n"
-                f"📦 *Items Ordered:*\n{cart_summary}\n\n"
-                f"📍 *Delivery Details:*\n"
-                f"👤 Name: {user_name}\n"
-                f"📱 Phone: {phone_number}\n"
-                f"🏠 Address: {address}\n"
-                f"📝 Note: {state.get('order_note', 'None')}\n"
-                f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
-                f"Please review and select an option below:"
-            )
-            
-            buttons = [
-                {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},  # 14 chars
-                {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},  # 15 chars
-                {"type": "reply", "reply": {"id": "add_note", "title": "📝 Add Note"}}  # 11 chars
-            ]
-            
+            # Return redirect to order handler with confirmation
             return {
                 "redirect": "order_handler",
-                "redirect_message": "handle_confirm_order_state",
-                "additional_message": confirmation_message,
-                "buttons": buttons
+                "redirect_message": "show_order_confirmation_after_address_update"
             }
 
+        # For new orders (not address updates), check if cart exists
         if not state.get("cart"):
-            logger.warning("Empty cart for session %s", session_id)
+            logger.warning("Empty cart for session %s, redirecting to greeting", session_id)
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
             return {
-                "redirect": "menu_handler",
-                "redirect_message": "handle_menu_selection",
+                "redirect": "greeting_handler",
+                "redirect_message": "handle_back_to_main",
                 "additional_message": "Your cart is empty. Please add items before confirming an order."
             }
 
+        # For new orders with cart, proceed to order confirmation
         state["current_state"] = "confirm_order"
         state["current_handler"] = "order_handler"
         self.session_manager.update_session_state(session_id, state)
         
-        cart_summary = format_cart(state.get("cart", {}))
-        total_amount = sum(
-            item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
-            for item_data in state.get("cart", {}).values()
-        )
-        user_name = state.get("user_name", "Guest")
-        phone_number = state.get("phone_number", session_id)
-        
-        confirmation_message = (
-            f"✅ *Address Confirmed!*\n\n"
-            f"🛒 *Order Confirmation*\n\n"
-            f"📦 *Items Ordered:*\n{cart_summary}\n\n"
-            f"📍 *Delivery Details:*\n"
-            f"👤 Name: {user_name}\n"
-            f"📱 Phone: {phone_number}\n"
-            f"🏠 Address: {address}\n"
-           
-            f"📝 Note: {state.get('order_note', 'None')}\n"
-            f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
-            f"Please review and select an option below:"
-        )
-        
-        buttons = [
-            {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},  # 14 chars
-            {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},  # 15 chars
-            {"type": "reply", "reply": {"id": "add_note", "title": "📝 Add Note"}},  # 11 chars
-          
-        ]
-        
         return {
             "redirect": "order_handler",
-            "redirect_message": "handle_confirm_order_state",
-            "additional_message": confirmation_message,
-            "buttons": buttons
+            "redirect_message": "show_order_confirmation"
         }
 
     def get_state_handlers(self) -> dict:

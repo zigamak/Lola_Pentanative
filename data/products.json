@@ -21,16 +21,6 @@
       "quantity": 101
     },
     {
-      "id": "112",
-      "name": "Jollof Rice",
-      "variant": null,
-      "price": 150.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Delicious Nigerian-style jollof rice",
-      "quantity": 85
-    },
-    {
       "id": "114",
       "name": "Ghana Whakhey Rice",
       "variant": null,
@@ -49,6 +39,16 @@
       "availability_status": true,
       "description": "Crispy fried potatoes served with fish sauce",
       "quantity": 100
+    },
+    {
+      "id": "112",
+      "name": "Jollof Rice",
+      "variant": null,
+      "price": 150.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Delicious Nigerian-style jollof rice",
+      "quantity": 81
     }
   ],
   "Side Dish": [

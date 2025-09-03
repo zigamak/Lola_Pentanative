@@ -208,6 +208,8 @@ class GreetingHandler(BaseHandler):
         user_data["display_name"] = preferred_name
         user_data["user_id"] = session_id
         user_data["user_number"] = session_id
+        user_data["name"] = preferred_name  # Add this for consistency
+        user_data["phone_number"] = session_id  # Add this for order handler compatibility
         self.data_manager.save_user_details(session_id, user_data)
 
         state["user_name"] = preferred_name
@@ -237,6 +239,7 @@ class GreetingHandler(BaseHandler):
     def handle_collect_delivery_address_state(self, state: Dict, message: str, session_id: str) -> Dict[str, Any]:
         """
         Handles the user's delivery address input from a button selection or free text.
+        FIXED: Properly saves address data for order handler compatibility.
         """
         delivery_address = None
         if message == "palmpay_address":
@@ -260,19 +263,36 @@ class GreetingHandler(BaseHandler):
 
         self.logger.info(f"Session {session_id}: Delivery address received: '{delivery_address}'.")
 
+        # FIXED: Save comprehensive user data that order handler expects
         user_data = self.data_manager.get_user_data(session_id) or {}
-        user_data["address"] = delivery_address
-        user_data["user_id"] = session_id
-        user_data["user_number"] = session_id
+        user_data.update({
+            "address": delivery_address,
+            "user_id": session_id,
+            "user_number": session_id,
+            "phone_number": session_id,  # Critical for order handler
+            "name": state.get("user_name", "Guest"),  # Critical for order handler
+            "user_perferred_name": state.get("user_name", "Guest"),
+            "display_name": state.get("user_name", "Guest"),
+            "address2": "",  # Order handler expects these
+            "address3": "",
+            "latitude": None,  # Initialize location data
+            "longitude": None,
+            "map_link": ""
+        })
         self.data_manager.save_user_details(session_id, user_data)
 
-        state["address"] = delivery_address
-        state["current_state"] = "greeting"
-        state["current_handler"] = "greeting_handler"
+        # FIXED: Update session state with all necessary data
+        state.update({
+            "address": delivery_address,
+            "user_name": state.get("user_name", "Guest"),
+            "phone_number": session_id,  # Critical for order handler
+            "current_state": "greeting",
+            "current_handler": "greeting_handler"
+        })
         self.session_manager.update_session_state(session_id, state)
 
         username = state.get("user_name", "Guest")
-        self.logger.info(f"Session {session_id} onboarding complete. Greeting {username}.")
+        self.logger.info(f"Session {session_id} onboarding complete for {username}. Address saved: {delivery_address}")
 
         user_type = "paid" if self._has_user_made_payment(session_id) else "guest"
         return self._send_greeting_with_image(session_id, username, user_type)
@@ -301,17 +321,32 @@ class GreetingHandler(BaseHandler):
         """Handle back to main menu navigation."""
         user_data = self.data_manager.get_user_data(session_id)
         user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
+        
+        # FIXED: Preserve user address when going back to main menu
+        saved_address = state.get("address") or (user_data.get("address", "") if user_data else "")
+        
         state["current_state"] = "greeting"
         state["current_handler"] = "greeting_handler"
+        state["user_name"] = user_name
+        state["phone_number"] = session_id
+        if saved_address:
+            state["address"] = saved_address
+        
+        # Clear cart and ordering state but preserve user data
         if "cart" in state:
             state["cart"] = {}
         if "selected_category" in state:
             del state["selected_category"]
         if "selected_item" in state:
             del state["selected_item"]
+        # Clear order-specific flags
+        state.pop("from_confirm_order", None)
+        state.pop("from_confirm_details", None)
+        state.pop("order_note", None)
+        state.pop("order_id", None)
 
         self.session_manager.update_session_state(session_id, state)
-        self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
+        self.logger.info(f"Session {session_id} returned to main menu (greeting state). Address preserved: {saved_address}")
 
         user_type = "paid" if self._has_user_made_payment(session_id) else "guest"
         return self._send_greeting_with_image(session_id, user_name, user_type)
