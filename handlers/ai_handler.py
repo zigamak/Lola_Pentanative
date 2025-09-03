@@ -4,7 +4,7 @@ import json
 import re
 from typing import Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime # Import the datetime module
+from datetime import datetime
 
 from .base_handler import BaseHandler
 from services.ai_service import AIService 
@@ -20,7 +20,7 @@ class OrderItem:
     price: float
 
 class AIHandler(BaseHandler):
-    """Handles AI-powered order processing and chatbot interactions."""
+    """Handles AI-powered order processing for bulk orders."""
     
     def __init__(self, config, session_manager, data_manager, whatsapp_service):
         super().__init__(config, session_manager, data_manager, whatsapp_service)
@@ -35,8 +35,8 @@ class AIHandler(BaseHandler):
             "Wednesday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-wednesday.jpg",
             "Thursday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-thursday.jpg",
             "Friday": "https://eventio.africa/wp-content/uploads/2025/08/ganador-friday.jpg",
-            "Saturday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg", # Fallback for weekends
-            "Sunday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg" # Fallback for weekends
+            "Saturday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg",
+            "Sunday": "https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg"
         }
 
         if not self.ai_enabled:
@@ -47,51 +47,21 @@ class AIHandler(BaseHandler):
     def _get_daily_menu_url(self):
         """
         Helper method to get the menu image URL for the current day of the week.
-        It uses the datetime module to get the weekday name (e.g., "Monday").
-        If a day is not in the dictionary, it will return a default URL.
         """
-        current_day = datetime.now().strftime("%A") # Returns the full weekday name
-        # Use .get() with a default fallback URL for safety
+        current_day = datetime.now().strftime("%A")
         return self.menu_image_urls.get(current_day, "https://test.mackennytutors.com/wp-content/uploads/2025/06/ganador.jpg")
 
     def handle_ai_menu_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
         """Handle AI menu selection state."""
         self.logger.info(f"AIHandler: Handling message '{message}' in AI menu state for session {session_id}. Original: '{original_message}'")
 
-        if message == "lola_chatbot":
-            return self._handle_lola_chatbot(state, session_id)
-        elif message == "ai_bulk_order":
+        if message == "ai_bulk_order":
             return self._handle_ai_bulk_order(state, session_id)
         elif message == "back_to_main":
             return self.handle_back_to_main(state, session_id)
-        elif message == "initial_entry" or message not in ["lola_chatbot", "ai_bulk_order", "back_to_main"]:
-            return self._show_ai_menu_options(state, session_id, "Please select an AI option:")
         else:
-            return self._show_ai_menu_options(state, session_id, "Please select a valid option:")
-    
-    def _handle_lola_chatbot(self, state: Dict, session_id: str) -> Dict:
-        """Handle Lola chatbot interaction, setting state and sending welcome message."""
-        state["current_state"] = "lola_chat"
-        state["ai_mode"] = "chatbot"
-        state["current_handler"] = "ai_handler"
-        self.session_manager.update_session_state(session_id, state)
-        
-        # Get the correct image URL for the day using the new helper method
-        image_url = self._get_daily_menu_url()
-        self.whatsapp_service.send_image_message(session_id, image_url, caption="Our Delicious Menu!")
+            return self._handle_ai_bulk_order(state, session_id)
 
-        welcome_message = (
-            "🤖 *Hi! I'm Lola, your AI assistant!*\n\n"
-            "I can help you with:\n"
-            "• Menu recommendations\n"
-            "• Order assistance\n"
-            "• General questions about our food\n"
-            "• Nutritional information\n\n"
-            "What would you like to know? Just ask me anything! 😊\n\n"
-            "_Type 'menu' to go back to the main menu_"
-        )
-        return self.whatsapp_service.create_text_message(session_id, welcome_message)
-    
     def _handle_ai_bulk_order(self, state: Dict, session_id: str) -> Dict:
         """Handle AI bulk order processing, setting state and sending welcome message."""
         state["current_state"] = "ai_bulk_order"
@@ -99,7 +69,6 @@ class AIHandler(BaseHandler):
         state["current_handler"] = "ai_handler"
         self.session_manager.update_session_state(session_id, state)
         
-        # Get the correct image URL for the day using the new helper method
         image_url = self._get_daily_menu_url()
         self.whatsapp_service.send_image_message(session_id, image_url, caption="Our Delicious Menu!")
 
@@ -108,34 +77,6 @@ class AIHandler(BaseHandler):
             "Take a look at the menu and type in your order\n\n"
         )
         return self.whatsapp_service.create_text_message(session_id, bulk_order_message)
-    
-    def handle_lola_chat_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
-        """Handle Lola chatbot conversation state."""
-        self.logger.info(f"AIHandler: Handling message '{message}' in Lola chat state for session {session_id}. Original: '{original_message}'")
-        
-        if message == "start_lola_chat":
-            return self._handle_lola_chatbot(state, session_id)
-        
-        if message and message.lower() == "menu":
-            return self.handle_back_to_main(state, session_id)
-        
-        if not self.ai_service.ai_enabled:
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "🤖 Sorry, the AI assistant is currently unavailable. Please try the regular menu options.\n\nType 'menu' to return to the main menu."
-            )
-        
-        try:
-            ai_response = self.ai_service.generate_lola_response(original_message)
-            return self.whatsapp_service.create_text_message(session_id, ai_response)
-        
-        except Exception as e:
-            logger.error(f"Error in Lola chat for session {session_id} when calling AIService: {e}", exc_info=True)
-            error_message = (
-                "🤖 Sorry, I'm having trouble processing that right now. "
-                "Please try again or type 'menu' to return to the main menu."
-            )
-            return self.whatsapp_service.create_text_message(session_id, error_message)
     
     def handle_ai_bulk_order_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
         """Handle AI bulk order processing state."""
@@ -163,30 +104,23 @@ class AIHandler(BaseHandler):
                 )
                 return self.whatsapp_service.create_text_message(session_id, error_message)
             
-            # --- NEW LOGIC START ---
-            # If any items are unrecognized, prioritize this message and ask user to rephrase.
-            # This prevents entering clarification for ambiguous items if there are clear unrecognized ones.
             if parsed_order.get("unrecognized_items"):
                 summary_with_unrecognized = self._create_order_summary(parsed_order)
                 
                 response_message = (
                     f"{summary_with_unrecognized}\n\n"
-                    "🚫 *Some items in your order were not found in our menu (Unrecognized Items above).*\n"
                     "Please ensure you are selecting from our *existing products* only. "
                     "You can rephrase your order, or type 'menu' to go back to the main menu."
                 )
                 
-                # Keep the user in the 'ai_bulk_order' state to allow them to retry or go back
                 state["current_state"] = "ai_bulk_order" 
                 state["current_handler"] = "ai_handler"
                 self.session_manager.update_session_state(session_id, state)
                 
                 return self.whatsapp_service.create_text_message(session_id, response_message)
-            # --- NEW LOGIC END ---
 
-            # If no unrecognized items, proceed with existing logic for ambiguous or recognized items
             state["parsed_order"] = parsed_order
-            state["current_handler"] = "ai_handler" # Keep handler consistent
+            state["current_handler"] = "ai_handler"
             
             if parsed_order.get("ambiguous_items"):
                 state["current_state"] = "ai_order_clarification"
@@ -218,7 +152,7 @@ class AIHandler(BaseHandler):
                     buttons
                 )
             
-            else: # Fallback for cases where no items are recognized, ambiguous, or unrecognized
+            else:
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     "I couldn't find any items to add to your order. Would you like to try again or see our menu?"
@@ -307,8 +241,6 @@ class AIHandler(BaseHandler):
         
         selected_item_name = None
         for match_name in possible_matches:
-            # Use original message for matching if needed, or stick to processed 'message'
-            # Assuming 'message' is already cleaned for button IDs
             if message.lower().strip() == match_name.lower().replace(" ", "_").replace("-", "_"):
                 selected_item_name = match_name
                 break
@@ -318,15 +250,14 @@ class AIHandler(BaseHandler):
             item_id = None
             found_item_data = None
 
-            # Iterate through menu_data to find the selected item's full details
             for category, items_data in self.data_manager.menu_data.items():
-                if isinstance(items_data, dict): # Old format, likely not used with product_inventory sync
+                if isinstance(items_data, dict):
                     if selected_item_name in items_data:
                         item_price = items_data[selected_item_name]
                         item_id = f"{category.lower().replace(' ', '_')}_{selected_item_name.lower().replace(' ', '_')}"
                         found_item_data = {"name": selected_item_name, "price": item_price, "id": item_id}
                         break
-                elif isinstance(items_data, list): # Expected format from product_inventory sync
+                elif isinstance(items_data, list):
                     for item_dict in items_data:
                         if isinstance(item_dict, dict) and item_dict.get("name") == selected_item_name:
                             item_price = item_dict.get("price", 0.0)
@@ -343,7 +274,7 @@ class AIHandler(BaseHandler):
                     "item_id": item_id,
                     "name": selected_item_name,
                     "quantity": original_qty, 
-                    "variations": found_item_data.get("variations", {}), # Use variations from found_item_data
+                    "variations": found_item_data.get("variations", {}),
                     "price": item_price,
                     "total_price": original_qty * item_price
                 }
@@ -354,7 +285,7 @@ class AIHandler(BaseHandler):
                 
                 parsed_order["order_total"] = parsed_order.get("order_total", 0.0) + recognized_item["total_price"]
 
-                ambiguous_items.pop(0) # Remove the clarified item
+                ambiguous_items.pop(0)
 
                 state["parsed_order"] = parsed_order
                 self.session_manager.update_session_state(session_id, state)
@@ -373,7 +304,6 @@ class AIHandler(BaseHandler):
                         clarification_buttons
                     )
                 else:
-                    # All ambiguous items clarified, move to confirmation
                     state["current_state"] = "ai_order_confirmation"
                     state["current_handler"] = "ai_handler"
                     self.session_manager.update_session_state(session_id, state)
@@ -406,41 +336,6 @@ class AIHandler(BaseHandler):
                 clarification_buttons
             )
 
-    def _show_ai_menu_options(self, state: Dict, session_id: str, message: str = "Choose an AI option:") -> Dict:
-        """Show AI menu options."""
-        if not self.ai_service.ai_enabled:
-            fallback_message = (
-                "🤖 *AI Assistant Currently Unavailable*\n\n"
-                "Our AI features are temporarily offline. Please use our regular menu options instead.\n\n"
-                "You can still:\n"
-                "📱 Browse our full menu\n"
-                "❓ Check our FAQ\n"
-                "📝 Send us your feedback"
-            )
-            
-            buttons = [
-                {"type": "reply", "reply": {"id": "order", "title": "📱 Order Menu"}},
-                {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
-                {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back to Main"}}
-            ]
-            
-            return self.whatsapp_service.create_button_message(session_id, fallback_message, buttons)
-        
-        buttons = [
-            {"type": "reply", "reply": {"id": "lola_chatbot", "title": "🤖 Lola Chatbot"}},
-            {"type": "reply", "reply": {"id": "ai_bulk_order", "title": "🛒 AI Bulk Order"}},
-            {"type": "reply", "reply": {"id": "back_to_main", "title": "🔙 Back to Main"}}
-        ]
-        
-        full_message = (
-            f"🤖 *AI Assistant Options*\n\n"
-            f"🤖 *Lola Chatbot* - Chat with our AI assistant\n"
-            f"🛒 *AI Bulk Order* - Order multiple items at once\n\n"
-            f"{message}"
-        )
-        
-        return self.whatsapp_service.create_button_message(session_id, full_message, buttons)
-    
     def _create_order_summary(self, parsed_order: Dict[str, Any]) -> str:
         """Create formatted order summary."""
         if not parsed_order.get("success"):
@@ -460,7 +355,7 @@ class AIHandler(BaseHandler):
         if parsed_order.get("unrecognized_items"):
             summary += "\n❌ *Unrecognized Items:*\n"
             for item in parsed_order["unrecognized_items"]:
-                summary += f"🚫 {item['input']} ({item['message']})\n"
+                summary += f"🚫 Oops! {item['input']} isn’t on our menu 😊\nKindly pick from the options above so we can process your order quickly!\n"
                 
         summary += f"\n*Total: ₦{parsed_order.get('order_total', 0.0):,.2f}*"
         
@@ -470,7 +365,7 @@ class AIHandler(BaseHandler):
         """Create buttons for clarifying an ambiguous item."""
         buttons = []
         if ambiguous_items:
-            ambiguous_item = ambiguous_items[0] # Only create buttons for the first ambiguous item
+            ambiguous_item = ambiguous_items[0]
             for i, match in enumerate(ambiguous_item.get("possible_matches", [])):
                 button_id = match.lower().replace(" ", "_").replace("-", "_") 
                 buttons.append({"type": "reply", "reply": {"id": button_id, "title": match}})
