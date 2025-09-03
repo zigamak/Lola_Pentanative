@@ -625,41 +625,48 @@ class OrderHandler(BaseHandler):
             charges = self.DELIVERY_FEE + service_charge
             total_amount = subtotal + charges
 
-            # Generate order ID
+            # Generate custom order ID for user-facing communication
             order_id = f"ORD-{uuid.uuid4().hex[:8].upper()}"
-            state["order_id"] = order_id
+            state["order_id"] = order_id  # Store custom order_id for display
 
-            # Prepare order data
+            # Prepare order data for database
             order_data = {
-                "order_id": order_id,
+                "order_id": order_id,  # Custom order_id for user-facing reference
                 "customer_id": session_id,
                 "items": [
                     {
-                        "name": item_name,
+                        "item_name": item_name,
                         "quantity": item_data.get("quantity", 1),
-                        "price": item_data.get("price", 0.0),
-                        "total_price": item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
+                        "unit_price": item_data.get("price", 0.0),
+                        "total_price": item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0)),
+                        "product_id": item_data.get("product_id")  # Ensure product_id is included
                     }
                     for item_name, item_data in cart.items()
                 ],
                 "subtotal": subtotal,
-                "delivery_fee": self.DELIVERY_FEE,
-                "service_charge": service_charge,
-                "total_amount": total_amount,
-                "delivery_address": state.get("address", ""),
-                "customer_name": state.get("user_name", "Guest"),
-                "customer_phone": state.get("phone_number", session_id),
-                "order_note": state.get("order_note", ""),
+                "address": state.get("address", ""),
                 "status": "pending payment",
-                "created_at": datetime.datetime.now().isoformat()
+                "total_amount": total_amount,
+                "payment_reference": None,  # Will be set in PaymentHandler
+                "payment_method_type": "paystack",
+                "service_charge": service_charge,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "customers_note": state.get("order_note", "")
             }
 
-            # Save order to database
+            # Save order to database and get the database-generated ID
             try:
-                self.data_manager.save_order(order_data)
-                logger.info(f"Order {order_id} saved to database for session {session_id}.")
+                db_order_id = self.data_manager.save_user_order(order_data)
+                if not db_order_id:
+                    logger.error(f"Failed to save order {order_id} for session {session_id}: No database ID returned")
+                    return self.whatsapp_service.create_text_message(
+                        session_id,
+                        "❌ Sorry, there was an error saving your order. Please try again."
+                    )
+                logger.info(f"Order {order_id} saved to database with DB ID {db_order_id} for session {session_id}.")
+                state["db_order_id"] = db_order_id  # Store database-generated ID
             except Exception as e:
-                logger.error(f"Failed to save order {order_id} for session {session_id}: {e}")
+                logger.error(f"Failed to save order {order_id} for session {session_id}: {e}", exc_info=True)
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     "❌ Sorry, there was an error saving your order. Please try again."
@@ -673,33 +680,33 @@ class OrderHandler(BaseHandler):
             except Exception as e:
                 logger.error(f"Error tracking order conversion: {e}")
 
-            # Redirect to payment handler
+            # Redirect to payment handler with db_order_id
             state["current_state"] = "payment_processing"
             state["current_handler"] = "payment_handler"
             self.session_manager.update_session_state(session_id, state)
 
             return {
                 "redirect": "payment_handler",
-                "redirect_message": "initiate_payment"
+                "redirect_message": "initiate_payment",
+                "order_id": order_id,  # Custom order_id for user-facing messages
+                "db_order_id": db_order_id  # Database-generated ID for queries
             }
 
         elif message_strip == "update_address":
             logger.info(f"User chose to update address for session {session_id}.")
-            # FIXED: Proper redirect to location handler instead of going to main menu
             state["current_state"] = "address_collection_menu"
             state["current_handler"] = "location_handler"
-            state["from_confirm_order"] = True  # Set flag to return to confirmation after address update
+            state["from_confirm_order"] = True
             self.session_manager.update_session_state(session_id, state)
-            
             return {
                 "redirect": "location_handler",
-                "redirect_message": "update_address"  # This triggers the location handler's address collection
+                "redirect_message": "update_address"
             }
 
         elif message_strip == "add_note":
             logger.info(f"User chose to add a note for session {session_id}.")
             state["current_state"] = "add_note"
-            state["from_order_confirmation"] = True  # Flag to return to confirmation
+            state["from_order_confirmation"] = True
             self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -727,8 +734,6 @@ class OrderHandler(BaseHandler):
                 "I didn't understand that. Please use the buttons to confirm your order, update your address, or cancel.",
                 buttons
             )
-            
-        # Add this method to your OrderHandler class
 
     def handle_show_order_confirmation_after_address_update(self, state: Dict, session_id: str) -> Dict:
         """Handle returning to order confirmation after address update."""
@@ -753,15 +758,15 @@ class OrderHandler(BaseHandler):
         # Show the updated order confirmation
         return self._show_order_confirmation(state, session_id)
 
-        def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
-            """Handle user providing new name and address via LocationAddressHandler."""
-            logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
+    def handle_get_new_name_address_state(self, state: Dict, message: str, session_id: str) -> Dict:
+        """Handle user providing new name and address via LocationAddressHandler."""
+        logger.debug(f"Handling get new name and address state for session {session_id}, message: {message}")
             
-            state["current_state"] = "address_collection_menu"
-            state["current_handler"] = "location_handler"
-            state["from_confirm_details"] = True  # Flag to return to confirm_details
-            self.session_manager.update_session_state(session_id, state)
-            return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
+        state["current_state"] = "address_collection_menu"
+        state["current_handler"] = "location_handler"
+        state["from_confirm_details"] = True  # Flag to return to confirm_details
+        self.session_manager.update_session_state(session_id, state)
+        return {"redirect": "location_handler", "redirect_message": "initiate_address_collection"}
 
     def handle_payment_pending_state(self, state: Dict, message: str, session_id: str) -> Dict:
         """Handle messages when payment is pending with Paystack."""

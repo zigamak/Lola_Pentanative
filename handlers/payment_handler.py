@@ -189,9 +189,10 @@ class PaymentHandler(BaseHandler):
                     "Your cart appears to be empty. Let's start fresh. How can I help you today?"
                 )
             
-            order_id = state.get("order_id")
-            if not order_id:
-                logger.error(f"No order_id found in state for session {session_id}")
+            db_order_id = state.get("db_order_id")
+            order_id = state.get("order_id")  # Custom order_id for user-facing messages
+            if not db_order_id:
+                logger.error(f"No db_order_id found in state for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -200,9 +201,9 @@ class PaymentHandler(BaseHandler):
                     "⚠️ No order found. Please try checking out again."
                 )
             
-            # Add validation to ensure order_id is not the string "None"
-            if str(order_id).lower() == "none":
-                logger.error(f"Invalid order_id 'None' found for session {session_id}")
+            # Add validation to ensure db_order_id is not the string "None"
+            if str(db_order_id).lower() == "none":
+                logger.error(f"Invalid db_order_id 'None' found for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -211,10 +212,11 @@ class PaymentHandler(BaseHandler):
                     "⚠️ Invalid order. Please try checking out again."
                 )
             
-            order_data = self.data_manager.get_order_by_id(order_id)
+            # Retrieve order by database-generated ID
+            order_data = self.data_manager.get_order_by_id(db_order_id)
             
             if not order_data:
-                logger.error(f"Order {order_id} not found in database for session {session_id}")
+                logger.error(f"Order with ID {db_order_id} not found in database for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -223,10 +225,11 @@ class PaymentHandler(BaseHandler):
                     "⚠️ Order not found. Please try checking out again."
                 )
             
-            # Get order totals from the existing order data (calculated by OrderHandler)
-            subtotal = order_data.get("total_amount", 0)
-            charges = order_data.get("charges", 0)
-            total_amount_ngn = subtotal + charges
+            # Get order totals from the existing order data
+            subtotal = order_data.get("subtotal", 0) or order_data.get("total_amount", 0)
+            service_charge = order_data.get("service_charge", 0)
+            charges = order_data.get("delivery_fee", 0) + service_charge
+            total_amount_ngn = order_data.get("total_amount", 0)
             
             if total_amount_ngn <= 0:
                 logger.warning(f"Invalid total amount {total_amount_ngn} for session {session_id}")
@@ -238,6 +241,7 @@ class PaymentHandler(BaseHandler):
                     "⚠️ Invalid order total. Please check your cart and try again."
                 )
             
+            # Use custom order_id for payment reference
             payment_reference = f"PAY-{order_id}"
             state["payment_reference"] = payment_reference
             
@@ -252,9 +256,9 @@ class PaymentHandler(BaseHandler):
                     "percentage": self.subaccount_percentage
                 } if self.subaccount_code else None
             }
-            success = self.data_manager.update_order_status(order_id, "pending_payment", payment_data)
+            success = self.data_manager.update_order_status(db_order_id, "pending_payment", payment_data)
             if not success:
-                logger.error(f"Failed to update order {order_id} to pending_payment status for session {session_id}")
+                logger.error(f"Failed to update order {db_order_id} to pending_payment status for session {session_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -275,7 +279,8 @@ class PaymentHandler(BaseHandler):
                 customer_name=state.get("user_name", "Guest"),
                 customer_phone=state.get("phone_number", session_id),
                 metadata={
-                    "order_id": order_id,
+                    "order_id": order_id,  # Custom order_id for reference
+                    "db_order_id": db_order_id,  # Database ID for internal use
                     "delivery_address": state.get("address", "Not provided"),
                     "charges": charges,
                     "phone_number": state.get("phone_number", session_id)
@@ -285,22 +290,21 @@ class PaymentHandler(BaseHandler):
             )
             
             if payment_url:
-                self.start_payment_monitoring(session_id, payment_reference, order_id)
+                self.start_payment_monitoring(session_id, payment_reference, db_order_id)
                 
                 state["current_state"] = "awaiting_payment"
                 state["current_handler"] = "payment_handler"
                 self.session_manager.update_session_state(session_id, state)
                 
-                logger.info(f"Payment link created successfully for order {order_id} with subaccount {self.subaccount_code}")
+                logger.info(f"Payment link created successfully for order {db_order_id} with subaccount {self.subaccount_code}")
                 
-                order_items = self.data_manager.get_order_items(order_id)
+                order_items = self.data_manager.get_order_items(db_order_id)
                 formatted_items = self._format_order_items(order_items)
                 
                 return self.whatsapp_service.create_text_message(
                     session_id,
                     f"🛒 *Order Created Successfully!*\n\n"
-                    f"📋 *Order ID:* {order_id}\n"
-                 
+                    f"📋 *Order ID:* {order_id}\n"  # Use custom order_id for user
                     f"💰 *Total:* ₦{total_amount_ngn:,.2f}\n"
                     f"🛒 *Items:* {formatted_items}\n\n"
                     f"💳 *Complete Payment:*\n{payment_url}\n\n"
@@ -309,7 +313,7 @@ class PaymentHandler(BaseHandler):
                     f"⏰ Payment link expires in 15 minutes."
                 )
             else:
-                logger.error(f"Failed to generate payment link for order {order_id}")
+                logger.error(f"Failed to generate payment link for order {db_order_id}")
                 state["current_state"] = "order_summary"
                 state["current_handler"] = "order_handler"
                 self.session_manager.update_session_state(session_id, state)
@@ -317,7 +321,7 @@ class PaymentHandler(BaseHandler):
                     session_id,
                     "⚠️ Failed to generate payment link. Please try again."
                 )
-                
+                    
         except Exception as e:
             logger.error(f"Error creating payment link for session {session_id}: {e}", exc_info=True)
             state["current_state"] = "order_summary"
@@ -327,7 +331,7 @@ class PaymentHandler(BaseHandler):
                 session_id,
                 "⚠️ Error processing payment. Please try again or contact support."
             )
-    
+        
     def _get_order_items_from_db(self, order_id: str) -> List[Dict]:
         """Fetch order items from whatsapp_order_details table using DataManager."""
         return self.data_manager.get_order_items(order_id)

@@ -1,16 +1,6 @@
 {
   "Main Dish": [
     {
-      "id": "113",
-      "name": "Fried Rice",
-      "variant": null,
-      "price": 2000.0,
-      "currency": "NGN",
-      "availability_status": true,
-      "description": "Fried rice with vegetables and seasoning",
-      "quantity": 96
-    },
-    {
       "id": "115",
       "name": "White Spaghetti & Sauce",
       "variant": null,
@@ -48,7 +38,17 @@
       "currency": "NGN",
       "availability_status": true,
       "description": "Delicious Nigerian-style jollof rice",
-      "quantity": 81
+      "quantity": 80
+    },
+    {
+      "id": "113",
+      "name": "Fried Rice",
+      "variant": null,
+      "price": 2000.0,
+      "currency": "NGN",
+      "availability_status": true,
+      "description": "Fried rice with vegetables and seasoning",
+      "quantity": 95
     }
   ],
   "Side Dish": [

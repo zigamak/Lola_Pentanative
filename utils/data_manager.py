@@ -341,7 +341,7 @@ class DataManager:
         """Save user order and order items to the database."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Validate or fetch product_id for each item
                     for item in order_data["items"]:
                         if not item.get("product_id"):
@@ -352,6 +352,15 @@ class DataManager:
                                 return None
                             item["product_id"] = product_id
                             logger.debug(f"Assigned product_id {product_id} to item {item['item_name']}")
+
+                    # Ensure payment_reference is not None
+                    payment_reference = order_data.get("payment_reference")
+                    if not payment_reference:
+                        # Generate a default payment_reference if none provided
+                        order_id = order_data.get("order_id", f"ORD-{uuid.uuid4().hex[:8].upper()}")
+                        payment_reference = f"PAY-{order_id}"
+                        logger.warning(f"No payment_reference provided for order. Generated default: {payment_reference}")
+                        order_data["payment_reference"] = payment_reference
 
                     # Insert into whatsapp_orders
                     cur.execute(
@@ -371,7 +380,7 @@ class DataManager:
                             order_data["address"],
                             order_data["status"],
                             order_data["total_amount"],
-                            order_data["payment_reference"],
+                            payment_reference,
                             order_data["payment_method_type"],
                             order_data.get("service_charge", 0.0),
                             order_data["timestamp"],
@@ -380,8 +389,8 @@ class DataManager:
                             order_data.get("customers_note", "")
                         )
                     )
-                    order_id = cur.fetchone()[0]
-                    logger.info(f"Saved order {order_id} for customer {order_data['customer_id']}")
+                    order_id = cur.fetchone()['id']
+                    logger.info(f"Saved order {order_id} for customer {order_data['customer_id']} with payment_reference {payment_reference}")
 
                     # Insert into whatsapp_order_details
                     for item in order_data["items"]:

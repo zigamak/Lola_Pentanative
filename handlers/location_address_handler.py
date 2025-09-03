@@ -183,11 +183,9 @@ class LocationAddressHandler(BaseHandler):
         logger.info("Requested live location for session %s", session_id)
         return self.whatsapp_service.create_text_message(
             session_id,
-            "📍 *Share Your Location*\n\n" +
-            "1️⃣ Tap *attachment* (📎) button\n" +
-            "2️⃣ Select *'Location'*\n" +
-            "3️⃣ Choose *'Send current location'*\n\n" +
-            "✨ I'll convert it to an address!\n" +
+            "📍 *Send Your Location*\n\n" +
+            "Just tap 📎 or ➕ → *Location* → *Send location*.\n\n" +
+            "I'll handle the rest!\n\n" +
             "⏰ *Waiting for your location...*"
         )
 
