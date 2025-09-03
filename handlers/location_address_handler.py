@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 class LocationAddressHandler(BaseHandler):
     """
     Handles location-based address collection for the bot, including live location,
-    Google Maps searches, manual address entry, saved addresses, and preset locations.
+    manual address entry, and preset locations.
     """
 
     def __init__(self, config, session_manager, data_manager, whatsapp_service, location_service):
@@ -18,9 +18,10 @@ class LocationAddressHandler(BaseHandler):
     def initiate_address_collection(self, state: dict, session_id: str):
         """
         Starts address collection with options tailored to context. Shows preset locations
-        when called from confirm_order state, otherwise includes full options.
+        when called from confirm_order state, otherwise includes live location and manual entry.
         """
         state["current_state"] = "address_collection_menu"
+        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler is set
         from_confirm_order = state.get("from_confirm_order", False)
 
         if from_confirm_order:
@@ -35,16 +36,10 @@ class LocationAddressHandler(BaseHandler):
                 {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
                 {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
             ]
-            if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-                buttons.append({
-                    "type": "reply",
-                    "reply": {"id": "search_on_maps", "title": "🗺️ Search Maps"}  # 13 chars
-                })
+            # Only add saved address option if there's actually a saved address
             if state.get("address"):
-                buttons.append({
-                    "type": "reply",
-                    "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}  # 14 chars
-                })
+                buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})  # 14 chars
+            
             saved_address_text = f"\n\n🏠 *Last address:* {state['address']}" if state.get("address") else ""
             message = f"📍 *Provide delivery address*{saved_address_text}\n\nPlease select an option below:"
 
@@ -58,6 +53,9 @@ class LocationAddressHandler(BaseHandler):
                     "Error: Invalid button configuration. Please try again or contact support."
                 )
 
+        # Update session state before returning
+        self.session_manager.update_session_state(session_id, state)
+        
         logger.debug("Initiating address collection for session %s, from_confirm_order: %s, buttons: %s", session_id, from_confirm_order, buttons)
         return self.whatsapp_service.create_button_message(session_id, message, buttons)
 
@@ -67,17 +65,15 @@ class LocationAddressHandler(BaseHandler):
         """
         logger.debug("Handling address collection menu for session %s, message: %s", session_id, message)
         
-        # Handle the case where user comes from order handler with "update_address"
         if message == "update_address":
             logger.info("Received update_address redirect from order handler for session %s", session_id)
             return self.initiate_address_collection(state, session_id)
         
-        # Handle preset locations and enter address option
         if message == "preset_palmpay_salvation":
-            address = "Palmpay Salvation, Abuja"
-            map_link = self.location_service.generate_maps_link(address) if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key() else ""
-            coordinates = self.location_service.get_coordinates_from_address(address) if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key() else None
+            address = "Palmpay Salvation"
+            coordinates = self.location_service.get_coordinates_from_address(address) if self.config.ENABLE_LOCATION_FEATURES else None
             latitude, longitude = coordinates if coordinates else (None, None)
+            map_link = self.location_service.generate_maps_link(address) if self.config.ENABLE_LOCATION_FEATURES else ""
             
             state["address"] = address
             state["latitude"] = latitude
@@ -90,10 +86,10 @@ class LocationAddressHandler(BaseHandler):
             return self._proceed_to_order_confirmation(state, session_id, address, maps_info)
         
         elif message == "preset_howson_wright":
-            address = "Howson Wright, Abuja"
-            map_link = self.location_service.generate_maps_link(address) if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key() else ""
-            coordinates = self.location_service.get_coordinates_from_address(address) if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key() else None
+            address = "Howson Wright"
+            coordinates = self.location_service.get_coordinates_from_address(address) if self.config.ENABLE_LOCATION_FEATURES else None
             latitude, longitude = coordinates if coordinates else (None, None)
+            map_link = self.location_service.generate_maps_link(address) if self.config.ENABLE_LOCATION_FEATURES else ""
             
             state["address"] = address
             state["latitude"] = latitude
@@ -109,39 +105,33 @@ class LocationAddressHandler(BaseHandler):
             logger.info("User chose to enter their own address for session %s", session_id)
             return self._show_address_entry_submenu(state, session_id)
         
-        # Handle normal address collection menu options
-        if message == "share_current_location":
+        elif message == "share_current_location":
             return self._request_live_location(state, session_id)
-        elif message == "search_on_maps":
-            if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-                return self._initiate_maps_search(state, session_id)
-            logger.warning("Maps search selected but not enabled for session %s", session_id)
-            return self._request_manual_address(state, session_id)
+        
         elif message == "type_address_manually":
             return self._request_manual_address(state, session_id)
+        
         elif message == "use_saved_address":
             return self._use_saved_address(state, session_id)
-        elif message == "back_to_menu":
-            return self.initiate_address_collection(state, session_id)
-        elif message == "share_location":
-            return self._request_live_location(state, session_id)
+        
         else:
             logger.debug("Invalid option '%s' for session %s", message, session_id)
-            buttons = [
-                {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
-                {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
-            ]
-            if not state.get("from_confirm_order", False):
-                if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-                    buttons.append({"type": "reply", "reply": {"id": "search_on_maps", "title": "🗺️ Search Maps"}})
-                if state.get("address"):
-                    buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})
+            # Fix: Rebuild buttons based on current context
+            from_confirm_order = state.get("from_confirm_order", False)
+            
+            if from_confirm_order:
+                buttons = [
+                    {"type": "reply", "reply": {"id": "preset_palmpay_salvation", "title": "Palmpay Salvation"}},  # 19 chars
+                    {"type": "reply", "reply": {"id": "preset_howson_wright", "title": "Howson Wright"}},      # 16 chars
+                    {"type": "reply", "reply": {"id": "enter_your_address", "title": "Enter Your Address"}}   # 19 chars
+                ]
             else:
                 buttons = [
-                    {"type": "reply", "reply": {"id": "preset_palmpay_salvation", "title": "🏢 Palmpay Salvation"}},  # 19 chars
-                    {"type": "reply", "reply": {"id": "preset_howson_wright", "title": "🏢 Howson Wright"}},      # 16 chars
-                    {"type": "reply", "reply": {"id": "enter_your_address", "title": "✏️ Enter Your Address"}}   # 19 chars
+                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}},  # 15 chars
+                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}    # 13 chars
                 ]
+                if state.get("address"):
+                    buttons.append({"type": "reply", "reply": {"id": "use_saved_address", "title": "🏠 Saved Address"}})
             
             return self.whatsapp_service.create_button_message(
                 session_id,
@@ -154,6 +144,7 @@ class LocationAddressHandler(BaseHandler):
         Shows submenu for live location or manual address entry when 'Enter your address' is selected.
         """
         state["current_state"] = "address_entry_submenu"
+        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler stays consistent
         self.session_manager.update_session_state(session_id, state)
         logger.info("Showing address entry submenu for session %s", session_id)
         
@@ -195,6 +186,7 @@ class LocationAddressHandler(BaseHandler):
         Prompts user to share live location via WhatsApp.
         """
         state["current_state"] = "awaiting_live_location"
+        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler is set
         self.session_manager.update_session_state(session_id, state)
         logger.info("Requested live location for session %s", session_id)
         return self.whatsapp_service.create_text_message(
@@ -207,29 +199,12 @@ class LocationAddressHandler(BaseHandler):
             "⏰ *Waiting for your location...*"
         )
 
-    def _initiate_maps_search(self, state: dict, session_id: str):
-        """
-        Prompts user to type a search query for Google Maps.
-        """
-        state["current_state"] = "maps_search_input"
-        self.session_manager.update_session_state(session_id, state)
-        logger.info("Initiated Maps search for session %s", session_id)
-        return self.whatsapp_service.create_text_message(
-            session_id,
-            "🗺️ *Search Address*\n\n" +
-            "Type a place, landmark, or address.\n\n" +
-            "*Examples:*\n" +
-            "• Silverbird Cinemas Abuja\n" +
-            "• Plot 123 Gwarinpa Estate\n" +
-            "• University of Abuja\n\n" +
-            "What’s your location?"
-        )
-
     def _request_manual_address(self, state: dict, session_id: str):
         """
         Prompts user to manually type their delivery address.
         """
         state["current_state"] = "manual_address_input"
+        state["current_handler"] = "location_address_handler"  # Fix: Ensure handler is set
         self.session_manager.update_session_state(session_id, state)
         logger.info("Requested manual address for session %s", session_id)
         return self.whatsapp_service.create_text_message(
@@ -251,10 +226,7 @@ class LocationAddressHandler(BaseHandler):
             logger.warning("No saved address for session %s", session_id)
             return self.initiate_address_collection(state, session_id)
 
-        maps_info = ""
-        if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key() and state.get("map_link"):
-            maps_info = f"\n🗺️ *View on Maps:* {state['map_link']}"
-
+        maps_info = f"\n🗺️ *View on Maps:* {state['map_link']}" if state.get("map_link") else ""
         logger.info("Using saved address for session %s: %s", session_id, state["address"])
         return self._proceed_to_order_confirmation(state, session_id, state["address"], maps_info)
 
@@ -266,7 +238,11 @@ class LocationAddressHandler(BaseHandler):
 
         if not latitude or not longitude:
             logger.warning("Invalid location data for session %s", session_id)
-            return self.whatsapp_service.create_text_message(
+            # Fix: Maintain current handler and state
+            state["current_state"] = "address_collection_menu"
+            state["current_handler"] = "location_address_handler"
+            self.session_manager.update_session_state(session_id, state)
+            return self.whatsapp_service.create_button_message(
                 session_id,
                 "❌ *Invalid location*\n\nPlease select an option below:",
                 [
@@ -277,22 +253,29 @@ class LocationAddressHandler(BaseHandler):
 
         readable_address = location_address
         map_link = ""
-        if (not readable_address or "unknown" in readable_address.lower()) and \
-           self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-            geocoded_address = self.location_service.get_address_from_coordinates(latitude, longitude)
-            if geocoded_address:
-                readable_address = geocoded_address
-                map_link = self.location_service.generate_maps_link(readable_address)
-                logger.info("Geocoded coordinates %s,%s to address: %s", latitude, longitude, readable_address)
-            else:
-                logger.warning("Could not geocode coordinates %s,%s for %s", session_id)
-                map_link = self.location_service.generate_maps_link_from_coordinates(latitude, longitude)
+        
+        # Fix: Better address handling
+        if (not readable_address or readable_address == "unknown" or len(readable_address.strip()) == 0) and self.config.ENABLE_LOCATION_FEATURES:
+            try:
+                geocoded_address = self.location_service.get_address_from_coordinates(latitude, longitude)
+                if geocoded_address:
+                    readable_address = geocoded_address
+                    map_link = self.location_service.generate_maps_link(readable_address)
+                    logger.info("Geocoded coordinates %s,%s to address: %s", latitude, longitude, readable_address)
+                else:
+                    logger.warning("Could not geocode coordinates %s,%s for %s", latitude, longitude, session_id)
+                    map_link = self.location_service.generate_maps_link_from_coordinates(latitude, longitude)
+            except Exception as e:
+                logger.error("Error geocoding coordinates for %s: %s", session_id, e)
+                map_link = self.location_service.generate_maps_link_from_coordinates(latitude, longitude) if self.config.ENABLE_LOCATION_FEATURES else ""
 
-        if readable_address:
+        if readable_address and readable_address != "unknown":
             state["address"] = readable_address
             state["latitude"] = latitude
             state["longitude"] = longitude
-            state["map_link"] = map_link if map_link else self.location_service.generate_maps_link(readable_address)
+            state["map_link"] = map_link
+            state["current_state"] = "confirm_detected_location"
+            state["current_handler"] = "location_address_handler"
             self._save_address_to_user_details(state, readable_address, latitude, longitude, map_link, session_id)
 
             location_info = self.location_service.format_location_info(latitude, longitude, readable_address)
@@ -301,7 +284,6 @@ class LocationAddressHandler(BaseHandler):
                 {"type": "reply", "reply": {"id": "choose_different", "title": "📍 Choose Another"}}  # 15 chars
             ]
 
-            state["current_state"] = "confirm_detected_location"
             self.session_manager.update_session_state(session_id, state)
             logger.info("Live location processed for %s. Awaiting confirmation.", session_id)
             return self.whatsapp_service.create_button_message(
@@ -311,10 +293,8 @@ class LocationAddressHandler(BaseHandler):
             )
         else:
             coordinates_text = f"Latitude: {latitude}, Longitude: {longitude}"
-            maps_link_info = ""
-            if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-                map_link = self.location_service.generate_maps_link_from_coordinates(latitude, longitude)
-                maps_link_info = f"\n🗺️ *View on Maps:* {map_link}"
+            map_link = self.location_service.generate_maps_link_from_coordinates(latitude, longitude) if self.config.ENABLE_LOCATION_FEATURES else ""
+            maps_link_info = f"\n🗺️ *View on Maps:* {map_link}" if map_link else ""
 
             buttons = [
                 {"type": "reply", "reply": {"id": "use_coordinates", "title": "✅ Use Coordinates"}},  # 16 chars
@@ -324,6 +304,7 @@ class LocationAddressHandler(BaseHandler):
             state["temp_coordinates"] = {"latitude": latitude, "longitude": longitude}
             state["map_link"] = map_link
             state["current_state"] = "confirm_coordinates"
+            state["current_handler"] = "location_address_handler"
             self.session_manager.update_session_state(session_id, state)
             logger.warning("No readable address for %s from %s,%s. Awaiting coordinates confirmation.", session_id, latitude, longitude)
             return self.whatsapp_service.create_button_message(
@@ -332,99 +313,6 @@ class LocationAddressHandler(BaseHandler):
                 buttons
             )
 
-    def handle_maps_search_input(self, state: dict, original_message: str, session_id: str):
-        """
-        Handles user's Google Maps search query input.
-        """
-        search_query = original_message.strip()
-        logger.debug("Handling Maps search for %s: '%s'", session_id, search_query)
-
-        if not search_query:
-            return self.whatsapp_service.create_text_message(
-                session_id,
-                "Please enter a valid search term.\n\nPlease select an option below:",
-                [
-                    {"type": "reply", "reply": {"id": "search_on_maps", "title": "🔍 Search Again"}},  # 14 chars
-                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}  # 13 chars
-                ]
-            )
-
-        if not (self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key()):
-            logger.error("Maps search attempted by %s but API not enabled.", session_id)
-            state["current_state"] = "manual_address_input"
-            self.session_manager.update_session_state(session_id, state)
-            return self._request_manual_address(state, session_id)
-
-        coordinates = self.location_service.get_coordinates_from_address(search_query)
-        if coordinates:
-            latitude, longitude = coordinates
-            formatted_address = self.location_service.get_address_from_coordinates(latitude, longitude)
-            map_link = self.location_service.generate_maps_link(formatted_address or search_query)
-
-            if formatted_address:
-                state["temp_address"] = formatted_address
-                state["temp_coordinates"] = {"latitude": latitude, "longitude": longitude}
-                state["map_link"] = map_link
-                state["current_state"] = "confirm_maps_result"
-                self.session_manager.update_session_state(session_id, state)
-
-                location_info = self.location_service.format_location_info(latitude, longitude, formatted_address)
-                buttons = [
-                    {"type": "reply", "reply": {"id": "use_maps_result", "title": "✅ Use Address"}},  # 12 chars
-                    {"type": "reply", "reply": {"id": "search_again", "title": "🔍 Search Again"}},  # 14 chars
-                    {"type": "reply", "reply": {"id": "type_manually", "title": "✏️ Type Address"}}  # 13 chars
-                ]
-                logger.info("Maps search found result for '%s' for %s.", search_query, session_id)
-                return self.whatsapp_service.create_button_message(
-                    session_id,
-                    f"🎯 *Found Location!*\n\n{location_info}\n\nPlease select an option below:",
-                    buttons
-                )
-            else:
-                logger.warning("Maps search found coordinates but no address for '%s' for %s.", search_query, session_id)
-                return self._handle_maps_search_with_coordinates_only(state, session_id, latitude, longitude, search_query)
-        else:
-            logger.info("Maps search failed for '%s' for %s.", search_query, session_id)
-            return self._handle_search_failure(session_id, search_query)
-
-    def _handle_maps_search_with_coordinates_only(self, state: dict, session_id: str, latitude: float, longitude: float, search_query: str):
-        """
-        Handles Maps search yielding coordinates but no readable address.
-        """
-        coordinates_text = f"Latitude: {latitude}, Longitude: {longitude}"
-        map_link = self.location_service.generate_maps_link_from_coordinates(latitude, longitude)
-
-        buttons = [
-            {"type": "reply", "reply": {"id": "use_coordinates", "title": "✅ Use Coordinates"}},  # 16 chars
-            {"type": "reply", "reply": {"id": "type_address_instead", "title": "✏️ Type Address"}}  # 13 chars
-        ]
-
-        state["temp_coordinates"] = {"latitude": latitude, "longitude": longitude}
-        state["map_link"] = map_link
-        state["current_state"] = "confirm_coordinates"
-        self.session_manager.update_session_state(session_id, state)
-        return self.whatsapp_service.create_button_message(
-            session_id,
-            f"📍 *Location Found:*\n\nFound for '{search_query}':\n{coordinates_text}\n🗺️ *View on Maps:* {map_link}\n\nPlease select an option below:",
-            buttons
-        )
-
-    def _handle_search_failure(self, session_id: str, search_query: str):
-        """
-        Handles failed Google Maps search.
-        """
-        buttons = [
-            {"type": "reply", "reply": {"id": "share_location", "title": "📍 Share Location"}},  # 15 chars
-            {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}}  # 13 chars
-        ]
-
-        return self.whatsapp_service.create_button_message(
-            session_id,
-            f"🤔 *Couldn't find: '{search_query}'*\n\nPossible issues:\n" +
-            "• New or unknown location\n• Typo in name\n• Local landmark\n\nPlease select an option below:",
-            buttons
-        )
-
     def handle_manual_address_input(self, state: dict, original_message: str, session_id: str):
         """
         Handles manual address input with validation and geocoding.
@@ -432,44 +320,50 @@ class LocationAddressHandler(BaseHandler):
         address = original_message.strip()
         logger.debug("Handling manual address for %s: '%s'", session_id, address)
 
-        if len(address) < 10 or (not any(char.isdigit() for char in address) and not any(char.isalpha() for char in address)):
+        # Fix: Better validation logic
+        if len(address) < 5 or not any(char.isalpha() for char in address):
+            # Fix: Maintain current handler
+            state["current_state"] = "manual_address_input"
+            state["current_handler"] = "location_address_handler"
+            self.session_manager.update_session_state(session_id, state)
             return self.whatsapp_service.create_button_message(
                 session_id,
                 "⚠️ *Invalid address*\n\nPlease include:\n" +
                 "• Street name/number\n• Area/District\n• City/State\n\n" +
                 "Example: 123 Main St, Wuse 2, Abuja\n\nPlease select an option below:",
                 [
-                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Try Again"}},
-                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}}
+                    {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Try Again"}},  # 10 chars
+                    {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Share Location"}}  # 15 chars
                 ]
             )
 
-        # Process and save the address
         location_coordinates = None
         map_link = ""
-        if self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-            coordinates = self.location_service.get_coordinates_from_address(address)
-            if coordinates:
-                latitude, longitude = coordinates
-                location_coordinates = {"latitude": latitude, "longitude": longitude}
-                map_link = self.location_service.generate_maps_link(address)
-                logger.info("Geocoded address '%s' to: %s", address, location_coordinates)
-                
-                # Update state with coordinates
-                state["latitude"] = latitude
-                state["longitude"] = longitude
-            else:
-                logger.warning("Could not geocode address '%s' for %s", address, session_id)
+        if self.config.ENABLE_LOCATION_FEATURES:
+            try:
+                coordinates = self.location_service.get_coordinates_from_address(address)
+                if coordinates:
+                    latitude, longitude = coordinates
+                    location_coordinates = {"latitude": latitude, "longitude": longitude}
+                    map_link = self.location_service.generate_maps_link(address)
+                    logger.info("Geocoded address '%s' to: %s", address, location_coordinates)
+                else:
+                    logger.warning("Could not geocode address '%s' for %s", address, session_id)
+            except Exception as e:
+                logger.error("Error geocoding address '%s' for %s: %s", address, session_id, e)
 
-        # Save to user details and update state
+        # Fix: Update state properly
+        state["address"] = address
+        state["latitude"] = location_coordinates.get("latitude") if location_coordinates else None
+        state["longitude"] = location_coordinates.get("longitude") if location_coordinates else None
+        state["map_link"] = map_link
+        
         self._save_address_to_user_details(state, address, 
-                                        location_coordinates.get("latitude") if location_coordinates else None,
-                                        location_coordinates.get("longitude") if location_coordinates else None,
-                                        map_link, session_id)
+                                         location_coordinates.get("latitude") if location_coordinates else None,
+                                         location_coordinates.get("longitude") if location_coordinates else None,
+                                         map_link, session_id)
 
         logger.info("Manual address '%s' processed for %s", address, session_id)
-        
-        # Return to order confirmation
         maps_info = f"\n🗺️ *View on Maps:* {map_link}" if map_link else ""
         return self._proceed_to_order_confirmation(state, session_id, address, maps_info)
 
@@ -480,14 +374,10 @@ class LocationAddressHandler(BaseHandler):
         logger.debug("Handling confirm detected location for %s, message: %s", session_id, message)
         if message == "confirm_location":
             self._save_address_to_user_details(state, state["address"], 
-                                            state["latitude"] if state.get("latitude") else None,
-                                            state["longitude"] if state.get("longitude") else None,
+                                            state.get("latitude"),
+                                            state.get("longitude"),
                                             state.get("map_link", ""), session_id)
-            maps_info = ""
-            if state.get("latitude") and state.get("longitude") and state.get("address") and \
-               self.config.ENABLE_LOCATION_FEATURES and self.location_service.validate_api_key():
-                maps_info = f"\n{self.location_service.format_location_info(state['latitude'], state['longitude'], state['address'])}"
-
+            maps_info = f"\n{self.location_service.format_location_info(state['latitude'], state['longitude'], state['address'])}" if state.get("latitude") and state.get("longitude") and state.get("address") else ""
             logger.info("Confirmed location for %s: %s", session_id, state.get("address"))
             return self._proceed_to_order_confirmation(state, session_id, state["address"], maps_info)
 
@@ -496,6 +386,9 @@ class LocationAddressHandler(BaseHandler):
             state.pop("longitude", None)
             state.pop("address", None)
             state.pop("map_link", None)
+            # Fix: Reset to appropriate state
+            state["current_state"] = "address_collection_menu"
+            state["current_handler"] = "location_address_handler"
             self.session_manager.update_session_state(session_id, state)
             logger.info("User %s chose different address method", session_id)
             return self.initiate_address_collection(state, session_id)
@@ -503,9 +396,9 @@ class LocationAddressHandler(BaseHandler):
         else:
             logger.debug("Invalid option '%s' for %s", message, session_id)
             location_info = self.location_service.format_location_info(
-                state["latitude"],
-                state["longitude"],
-                state["address"]
+                state.get("latitude"),
+                state.get("longitude"),
+                state.get("address")
             ) if state.get("latitude") and state.get("longitude") and state.get("address") else "Location data unavailable."
             return self.whatsapp_service.create_button_message(
                 session_id,
@@ -513,67 +406,6 @@ class LocationAddressHandler(BaseHandler):
                 [
                     {"type": "reply", "reply": {"id": "confirm_location", "title": "✅ Use Address"}},  # 12 chars
                     {"type": "reply", "reply": {"id": "choose_different", "title": "📍 Choose Another"}}  # 15 chars
-                ]
-            )
-
-    def handle_confirm_maps_result(self, state: dict, message: str, session_id: str):
-        """
-        Handles confirmation of Google Maps search result.
-        """
-        logger.debug("Handling confirm Maps result for %s, message: %s", session_id, message)
-        if message == "use_maps_result":
-            if not state.get("temp_address") or not state.get("temp_coordinates"):
-                logger.error("Missing temp address/coordinates for %s", session_id)
-                return self._initiate_maps_search(state, session_id)
-
-            state["address"] = state["temp_address"]
-            state["latitude"] = state["temp_coordinates"]["latitude"]
-            state["longitude"] = state["temp_coordinates"]["longitude"]
-            state["map_link"] = state.get("map_link", "")
-            self._save_address_to_user_details(state, state["address"], 
-                                            state["temp_coordinates"]["latitude"],
-                                            state["temp_coordinates"]["longitude"],
-                                            state["map_link"], session_id)
-
-            coords = state["temp_coordinates"]
-            maps_info = self.location_service.format_location_info(coords["latitude"], coords["longitude"], state["address"])
-            state.pop("temp_address", None)
-            state.pop("temp_coordinates", None)
-            self.session_manager.update_session_state(session_id, state)
-
-            logger.info("Confirmed Maps result for %s: %s", session_id, state["address"])
-            return self._proceed_to_order_confirmation(state, session_id, state["address"], f"\n{maps_info}")
-
-        elif message == "search_again":
-            state.pop("temp_address", None)
-            state.pop("temp_coordinates", None)
-            state.pop("map_link", None)
-            self.session_manager.update_session_state(session_id, state)
-            logger.info("User %s chose to search Maps again", session_id)
-            return self._initiate_maps_search(state, session_id)
-
-        elif message == "type_manually":
-            state.pop("temp_address", None)
-            state.pop("temp_coordinates", None)
-            state.pop("map_link", None)
-            self.session_manager.update_session_state(session_id, state)
-            logger.info("User %s chose to type address manually", session_id)
-            return self._request_manual_address(state, session_id)
-
-        else:
-            logger.debug("Invalid option '%s' for %s", message, session_id)
-            location_info = self.location_service.format_location_info(
-                state["temp_coordinates"]["latitude"],
-                state["temp_coordinates"]["longitude"],
-                state["temp_address"]
-            ) if state.get("temp_coordinates") and state.get("temp_address") else "Location data unavailable."
-            return self.whatsapp_service.create_button_message(
-                session_id,
-                f"❌ *Invalid option: '{message}'*\n\n{location_info}\n\nPlease select an option below:",
-                [
-                    {"type": "reply", "reply": {"id": "use_maps_result", "title": "✅ Use Address"}},  # 12 chars
-                    {"type": "reply", "reply": {"id": "search_again", "title": "🔍 Search Again"}},  # 14 chars
-                    {"type": "reply", "reply": {"id": "type_manually", "title": "✏️ Type Address"}}  # 13 chars
                 ]
             )
 
@@ -598,13 +430,15 @@ class LocationAddressHandler(BaseHandler):
             self.session_manager.update_session_state(session_id, state)
 
             maps_link_info = f"\n🗺️ *View on Maps:* {state['map_link']}" if state.get("map_link") else ""
-
             logger.info("Confirmed coordinates for %s: %s", session_id, address_fallback)
             return self._proceed_to_order_confirmation(state, session_id, address_fallback, maps_link_info)
 
         elif message == "type_address_instead":
             state.pop("temp_coordinates", None)
             state.pop("map_link", None)
+            # Fix: Set proper state for manual address input
+            state["current_state"] = "manual_address_input"
+            state["current_handler"] = "location_address_handler"
             self.session_manager.update_session_state(session_id, state)
             logger.info("User %s chose to type address instead", session_id)
             return self._request_manual_address(state, session_id)
@@ -628,6 +462,13 @@ class LocationAddressHandler(BaseHandler):
         """
         if original_message and original_message.strip():
             logger.info("User %s typed '%s' while awaiting live location", session_id, original_message)
+            
+            # Fix: Check if the typed message is actually an address attempt
+            stripped_message = original_message.strip()
+            if len(stripped_message) >= 5 and any(char.isalpha() for char in stripped_message):
+                logger.info("Treating typed message as manual address input for %s", session_id)
+                return self.handle_manual_address_input(state, original_message, session_id)
+            
             buttons = [
                 {"type": "reply", "reply": {"id": "share_current_location", "title": "📍 Try Share Again"}},  # 16 chars
                 {"type": "reply", "reply": {"id": "type_address_manually", "title": "✏️ Type Address"}},    # 13 chars
@@ -635,7 +476,7 @@ class LocationAddressHandler(BaseHandler):
             ]
             return self.whatsapp_service.create_button_message(
                 session_id,
-                f"⏰ *Waiting for location...*\n\nYou typed '{original_message}'.\n\nPlease select an option below:",
+                f"⏰ *Still waiting for location...*\n\nYou typed: '{original_message}'\n\nTo use this as your address, click 'Type Address'. Otherwise, please select an option below:",
                 buttons
             )
         return None
@@ -658,7 +499,6 @@ class LocationAddressHandler(BaseHandler):
         }
         try:
             self.data_manager.save_user_details(session_id, user_data)
-            # Update state to ensure persistence
             state["address"] = address
             state["latitude"] = latitude
             state["longitude"] = longitude
@@ -674,12 +514,9 @@ class LocationAddressHandler(BaseHandler):
         """
         if state.get("from_confirm_order", False):
             logger.info("Redirecting to OrderHandler for session %s after address update", session_id)
-            
-            # Update state with the new address information
             state["address"] = address
             state["map_link"] = maps_info.replace("\n🗺️ *View on Maps:* ", "") if maps_info and "🗺️ *View on Maps:* " in maps_info else ""
             
-            # Save to user details for persistence
             user_data = {
                 "name": state.get("user_name", "Guest"),
                 "phone_number": session_id,
@@ -697,13 +534,11 @@ class LocationAddressHandler(BaseHandler):
             except Exception as e:
                 logger.error("Failed to save address to user details for %s: %s", session_id, e)
             
-            # Prepare for return to order handler
             state["current_state"] = "confirm_order"
             state["current_handler"] = "order_handler"
-            state.pop("from_confirm_order", None)  # Remove the flag to prevent loops
+            state.pop("from_confirm_order", None)
             self.session_manager.update_session_state(session_id, state)
             
-            # Create confirmation message with updated address
             cart_summary = format_cart(state.get("cart", {}))
             total_amount = sum(
                 item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
@@ -711,9 +546,6 @@ class LocationAddressHandler(BaseHandler):
             )
             user_name = state.get("user_name", "Guest")
             phone_number = state.get("phone_number", session_id)
-            latitude = state.get("latitude")
-            longitude = state.get("longitude")
-            map_link = state.get("map_link", "")
             
             confirmation_message = (
                 f"✅ *Address Updated Successfully!*\n\n"
@@ -732,7 +564,6 @@ class LocationAddressHandler(BaseHandler):
                 {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},  # 14 chars
                 {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},  # 15 chars
                 {"type": "reply", "reply": {"id": "add_note", "title": "📝 Add Note"}}  # 11 chars
-               
             ]
             
             return {
@@ -742,7 +573,6 @@ class LocationAddressHandler(BaseHandler):
                 "buttons": buttons
             }
 
-        # Handle non-confirm_order cases (regular address collection flow)
         if not state.get("cart"):
             logger.warning("Empty cart for session %s", session_id)
             state["current_state"] = "greeting"
@@ -754,12 +584,10 @@ class LocationAddressHandler(BaseHandler):
                 "additional_message": "Your cart is empty. Please add items before confirming an order."
             }
 
-        # Regular flow - show order confirmation via OrderHandler
         state["current_state"] = "confirm_order"
         state["current_handler"] = "order_handler"
         self.session_manager.update_session_state(session_id, state)
         
-        # Create confirmation message for regular flow
         cart_summary = format_cart(state.get("cart", {}))
         total_amount = sum(
             item_data.get("total_price", item_data.get("quantity", 1) * item_data.get("price", 0.0))
@@ -767,9 +595,6 @@ class LocationAddressHandler(BaseHandler):
         )
         user_name = state.get("user_name", "Guest")
         phone_number = state.get("phone_number", session_id)
-        latitude = state.get("latitude")
-        longitude = state.get("longitude")
-        map_link = state.get("map_link", "")
         
         confirmation_message = (
             f"✅ *Address Confirmed!*\n\n"
@@ -779,8 +604,7 @@ class LocationAddressHandler(BaseHandler):
             f"👤 Name: {user_name}\n"
             f"📱 Phone: {phone_number}\n"
             f"🏠 Address: {address}\n"
-            f"🌍 Coordinates: {'Lat: ' + str(latitude) + ', Lon: ' + str(longitude) if latitude and longitude else 'Not set'}\n"
-            f"🗺️ Map Link: {map_link or 'Not set'}\n"
+           
             f"📝 Note: {state.get('order_note', 'None')}\n"
             f"\n💰 *Total Amount: ₦{total_amount:,.2f}*\n\n"
             f"Please review and select an option below:"
@@ -790,7 +614,7 @@ class LocationAddressHandler(BaseHandler):
             {"type": "reply", "reply": {"id": "final_confirm", "title": "✅ Confirm & Pay"}},  # 14 chars
             {"type": "reply", "reply": {"id": "update_address", "title": "📍 Update Address"}},  # 15 chars
             {"type": "reply", "reply": {"id": "add_note", "title": "📝 Add Note"}},  # 11 chars
-            {"type": "reply", "reply": {"id": "cancel_order", "title": "❌ Cancel Order"}}  # 14 chars
+          
         ]
         
         return {
@@ -808,9 +632,7 @@ class LocationAddressHandler(BaseHandler):
             "address_collection_menu": self.handle_address_collection_menu,
             "address_entry_submenu": self.handle_address_entry_submenu,
             "awaiting_live_location": self.handle_awaiting_live_location_timeout,
-            "maps_search_input": self.handle_maps_search_input,
             "manual_address_input": self.handle_manual_address_input,
             "confirm_detected_location": self.handle_confirm_detected_location,
-            "confirm_maps_result": self.handle_confirm_maps_result,
             "confirm_coordinates": self.handle_confirm_coordinates
         }

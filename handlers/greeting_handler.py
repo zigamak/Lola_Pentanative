@@ -180,7 +180,7 @@ class GreetingHandler(BaseHandler):
         else:
             username = user_data.get("display_name", "Guest")
             state["user_name"] = username
-            state["delivery_address"] = user_data.get("address", "")
+            state["address"] = user_data.get("address", "")
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
@@ -266,7 +266,7 @@ class GreetingHandler(BaseHandler):
         user_data["user_number"] = session_id
         self.data_manager.save_user_details(session_id, user_data)
 
-        state["delivery_address"] = delivery_address
+        state["address"] = delivery_address
         state["current_state"] = "greeting"
         state["current_handler"] = "greeting_handler"
         self.session_manager.update_session_state(session_id, state)
