@@ -217,7 +217,7 @@ class EnquiryHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (invalid state).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
@@ -254,7 +254,7 @@ class EnquiryHandler(BaseHandler):
             )
         else:
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]

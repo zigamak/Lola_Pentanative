@@ -97,7 +97,7 @@ class TrackOrderHandler(BaseHandler):
             else:
                 self.logger.info(f"Session {session_id}: Returning to non-paid user main menu after tracking order.")
                 buttons = [
-                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                    {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                     {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                     {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
                 ]
@@ -145,7 +145,7 @@ class TrackOrderHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (no orders found).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
@@ -190,7 +190,7 @@ class TrackOrderHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (invalid order status).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]
@@ -235,7 +235,7 @@ class TrackOrderHandler(BaseHandler):
         else:
             self.logger.info(f"Session {session_id}: Returning to non-paid user main menu (error).")
             buttons = [
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]

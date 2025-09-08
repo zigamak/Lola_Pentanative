@@ -28,7 +28,7 @@ class BaseHandler:
         else:
             buttons = [
                 # Non-paid (guest) user menu
-                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Let Lola Order"}},
+                {"type": "reply", "reply": {"id": "ai_bulk_order_direct", "title": "👩🏾‍🍳 Place an Order"}},
                 {"type": "reply", "reply": {"id": "enquiry", "title": "❓ Enquiry"}},
                 {"type": "reply", "reply": {"id": "complain", "title": "📝 Complain"}}
             ]

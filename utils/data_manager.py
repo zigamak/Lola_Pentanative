@@ -1063,3 +1063,46 @@ class DataManager:
         except Exception as e:
             logger.error(f"Unexpected error while retrieving abandoned carts from whatsapp_leads: {e}", exc_info=True)
             return []
+    
+    def get_latest_order_by_customer_id(self, customer_id: str) -> Optional[Dict]:
+        """Retrieve the latest order for a customer by customer_id."""
+        try:
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(
+                        """
+                        SELECT id, customer_id, address, status, total_amount,
+                            payment_reference, payment_method_type, service_charge,
+                            timestamp, dateadded, customers_note
+                        FROM whatsapp_orders
+                        WHERE customer_id = %s AND merchant_details_id = %s
+                        ORDER BY timestamp DESC, dateadded DESC
+                        LIMIT 1
+                        """,
+                        (customer_id, self.merchant_id)
+                    )
+                    result = cur.fetchone()
+                    if result:
+                        order_dict = {
+                            "order_id": result['id'],
+                            "customer_id": result['customer_id'],
+                            "address": result['address'],
+                            "status": result['status'],
+                            "total_amount": float(result['total_amount']),
+                            "payment_reference": result['payment_reference'],
+                            "payment_method_type": result['payment_method_type'],
+                            "service_charge": float(result['service_charge']),
+                            "timestamp": result['timestamp'],
+                            "dateadded": result['dateadded'],
+                            "customers_note": result['customers_note']
+                        }
+                        logger.info(f"Retrieved latest order {result['id']} for customer {customer_id}")
+                        return order_dict
+                    logger.info(f"No orders found for customer {customer_id}")
+                    return None
+        except psycopg2.Error as e:
+            logger.error(f"Database error retrieving latest order for customer {customer_id}: {e}", exc_info=True)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving latest order for customer {customer_id}: {e}", exc_info=True)
+            return None
