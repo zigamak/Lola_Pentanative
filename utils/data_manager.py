@@ -75,11 +75,11 @@ class DataManager:
             logger.info(f"Created data directory: {data_dir}")
 
     def _ensure_database_columns(self):
-        """Ensure required columns exist in the whatsapp_orders table."""
+        """Ensure required columns exist in the whatsapp_orders and whatsapp_merchant_product_inventory tables."""
         try:
             with psycopg2.connect(**self.db_params) as conn:
                 with conn.cursor() as cur:
-                    # Check and add customers_note column
+                    # Check and add columns for whatsapp_orders table
                     cur.execute("""
                         SELECT column_name 
                         FROM information_schema.columns 
@@ -95,7 +95,6 @@ class DataManager:
                     else:
                         logger.debug("customers_note column already exists in whatsapp_orders table.")
 
-                    # Check and add service_charge column
                     cur.execute("""
                         SELECT column_name 
                         FROM information_schema.columns 
@@ -111,11 +110,47 @@ class DataManager:
                     else:
                         logger.debug("service_charge column already exists in whatsapp_orders table.")
 
+                    # Check and add columns for whatsapp_merchant_product_inventory table
+                    inventory_columns = {
+                        'id': 'BIGINT',
+                        'merchant_details_id': 'BIGINT',
+                        'product_name': 'TEXT',
+                        'description': 'TEXT',
+                        'product_category': 'TEXT',
+                        'variant_name': 'TEXT',
+                        'currency': 'TEXT',
+                        'price': 'NUMERIC',
+                        'availability_status': 'BOOLEAN',
+                        'quantity': 'INTEGER',
+                        'last_updated': 'TIMESTAMP WITH TIME ZONE',
+                        'date_created': 'TIMESTAMP WITH TIME ZONE',
+                        'channel': 'TEXT',
+                        'food_share_pattern': 'CHARACTER VARYING'
+                    }
+
+                    for column_name, column_type in inventory_columns.items():
+                        cur.execute("""
+                            SELECT column_name 
+                            FROM information_schema.columns 
+                            WHERE table_name = 'whatsapp_merchant_product_inventory' 
+                            AND column_name = %s;
+                        """, (column_name,))
+                        if not cur.fetchone():
+                            cur.execute(f"""
+                                ALTER TABLE whatsapp_merchant_product_inventory
+                                ADD COLUMN {column_name} {column_type};
+                            """)
+                            logger.info(f"Added {column_name} column to whatsapp_merchant_product_inventory table.")
+                        else:
+                            logger.debug(f"{column_name} column already exists in whatsapp_merchant_product_inventory table.")
+
                     conn.commit()
         except psycopg2.Error as e:
-            logger.error(f"Database error while ensuring columns in whatsapp_orders: {e}", exc_info=True)
+            logger.error(f"Database error while ensuring columns: {e}", exc_info=True)
+            conn.rollback()
         except Exception as e:
-            logger.error(f"Unexpected error while ensuring columns in whatsapp_orders: {e}", exc_info=True)
+            logger.error(f"Unexpected error while ensuring columns: {e}", exc_info=True)
+            conn.rollback()
 
     def _load_json_data(self, file_path: str) -> Any:
         """Helper to load JSON data from a file."""
@@ -783,9 +818,6 @@ class DataManager:
             logger.error(f"Unexpected error retrieving items for order {order_id}: {e}", exc_info=True)
             return []
 
-
-   
-
     def save_lead(self, lead: Lead):
         """Save or update a lead in the whatsapp_leads table."""
         try:
@@ -853,7 +885,6 @@ class DataManager:
             logger.error(f"Unexpected error while saving lead {lead.user_id} to whatsapp_leads: {e}", exc_info=True)
             raise
         
-    
     def get_lead(self, merchant_details_id: str, user_id: str) -> Optional[Lead]:
         """Retrieve a lead from the whatsapp_leads table."""
         try:
@@ -886,12 +917,12 @@ class DataManager:
     def get_product_by_name(self, product_name: str) -> Optional[Dict]:
         """Retrieve product details by name from products file."""
         try:
-            with open(self.products_file, 'r', encoding='utf-8') as f:
+            with open(self.config.PRODUCTS_FILE, 'r', encoding='utf-8') as f:
                 products = json.load(f)
             for product in products:
                 if product.get('name').lower() == product_name.lower():
                     return product
-            logger.warning(f"Product {product_name} not found in {self.products_file}")
+            logger.warning(f"Product {product_name} not found in {self.config.PRODUCTS_FILE}")
             return None
         except Exception as e:
             logger.error(f"Error retrieving product {product_name}: {e}", exc_info=True)
@@ -926,40 +957,42 @@ class DataManager:
     def save_feedback_to_db(self, feedback_data: Dict) -> bool:
         """Save feedback data to the whatsapp_feedback table."""
         try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-                query = """
-                    INSERT INTO whatsapp_feedback (phone_number, user_name, order_id, rating, comment, timestamp, session_duration)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """
-                cur.execute(query, (
-                    feedback_data['phone_number'],
-                    feedback_data['user_name'],
-                    feedback_data['order_id'],
-                    feedback_data['rating'],
-                    feedback_data['comment'],
-                    feedback_data['timestamp'],
-                    feedback_data['session_duration']
-                ))
-                self.conn.commit()
-                feedback_id = cur.fetchone()['id']
-                logger.info(f"Saved feedback to database with ID {feedback_id} for order {feedback_data['order_id']}")
-                return True
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        INSERT INTO whatsapp_feedback (phone_number, user_name, order_id, rating, comment, timestamp, session_duration)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """
+                    cur.execute(query, (
+                        feedback_data['phone_number'],
+                        feedback_data['user_name'],
+                        feedback_data['order_id'],
+                        feedback_data['rating'],
+                        feedback_data['comment'],
+                        feedback_data['timestamp'],
+                        feedback_data['session_duration']
+                    ))
+                    conn.commit()
+                    feedback_id = cur.fetchone()['id']
+                    logger.info(f"Saved feedback to database with ID {feedback_id} for order {feedback_data['order_id']}")
+                    return True
         except Exception as e:
             logger.error(f"Error saving feedback to database: {str(e)}", exc_info=True)
-            self.conn.rollback()
+            conn.rollback()
             return False
 
     def get_feedback_analytics(self) -> Dict[str, Any]:
         """Get feedback analytics summary from database."""
         try:
-            with self.data_manager.conn.cursor(cursor_factory=RealDictCursor) as cur:
-                query = """
-                    SELECT phone_number, user_name, order_id, rating, comment, timestamp, session_duration
-                    FROM whatsapp_feedback
-                """
-                cur.execute(query)
-                feedback_list = cur.fetchall()
+            with psycopg2.connect(**self.db_params) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    query = """
+                        SELECT phone_number, user_name, order_id, rating, comment, timestamp, session_duration
+                        FROM whatsapp_feedback
+                    """
+                    cur.execute(query)
+                    feedback_list = cur.fetchall()
 
             if not feedback_list:
                 return {"total_feedback": 0, "message": "No feedback data available"}

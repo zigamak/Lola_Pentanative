@@ -86,7 +86,9 @@ class ProductSyncHandler:
                             description,
                             date_created,
                             last_updated,
-                            quantity
+                            quantity,
+                            channel,
+                            food_share_pattern
                         FROM whatsapp_merchant_product_inventory
                         WHERE availability_status = true AND merchant_details_id = %s
                     """
@@ -107,7 +109,9 @@ class ProductSyncHandler:
                             'currency': row['currency'],
                             'availability_status': row['availability_status'],
                             'description': row['description'],
-                            'quantity': row['quantity']
+                            'quantity': row['quantity'],
+                            'channel': row['channel'],
+                            'food_share_pattern': row['food_share_pattern']
                         }
                         menu_data[category].append(item)
 
@@ -126,4 +130,3 @@ class ProductSyncHandler:
         except Exception as e:
             logger.error(f"Unexpected error while syncing products: {e}")
             return False
-

@@ -40,6 +40,8 @@ class Config:
         self.AZURE_DEPLOYMENT_NAME = os.getenv('AZURE_DEPLOYMENT_NAME')
         self.AZURE_API_VERSION = os.getenv('AZURE_API_VERSION')
         
+        
+        
         # Feature flags
         self.ENABLE_AI_FEATURES = os.getenv('ENABLE_AI_FEATURES', 'false').lower() == 'true'
         self.ENABLE_LOCATION_FEATURES = os.getenv('ENABLE_LOCATION_FEATURES', 'false').lower() == 'true'

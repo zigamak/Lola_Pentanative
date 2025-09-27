@@ -209,11 +209,13 @@ class MessageProcessor:
                     response = self.ai_handler.handle_ai_order_confirmation_state(state, message, original_message, session_id)
                 elif current_state == "ai_order_clarification":
                     response = self.ai_handler.handle_ai_order_clarification_state(state, message, original_message, session_id)
+                elif current_state == "ai_portion_clarification":
+                    response = self.ai_handler.handle_ai_portion_clarification_state(state, message, original_message, session_id)
                 else:
-                    logger.warning(f"Session {session_id}: Unhandled AI state '{current_state}'. Resetting to AI menu.")
-                    state["current_state"] = "ai_menu_selection"
+                    logger.warning(f"Session {session_id}: Unhandled AI state '{current_state}'. Continuing with AI bulk order.")
+                    state["current_state"] = "ai_bulk_order"
                     self.session_manager.update_session_state(session_id, state)
-                    response = self.ai_handler.handle_ai_menu_state(state, "initial_entry", original_message, session_id)
+                    response = self.ai_handler.handle_ai_bulk_order_state(state, "continue_ordering", original_message, session_id)
             
             elif current_handler_name == "enquiry_handler":
                 if current_state == "enquiry_menu":
