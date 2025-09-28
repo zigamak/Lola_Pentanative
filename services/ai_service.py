@@ -140,7 +140,7 @@ Keep responses concise (max 200 words) and engaging. If asked about ordering, re
         
         menu_context = self._create_menu_context()
         
-        system_prompt = f"""You are Lola, a WhatsApp customer-service bot for Ganador Express. Your job is to parse customer food orders from conversational or ambiguous language into a structured JSON format. 
+        system_prompt = f"""You are Lola, a WhatsApp customer-service bot for Ganador Express. Your job is to parse customer food orders from conversational or ambiguous language into a structured JSON format, including modifications to existing orders.
 
 Available menu items:
 {menu_context}
@@ -151,12 +151,14 @@ SMART ORDERING RULES:
    - Default packs = 1 (not "unspecified")
    - Default food_share_pattern = use exact pattern from menu for each item
    - If no portions specified, assume 1 portion per item
+   - If a number is specified before multiple items without individual counts (e.g., "3 jollof rice and fried rice"), assume the number applies to each item (3 jollof and 3 fried rice).
 
 2. PACK LOGIC:
    - If user specifies packs (e.g., "in 3 packs"), use that number for packs
    - Treat terms like "packs," "plates," "servings," or "people" (e.g., "for 3 people") as equivalent to specifying the number of packs
    - If user says "separate packs" or similar, packs = number of different items
    - Pack calculation: total portions can be distributed across specified packs
+   - If user explicitly assigns items to specific packs (e.g., "for pack 1: ..., for pack 2: ..."), use the alternative grouped format below, with packs equal to the highest pack number mentioned or inferred.
 
 3. PORTION UNDERSTANDING:
    - "2 portions of Jollof rice" = exactly 2 portions
@@ -164,19 +166,26 @@ SMART ORDERING RULES:
    - "2 Jollof rice" = 2 portions
    - Only mark as "unspecified" if genuinely ambiguous
 
-4. SMART INTERPRETATION:
+4. MODIFICATION HANDLING:
+   - If user says "add 2 Jollof rice," include these as new items or add to existing item portions
+   - If user says "remove Jollof rice," include the item in the output with 0 portions to indicate removal
+   - If user says "change to 3 packs," update the packs count
+   - For ambiguous modifications, mark items as needing clarification
+
+5. SMART INTERPRETATION:
    - Be generous with matching (e.g., "burger" matches menu items)
    - Understand Nigerian food terms and variations
    - Handle multiple ways of saying the same thing
    - Use the EXACT food_share_pattern from the menu data for each item
+   - Be smart about ambiguous phrases: if a number precedes a list of items, apply it to all unless otherwise specified.
 
-5. OUTPUT FORMAT:
+6. OUTPUT FORMAT (for non-specific pack assignments):
 {{
     "success": true,
     "items": [
         {{
             "name": "exact menu item name",
-            "portions": number (default 1, never "unspecified" unless truly ambiguous),
+            "portions": number (default 1, never "unspecified" unless truly ambiguous, 0 for removals),
             "item_id": "menu item id",
             "price": price_per_item (float),
             "total_price": portions * price (float),
@@ -196,16 +205,51 @@ SMART ORDERING RULES:
     ]
 }}
 
+ALTERNATIVE OUTPUT FORMAT (use ONLY if user specifies items for specific packs):
+{{
+    "success": true,
+    "pack_groups": [
+        {{
+            "pack": 1,
+            "items": [
+                {{
+                    "name": "exact menu item name",
+                    "portions": number for this pack,
+                    "item_id": "menu item id",
+                    "price": price_per_item (float),
+                    "total_price": portions * price (float),
+                    "variations": {{}},
+                    "food_share_pattern": "use exact pattern from menu (Combo/Portion)"
+                }}
+            ]
+        }},
+        // ... more packs
+    ],
+    "packs": number (count of pack_groups),
+    "grouping": "Description of packing preference",
+    "special_instructions": "Any special requests",
+    "order_total": sum of all item total_prices (float),
+    "unrecognized_items": [
+        {{
+            "input": "user input not found",
+            "message": "why not recognized"
+        }}
+    ]
+}}
+
 EXAMPLES:
-- "1 Jollof rice and 1 fried rice" → 1 portion each, 1 pack total, use menu's food_share_pattern for each
-- "2 Jollof rice in 2 packs" → 2 portions Jollof, 2 packs (1 portion per pack)
-- "Jollof rice and chicken" → 1 portion each, 1 pack, use exact food_share_pattern from menu
-- "3 Jollof rice for 3 people" → 3 portions Jollof, 3 packs
-- "2 Fried rice in 3 plates" → 2 portions Fried rice, 3 packs
-- "Chicken for 3 servings" → 1 portion Chicken, 3 packs
+- "1 Jollof rice and 1 fried rice" → use flat format, 1 portion each, 1 pack total, use menu's food_share_pattern
+- "2 Jollof rice in 2 packs" → flat, 2 portions Jollof, 2 packs (1 portion per pack)
+- "Jollof rice and chicken" → flat, 1 portion each, 1 pack, use exact food_share_pattern
+- "3 Jollof rice for 3 people" → flat, 3 portions Jollof, 3 packs
+- "2 Fried rice in 3 plates" → flat, 2 portions Fried rice, 3 packs
+- "Chicken for 3 servings" → flat, 1 portion Chicken, 3 packs
+- "Add 1 Chicken, remove Jollof rice, change to 2 packs" → flat, 1 portion Chicken, 0 portions Jollof rice, 2 packs
+- "3 portions of Jollof rice and fried rice for pack 1, Yam and egg for pack 2, 3 portions of Jollof rice and fried rice for pack 3" → use grouped format, interpret as 3 Jollof and 3 Fried for pack 1 (apply 3 to both), 1 Yam and 1 Egg for pack 2, 3 Jollof and 3 Fried for pack 3, packs=3
 
 CRITICAL: Only use "unspecified" if the order is genuinely unclear. Default to sensible assumptions.
 Always use the EXACT food_share_pattern from the menu data - don't default all items to "Combo".
+Use the grouped format ONLY when packs are explicitly assigned with items; otherwise, use flat.
 """
 
         try:
@@ -225,24 +269,41 @@ Always use the EXACT food_share_pattern from the menu data - don't default all i
                 parsed_json = json.loads(json_match.group())
                 
                 # Ensure defaults are set properly
-                parsed_json.setdefault("items", [])
                 parsed_json.setdefault("unrecognized_items", [])
                 parsed_json["order_total"] = float(parsed_json.get("order_total", 0.0))
-                parsed_json.setdefault("packs", 1)  # Default to 1 pack, not "unspecified"
                 parsed_json.setdefault("grouping", "")
                 parsed_json.setdefault("special_instructions", "")
                 
-                # Apply smart defaults to items while preserving menu patterns
-                for item in parsed_json.get("items", []):
-                    if item.get("portions") == "unspecified" or not item.get("portions"):
-                        item["portions"] = 1  # Default to 1 portion
-                    # Don't default food_share_pattern - use what's from menu or what AI determined
-                
-                # Recalculate order total to ensure accuracy
-                parsed_json["order_total"] = sum(
-                    float(item.get("total_price", 0.0)) 
-                    for item in parsed_json.get("items", [])
-                )
+                if "pack_groups" in parsed_json:
+                    parsed_json.setdefault("packs", len(parsed_json["pack_groups"]))
+                    # Recalculate totals for grouped
+                    total = 0.0
+                    for group in parsed_json["pack_groups"]:
+                        for item in group.get("items", []):
+                            if "portions" not in item or item["portions"] == "unspecified":
+                                item["portions"] = 1
+                            if item.get("portions") != 0:
+                                item["total_price"] = float(item.get("price", 0.0)) * float(item["portions"])
+                            else:
+                                item["total_price"] = 0.0
+                            total += item["total_price"]
+                    parsed_json["order_total"] = total
+                else:
+                    parsed_json.setdefault("items", [])
+                    parsed_json.setdefault("packs", 1)
+                    # Apply defaults for flat
+                    for item in parsed_json.get("items", []):
+                        if item.get("portions") == "unspecified" or not item.get("portions"):
+                            item["portions"] = 1
+                        if item.get("portions") != 0:
+                            item["total_price"] = float(item.get("price", 0.0)) * float(item["portions"])
+                        else:
+                            item["total_price"] = 0.0
+                    # Recalculate order total
+                    parsed_json["order_total"] = sum(
+                        float(item.get("total_price", 0.0)) 
+                        for item in parsed_json.get("items", []) if item.get("portions") != 0
+                    )
                 
                 return parsed_json
             else:

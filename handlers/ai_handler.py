@@ -88,12 +88,13 @@ class AIHandler(BaseHandler):
         state["current_state"] = "ai_bulk_order"
         state["ai_mode"] = "bulk_order"
         state["current_handler"] = "ai_handler"
+        state["temp_order"] = {}  # Initialize temporary order storage
         self.session_manager.update_session_state(session_id, state)
         
         image_url = self._get_daily_menu_url()
         self.whatsapp_service.send_image_message(session_id, image_url, caption="Our Delicious Menu!")
         bulk_order_message = (
-           "Hi, I'm Lola from Ganador Express!\n\n"
+            "Hi, I'm Lola from Ganador Express!\n\n"
             "How to order:\n"
             "• List the items and portions\n"
             "• Say how many packs you want\n\n"
@@ -157,6 +158,10 @@ class AIHandler(BaseHandler):
                 )
                 return self.whatsapp_service.create_text_message(session_id, error_message)
             
+            # Save the parsed order to temp_order
+            state["temp_order"] = parsed_order
+            self.session_manager.update_session_state(session_id, state)
+            
             # Check for unrecognized items
             if parsed_order.get("unrecognized_items"):
                 summary = self._create_order_summary(parsed_order)
@@ -172,7 +177,12 @@ class AIHandler(BaseHandler):
                 return self.whatsapp_service.create_text_message(session_id, response_message)
             
             # Check for unspecified portions
-            unspecified_items = [item for item in parsed_order.get("items", []) if item.get("portions") == "unspecified"]
+            unspecified_items = []
+            if "pack_groups" in parsed_order:
+                for group in parsed_order["pack_groups"]:
+                    unspecified_items.extend([item for item in group.get("items", []) if item.get("portions") == "unspecified"])
+            else:
+                unspecified_items = [item for item in parsed_order.get("items", []) if item.get("portions") == "unspecified"]
             if unspecified_items:
                 state["parsed_order"] = parsed_order
                 state["current_state"] = "ai_portion_clarification"
@@ -219,7 +229,7 @@ class AIHandler(BaseHandler):
         self.logger.debug(f"Handling AI portion clarification state for session {session_id}, message: {message}. Original: '{original_message}'")
         
         parsed_order = state.get("parsed_order", {})
-        if not parsed_order.get("items"):
+        if ("pack_groups" not in parsed_order and not parsed_order.get("items")):
             self.logger.warning(f"No items in parsed order for portion clarification in session {session_id}.")
             return self.whatsapp_service.create_text_message(
                 session_id,
@@ -237,13 +247,29 @@ class AIHandler(BaseHandler):
                     "Or type 'menu' to go back."
                 )
             
-            # Update portions for items with previously unspecified quantities
-            for item in parsed_order["items"]:
-                if item.get("portions") == "unspecified":
-                    for clarified_item in clarification_response.get("items", []):
-                        if clarified_item["name"].lower() == item["name"].lower() and clarified_item["portions"] != "unspecified":
-                            item["portions"] = clarified_item["portions"]
-                            item["total_price"] = float(item["price"]) * float(clarified_item["portions"])
+            # Update portions
+            if "pack_groups" in parsed_order or "pack_groups" in clarification_response:
+                # If grouped, merge or update accordingly
+                # For simplicity, since clarification is for portions, apply to the existing structure
+                all_items = []
+                if "pack_groups" in parsed_order:
+                    for group in parsed_order["pack_groups"]:
+                        all_items.extend(group.get("items", []))
+                else:
+                    all_items = parsed_order.get("items", [])
+                for item in all_items:
+                    if item.get("portions") == "unspecified":
+                        for clarified_item in clarification_response.get("items", []):
+                            if clarified_item["name"].lower() == item["name"].lower() and clarified_item["portions"] != "unspecified":
+                                item["portions"] = clarified_item["portions"]
+                                item["total_price"] = float(item["price"]) * float(clarified_item["portions"])
+            else:
+                for item in parsed_order["items"]:
+                    if item.get("portions") == "unspecified":
+                        for clarified_item in clarification_response.get("items", []):
+                            if clarified_item["name"].lower() == item["name"].lower() and clarified_item["portions"] != "unspecified":
+                                item["portions"] = clarified_item["portions"]
+                                item["total_price"] = float(item["price"]) * float(clarified_item["portions"])
             
             # Update packs, grouping, and special instructions if provided
             if clarification_response.get("packs") != "unspecified":
@@ -254,10 +280,26 @@ class AIHandler(BaseHandler):
                 parsed_order["special_instructions"] = clarification_response["special_instructions"]
             
             # Recalculate order total
-            parsed_order["order_total"] = sum(float(item["total_price"]) for item in parsed_order["items"] if item.get("portions") != "unspecified")
+            if "pack_groups" in parsed_order:
+                total = 0.0
+                for group in parsed_order["pack_groups"]:
+                    for item in group.get("items", []):
+                        total += float(item.get("total_price", 0.0))
+                parsed_order["order_total"] = total
+            else:
+                parsed_order["order_total"] = sum(float(item["total_price"]) for item in parsed_order["items"] if item.get("portions") != "unspecified")
+            
+            # Update temp_order with the clarified order
+            state["temp_order"] = parsed_order
+            self.session_manager.update_session_state(session_id, state)
             
             # Check if all portions are now specified
-            unspecified_items = [item for item in parsed_order["items"] if item.get("portions") == "unspecified"]
+            unspecified_items = []
+            if "pack_groups" in parsed_order:
+                for group in parsed_order["pack_groups"]:
+                    unspecified_items.extend([item for item in group.get("items", []) if item.get("portions") == "unspecified"])
+            else:
+                unspecified_items = [item for item in parsed_order.get("items", []) if item.get("portions") == "unspecified"]
             if unspecified_items:
                 state["parsed_order"] = parsed_order
                 self.session_manager.update_session_state(session_id, state)
@@ -308,6 +350,9 @@ class AIHandler(BaseHandler):
                 state["total_price"] = parsed_order.get("order_total", 0.0)
                 state["current_state"] = "confirm_details"
                 state["current_handler"] = "order_handler"
+                # Clear temp_order upon confirmation
+                if "temp_order" in state:
+                    del state["temp_order"]
                 self.session_manager.update_session_state(session_id, state)
                 self.logger.info(f"AI order confirmed. Cart: {state['cart']}. Redirecting to order handler.")
                 
@@ -320,30 +365,185 @@ class AIHandler(BaseHandler):
                 )
         
         elif message == "modify_ai_order":
-            state["current_state"] = "ai_bulk_order"
+            state["current_state"] = "ai_order_modification"
             state["current_handler"] = "ai_handler"
             self.session_manager.update_session_state(session_id, state)
             self.logger.info(f"User chose to modify AI order for session {session_id}.")
             
+            parsed_order = state.get("temp_order", {})
+            summary = self._create_order_summary(parsed_order) if parsed_order else "No items in your current order."
             return self.whatsapp_service.create_text_message(
                 session_id,
-                "Please tell me your updated order:"
+                f"🛒 *Current Order:*\n\n{summary}\n\n"
+                "Please specify changes (e.g., 'add 2 portions of Fried Rice', 'remove Jollof Rice', or 'change to 3 packs')."
             )
         
         elif message == "cancel_ai_order":
             self.logger.info(f"User cancelled AI order for session {session_id}.")
             if "parsed_order" in state:
                 del state["parsed_order"]
-                self.session_manager.update_session_state(session_id, state)
+            if "temp_order" in state:
+                del state["temp_order"]
+            self.session_manager.update_session_state(session_id, state)
             return self.handle_back_to_main(state, session_id, "Order cancelled. How can I help you?")
         
         else:
             self.logger.debug(f"Invalid input '{message}' in AI order confirmation state for session {session_id}.")
-            return self.whatsapp_service.create_text_message(
+            return self.whatsapp_service.create_button_message(
                 session_id,
-                "Please choose from the available options."
+                "Please choose from the available options.",
+                [
+                    {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
+                    {"type": "reply", "reply": {"id": "modify_ai_order", "title": "✏️ Modify Order"}},
+                    {"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel"}}
+                ]
             )
     
+    def handle_ai_order_modification_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
+        """Handle AI order modification state for adding or removing items."""
+        self.logger.debug(f"Handling AI order modification state for session {session_id}, message: {message}. Original: '{original_message}'")
+        
+        parsed_order = state.get("temp_order", {})
+        if not parsed_order.get("items") and not parsed_order.get("pack_groups"):
+            self.logger.info(f"No previous order found for modification in session {session_id}. Treating as new order.")
+            parsed_order = {
+                "success": True,
+                "items": [],
+                "packs": 1,
+                "grouping": "",
+                "special_instructions": "",
+                "order_total": 0.0,
+                "unrecognized_items": []
+            }
+        
+        try:
+            # Parse the modification request
+            modification_response = self.ai_service.parse_order_with_llm(original_message)
+            if not modification_response.get("success"):
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    f"❌ Could not process your modification: {modification_response.get('error', 'Unknown error')}.\n"
+                    "Please specify changes, e.g., 'add 2 portions of Fried Rice', 'remove Jollof Rice'. "
+                    "Or type 'menu' to go back."
+                )
+            
+            # Handle modifications
+            # Assuming modifications are flat for simplicity; if grouped, it would be a new order structure
+            if "pack_groups" in modification_response:
+                # If modification is grouped, replace or merge, but for now, replace if present
+                parsed_order["pack_groups"] = modification_response["pack_groups"]
+                parsed_order["packs"] = modification_response["packs"]
+            else:
+                if "pack_groups" in parsed_order:
+                    # If original is grouped, modifications might need to apply per pack, but to simplify, convert to flat if mod is flat
+                    # For now, assume modifications are flat, and if original grouped, flatten first - but skip complex merge
+                    # To handle, perhaps re-parse the entire order, but since modification is additive, it's tricky
+                    # For this update, we'll assume if original is grouped, and mod is flat, add to grouping or something, but to keep simple, let's treat mod as new parse
+                    # Actually, since modification is like "add 2 Jollof", the LLM will output flat, so for grouped, we may need to add logic
+                    # To avoid complexity, perhaps note that grouped modifications are not fully supported yet, but for now, if mod has pack_groups, use it, else apply to flat
+                    if "pack_groups" in parsed_order:
+                        logger.warning("Grouped order modification with flat response; skipping merge for now.")
+                    else:
+                        # Handle removals for flat
+                        if "remove" in original_message.lower():
+                            items_to_remove = [item["name"].lower() for item in modification_response.get("items", [])]
+                            parsed_order["items"] = [item for item in parsed_order["items"] if item["name"].lower() not in items_to_remove]
+                        
+                        # Handle additions
+                        if "add" in original_message.lower() or "remove" not in original_message.lower():
+                            for new_item in modification_response.get("items", []):
+                                existing_item = next((item for item in parsed_order["items"] if item["name"].lower() == new_item["name"].lower()), None)
+                                if existing_item and new_item["portions"] != "unspecified":
+                                    existing_item["portions"] += new_item["portions"]
+                                    existing_item["total_price"] = float(existing_item["price"]) * float(existing_item["portions"])
+                                elif new_item["portions"] != "unspecified":
+                                    parsed_order["items"].append(new_item)
+            
+            # Update packs, grouping, and special instructions if provided
+            if modification_response.get("packs") != "unspecified":
+                parsed_order["packs"] = modification_response["packs"]
+            if modification_response.get("grouping"):
+                parsed_order["grouping"] = modification_response["grouping"]
+            if modification_response.get("special_instructions"):
+                parsed_order["special_instructions"] = modification_response["special_instructions"]
+            
+            # Recalculate order total
+            if "pack_groups" in parsed_order:
+                total = 0.0
+                for group in parsed_order["pack_groups"]:
+                    for item in group.get("items", []):
+                        total += float(item.get("total_price", 0.0))
+                parsed_order["order_total"] = total
+            else:
+                parsed_order["order_total"] = sum(float(item["total_price"]) for item in parsed_order["items"] if item.get("portions") != "unspecified")
+            
+            # Update temp_order and parsed_order
+            state["temp_order"] = parsed_order
+            state["parsed_order"] = parsed_order
+            self.session_manager.update_session_state(session_id, state)
+            
+            # Check for unrecognized items
+            if modification_response.get("unrecognized_items"):
+                summary = self._create_order_summary(parsed_order)
+                response_message = (
+                    f"{summary}\n\n"
+                    "🚫 *Some items in your modification were not found in our menu:*\n"
+                    + "\n".join([f"🚫 {item['input']} ({item['message']})" for item in modification_response["unrecognized_items"]]) +
+                    "\n\nPlease ensure you are selecting from our *existing products* only. "
+                    "You can rephrase your changes or proceed to confirm."
+                )
+                buttons = [
+                    {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
+                    {"type": "reply", "reply": {"id": "modify_ai_order", "title": "✏️ Modify Again"}},
+                    {"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel"}}
+                ]
+                return self.whatsapp_service.create_button_message(session_id, response_message, buttons)
+            
+            # Check for unspecified portions
+            unspecified_items = []
+            if "pack_groups" in parsed_order:
+                for group in parsed_order["pack_groups"]:
+                    unspecified_items.extend([item for item in group.get("items", []) if item.get("portions") == "unspecified"])
+            else:
+                unspecified_items = [item for item in parsed_order.get("items", []) if item.get("portions") == "unspecified"]
+            if unspecified_items:
+                state["current_state"] = "ai_portion_clarification"
+                state["current_handler"] = "ai_handler"
+                self.session_manager.update_session_state(session_id, state)
+                items_needing_clarification = ", ".join([item["name"] for item in unspecified_items])
+                return self.whatsapp_service.create_text_message(
+                    session_id,
+                    f"🛒 *Order Summary:*\n\n{self._create_order_summary(parsed_order)}\n\n"
+                    f"You mentioned {items_needing_clarification} but didn’t specify how many portions. "
+                    "How many portions would you like for each, and how should we pack them?"
+                )
+            
+            # Move to confirmation
+            state["current_state"] = "ai_order_confirmation"
+            state["current_handler"] = "ai_handler"
+            self.session_manager.update_session_state(session_id, state)
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "confirm_ai_order", "title": "✅ Confirm Order"}},
+                {"type": "reply", "reply": {"id": "modify_ai_order", "title": "✏️ Modify Again"}},
+                {"type": "reply", "reply": {"id": "cancel_ai_order", "title": "❌ Cancel"}}
+            ]
+            
+            return self.whatsapp_service.create_button_message(
+                session_id,
+                self._create_order_summary(parsed_order) + "\n\nYour order has been updated! Would you like to proceed?",
+                buttons
+            )
+        
+        except Exception as e:
+            logger.error(f"Error in AI order modification for session {session_id}: {e}", exc_info=True)
+            return self.whatsapp_service.create_text_message(
+                session_id,
+                "🤖 Sorry, I'm having trouble processing your changes. "
+                "Please specify changes, e.g., 'add 2 portions of Fried Rice', 'remove Jollof Rice'. "
+                "Or type 'menu' to go back."
+            )
+
     def handle_ai_order_clarification_state(self, state: Dict, message: str, original_message: str, session_id: str) -> Dict:
         """Handle AI order clarification state for ambiguous items."""
         self.logger.debug(f"Handling AI order clarification state for session {session_id}, message: {message}. Original: '{original_message}'")
@@ -408,6 +608,7 @@ class AIHandler(BaseHandler):
                 parsed_order["order_total"] = parsed_order.get("order_total", 0.0) + recognized_item["total_price"]
                 ambiguous_items.pop(0)
                 state["parsed_order"] = parsed_order
+                state["temp_order"] = parsed_order  # Update temp_order
                 self.session_manager.update_session_state(session_id, state)
                 
                 if ambiguous_items:
@@ -483,30 +684,70 @@ class AIHandler(BaseHandler):
         return self.whatsapp_service.create_button_message(session_id, full_message, buttons)
     
     def _create_order_summary(self, parsed_order: Dict[str, Any]) -> str:
-        """Create formatted order summary."""
+        """Create formatted order summary, breaking down items by packs."""
         if not parsed_order.get("success"):
             return f"❌ Error: {parsed_order.get('error', 'Unknown error')}"
             
         summary = "🛒 *Order Summary:*\n\n"
+        packs = parsed_order.get("packs", 1)
         
-        if parsed_order.get("items"):
-            for item in parsed_order["items"]:
-                portions = item.get("portions", "unspecified")
-                summary += f"✅ {item['name']} ({portions} portion{'s' if portions != 1 and portions != 'unspecified' else ''})"
-                if item.get("food_share_pattern") == "combo":
-                    summary += " [Combo]"
-                summary += f" - ₦{item.get('total_price', 0.0):,.2f}\n"
+        if "pack_groups" in parsed_order:
+            # Use grouped structure
+            pack_groups = sorted(parsed_order["pack_groups"], key=lambda x: x["pack"])
+            for group in pack_groups:
+                pack_num = group["pack"]
+                summary += f"*Pack {pack_num}:*\n"
+                pack_items = []
+                for item in group.get("items", []):
+                    portions = item.get("portions", "unspecified")
+                    if portions != "unspecified" and portions != 0:
+                        pack_items.append(
+                            f"✅ {item['name']} ({portions} portion{'s' if portions != 1 else ''})"
+                            + (f" [Combo]" if item.get("food_share_pattern") == "combo" else "")
+                            + f" - ₦{item.get('total_price', 0.0):,.2f}"
+                        )
+                if pack_items:
+                    summary += "\n".join(pack_items) + "\n\n"
+                else:
+                    summary += "No items assigned to this pack.\n\n"
+        else:
+            # Flat items, distribute evenly
+            items = parsed_order.get("items", [])
+            if not items:
+                return "No items in the order."
+            
+            for pack_num in range(1, packs + 1):
+                summary += f"*Pack {pack_num}:*\n"
+                pack_items = []
+                for item in items:
+                    portions = item.get("portions", 0)
+                    if portions == "unspecified" or portions == 0:
+                        continue
+                    portions_per_pack = portions // packs + (1 if pack_num <= portions % packs else 0)
+                    if portions_per_pack > 0:
+                        pack_items.append(
+                            f"✅ {item['name']} ({portions_per_pack} portion{'s' if portions_per_pack != 1 else ''})"
+                            + (f" [Combo]" if item.get("food_share_pattern") == "combo" else "")
+                            + f" - ₦{float(item['price']) * portions_per_pack:,.2f}"
+                        )
+                if pack_items:
+                    summary += "\n".join(pack_items) + "\n\n"
+                else:
+                    summary += "No items assigned to this pack.\n\n"
         
+        # Add unrecognized items
         if parsed_order.get("unrecognized_items"):
-            summary += "\n❌ *Unrecognized Items:*\n"
+            summary += "*Unrecognized Items:*\n"
             for item in parsed_order["unrecognized_items"]:
                 summary += f"🚫 {item['input']} ({item['message']})\n"
+            summary += "\n"
                 
-        summary += f"\n*Packs*: {parsed_order.get('packs', 'unspecified')}"
-        summary += f"\n*Grouping*: {parsed_order.get('grouping', 'No specific grouping')}"
+        # Add grouping and special instructions
+        summary += f"*Total Packs*: {packs}\n"
+        summary += f"*Grouping*: {parsed_order.get('grouping', 'No specific grouping')}\n"
         if parsed_order.get("special_instructions"):
-            summary += f"\n*Special Instructions*: {parsed_order.get('special_instructions')}"
-        summary += f"\n*Total*: ₦{parsed_order.get('order_total', 0.0):,.2f}"
+            summary += f"*Special Instructions*: {parsed_order.get('special_instructions')}\n"
+        summary += f"*Total*: ₦{parsed_order.get('order_total', 0.0):,.2f}"
         
         return summary
 
@@ -524,7 +765,23 @@ class AIHandler(BaseHandler):
     def _convert_parsed_order_to_cart(self, parsed_order: Dict[str, Any]) -> Dict[str, Any]:
         """Converts the AI-parsed order into the standard cart format for the OrderHandler."""
         cart_items = {}
-        if parsed_order and parsed_order.get("items"):
+        if "pack_groups" in parsed_order:
+            for group in parsed_order["pack_groups"]:
+                for item in group.get("items", []):
+                    name = item["name"]
+                    if name in cart_items:
+                        cart_items[name]["quantity"] += item["portions"]
+                        cart_items[name]["total_price"] += item["total_price"]
+                    else:
+                        cart_items[name] = {
+                            "item_id": item["item_id"],
+                            "quantity": item["portions"],
+                            "price": item["price"],
+                            "total_price": item["total_price"],
+                            "variations": item.get("variations", {}),
+                            "food_share_pattern": item.get("food_share_pattern", "single")
+                        }
+        elif parsed_order.get("items"):
             for item in parsed_order["items"]:
                 if item.get("portions") != "unspecified":
                     cart_items[item["name"]] = {
