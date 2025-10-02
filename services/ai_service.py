@@ -19,7 +19,7 @@ class OrderItem:
 
 class AIService:
     """
-    Handles AI-powered interactions, including chatbot responses and order parsing,
+    Handles AI-powered interactions, including chatbot responses, order parsing, and name parsing,
     by interfacing with the Azure OpenAI API.
     """
 
@@ -151,14 +151,15 @@ SMART ORDERING RULES:
    - Default packs = 1 (not "unspecified")
    - Default food_share_pattern = use exact pattern from menu for each item
    - If no portions specified, assume 1 portion per item
-   - If a number is specified before multiple items without individual counts (e.g., "3 jollof rice and fried rice"), assume the number applies to each item (3 jollof and 3 fried rice).
+   - If a number is specified before multiple items without individual counts (e.g., "3 Jollof rice and Fried rice"), assume the number applies to each item (3 Jollof and 3 Fried rice).
 
 2. PACK LOGIC:
    - If user specifies packs (e.g., "in 3 packs"), use that number for packs
    - Treat terms like "packs," "plates," "servings," or "people" (e.g., "for 3 people") as equivalent to specifying the number of packs
    - If user says "separate packs" or similar, packs = number of different items
-   - Pack calculation: total portions can be distributed across specified packs
-   - If user explicitly assigns items to specific packs (e.g., "for pack 1: ..., for pack 2: ..."), use the alternative grouped format below, with packs equal to the highest pack number mentioned or inferred.
+   - If user says "for X people" without specific pack assignments, replicate the entire order across X packs (e.g., "3 Moi Moi, 2 Jollof and Beef for 3 people" means 3 packs, each with 3 Moi Moi, 2 Jollof, 1 Beef)
+   - If user explicitly assigns items to specific packs (e.g., "for pack 1: ..., for pack 2: ..."), use the grouped format with packs equal to the highest pack number mentioned or inferred
+   - Pack calculation: for grouped orders, total portions are as specified per pack; for flat, portions can be distributed across packs
 
 3. PORTION UNDERSTANDING:
    - "2 portions of Jollof rice" = exactly 2 portions
@@ -177,9 +178,9 @@ SMART ORDERING RULES:
    - Understand Nigerian food terms and variations
    - Handle multiple ways of saying the same thing
    - Use the EXACT food_share_pattern from the menu data for each item
-   - Be smart about ambiguous phrases: if a number precedes a list of items, apply it to all unless otherwise specified.
+   - Be smart about ambiguous phrases: if a number precedes a list of items, apply it to all unless otherwise specified
 
-6. OUTPUT FORMAT (for non-specific pack assignments):
+6. OUTPUT FORMAT (for non-specific pack assignments or non-replicated orders):
 {{
     "success": true,
     "items": [
@@ -205,7 +206,7 @@ SMART ORDERING RULES:
     ]
 }}
 
-ALTERNATIVE OUTPUT FORMAT (use ONLY if user specifies items for specific packs):
+ALTERNATIVE OUTPUT FORMAT (use ONLY if user specifies items for specific packs or "for X people" implies replication):
 {{
     "success": true,
     "pack_groups": [
@@ -238,18 +239,19 @@ ALTERNATIVE OUTPUT FORMAT (use ONLY if user specifies items for specific packs):
 }}
 
 EXAMPLES:
-- "1 Jollof rice and 1 fried rice" → use flat format, 1 portion each, 1 pack total, use menu's food_share_pattern
+- "1 Jollof rice and 1 fried rice" → flat, 1 portion each, 1 pack total, use menu's food_share_pattern
 - "2 Jollof rice in 2 packs" → flat, 2 portions Jollof, 2 packs (1 portion per pack)
 - "Jollof rice and chicken" → flat, 1 portion each, 1 pack, use exact food_share_pattern
 - "3 Jollof rice for 3 people" → flat, 3 portions Jollof, 3 packs
 - "2 Fried rice in 3 plates" → flat, 2 portions Fried rice, 3 packs
 - "Chicken for 3 servings" → flat, 1 portion Chicken, 3 packs
 - "Add 1 Chicken, remove Jollof rice, change to 2 packs" → flat, 1 portion Chicken, 0 portions Jollof rice, 2 packs
-- "3 portions of Jollof rice and fried rice for pack 1, Yam and egg for pack 2, 3 portions of Jollof rice and fried rice for pack 3" → use grouped format, interpret as 3 Jollof and 3 Fried for pack 1 (apply 3 to both), 1 Yam and 1 Egg for pack 2, 3 Jollof and 3 Fried for pack 3, packs=3
+- "3 portions of Jollof rice and Fried rice for pack 1, Yam and egg for pack 2, 3 portions of Jollof rice and Fried rice for pack 3" → grouped, 3 Jollof and 3 Fried for pack 1, 1 Yam and 1 Egg for pack 2, 3 Jollof and 3 Fried for pack 3, packs=3
+- "3 Moi Moi, 2 Jollof and Beef for 3 people" → grouped, 3 packs, each with 3 Moi Moi, 2 Jollof, 1 Beef
 
 CRITICAL: Only use "unspecified" if the order is genuinely unclear. Default to sensible assumptions.
 Always use the EXACT food_share_pattern from the menu data - don't default all items to "Combo".
-Use the grouped format ONLY when packs are explicitly assigned with items; otherwise, use flat.
+Use the grouped format when packs are explicitly assigned or when "for X people" implies replication; otherwise, use flat.
 """
 
         try:
@@ -356,6 +358,70 @@ Use the grouped format ONLY when packs are explicitly assigned with items; other
                 "unrecognized_items": []
             }
     
+    def parse_user_name(self, user_message: str) -> Dict[str, Any]:
+        """
+        Parses a user's input to extract their preferred name using the LLM.
+
+        Args:
+            user_message (str): The user's message containing the name.
+
+        Returns:
+            Dict[str, Any]: A dictionary with the parsed name or error details.
+        """
+        if not self.ai_enabled or not self.azure_client:
+            return {
+                "success": False,
+                "error": "AI name parsing is currently unavailable.",
+                "name": ""
+            }
+
+        system_prompt = """You are Lola, a WhatsApp customer-service bot for Ganador Express. Your task is to extract the preferred name from a user's message. The name might be provided in conversational formats like "you can call me Sam," "my name is Ziga," or "call me John." Return a JSON object with the extracted name.
+
+Output format:
+{
+    "success": true,
+    "name": "extracted name",
+    "error": "" (or error message if applicable)
+}
+
+Examples:
+- "you can call me Sam" → {"success": true, "name": "Sam", "error": ""}
+- "my name is Ziga" → {"success": true, "name": "Ziga", "error": ""}
+- "call me John" → {"success": true, "name": "John", "error": ""}
+- "no name here" → {"success": false, "name": "", "error": "No name found in the input"}
+"""
+
+        try:
+            response = self.azure_client.chat.completions.create(
+                model=self.deployment_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Extract the name from this message: {user_message}"}
+                ],
+                max_tokens=100,
+                temperature=0.2
+            )
+            ai_response_content = response.choices[0].message.content.strip()
+            json_match = re.search(r'\{.*\}', ai_response_content, re.DOTALL)
+            if json_match:
+                parsed_json = json.loads(json_match.group())
+                parsed_json.setdefault("success", False)
+                parsed_json.setdefault("name", "")
+                parsed_json.setdefault("error", "")
+                return parsed_json
+            else:
+                logger.error(f"No JSON found in AI response for name parsing: {ai_response_content}")
+                return {"success": False, "name": "", "error": "Could not parse AI response"}
+        except json.JSONDecodeError as jde:
+            logger.error(f"JSON decoding error in name parsing: {jde} - Response: {ai_response_content}")
+            return {"success": False, "name": "", "error": "Invalid AI response format"}
+        except (APIConnectionError, RateLimitError, OpenAIError) as e:
+            logger.error(f"Azure OpenAI API error in name parsing: {e}")
+            return {"success": False, "name": "", "error": "AI processing temporarily unavailable"}
+        except Exception as e:
+            logger.error(f"Unexpected error in name parsing: {e}")
+            return {"success": False, "name": "", "error": "AI processing error"}
+
     def _create_menu_context(self) -> str:
         """
         Creates a formatted string representation of the menu data for AI context.

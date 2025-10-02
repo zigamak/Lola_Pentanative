@@ -34,7 +34,7 @@ class BaseHandler:
             ]
         return buttons
 
-    def send_main_menu(self, session_id: str, user_name: str = "Guest", message: str = "How can I help you today?") -> Dict:
+    def send_main_menu(self, session_id: str, whatsapp_username: str = None, message: str = None) -> Dict:
         """
         Sends the main menu to the user.
         The menu buttons are dynamically generated based on the user's paid status.
@@ -42,16 +42,20 @@ class BaseHandler:
         is_paid_user = self.session_manager.is_paid_user_session(session_id)
         buttons = self.create_main_menu_buttons(is_paid_user)
 
-        # The 'message' parameter now fully contains the greeting
-        # (e.g., "Hello [User Name]! 👋\n\nHow can I help you today?")
-        # or the "Invalid option..." message.
+        # Fetch user data from DataManager
+        user_data = self.data_manager.get_user_data(session_id)
+        user_name = user_data.get("display_name", user_data.get("name", whatsapp_username or "Guest")) if user_data else (whatsapp_username or "Guest")
+        self.logger.info(f"Session {session_id}: Using username '{user_name}' for main menu (WhatsApp username: {whatsapp_username})")
+
+        # Use provided message or default with user_name
+        message = message or f"How can I help you today, {user_name}?"
         return self.whatsapp_service.create_button_message(
             session_id,
             message,
             buttons
         )
 
-    def handle_back_to_main(self, state: Dict, session_id: str, message: str = "Welcome back! How can I help you today?") -> Dict:
+    def handle_back_to_main(self, state: Dict, session_id: str, whatsapp_username: str = None, message: str = None) -> Dict:
         """
         Handles returning to the main menu by resetting the current state
         and sending the main menu options.
@@ -65,13 +69,14 @@ class BaseHandler:
             del state["selected_category"]
         if "selected_item" in state:
             del state["selected_item"]
-            
+
         self.session_manager.update_session_state(session_id, state)
         self.logger.info(f"Session {session_id} returned to main menu (greeting state).")
-        
-        # When returning to main, use the user's known name if available, otherwise "Guest"
+
+        # Fetch user data from DataManager
         user_data = self.data_manager.get_user_data(session_id)
-        user_name = user_data.get("display_name", "Guest") if user_data else "Guest"
+        user_name = user_data.get("display_name", user_data.get("name", whatsapp_username or "Guest")) if user_data else (whatsapp_username or "Guest")
         
-        # The message already includes the greeting for returning users.
+        # Use provided message or default with user_name
+        message = message or f"Welcome back! How can I help you today, {user_name}?"
         return self.send_main_menu(session_id, user_name, message=message)

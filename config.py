@@ -28,7 +28,14 @@ class Config:
         
         #self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
         self.SUBACCOUNT_PERCENTAGE = 1
-        self.MERCHANT_PHONE_NUMBER = "2347082345056"
+        self.MERCHANT_PHONE_NUMBERS = [
+        "2347082345056",
+        "2348055614455",
+        "2348096500003",
+        "2348129750653"]
+      
+        
+        
         
         # Merchant ID from environment variable
         self.MERCHANT_ID = os.getenv('MERCHANT_ID', '20')

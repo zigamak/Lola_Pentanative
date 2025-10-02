@@ -249,20 +249,19 @@ class AIHandler(BaseHandler):
             
             # Update portions
             if "pack_groups" in parsed_order or "pack_groups" in clarification_response:
-                # If grouped, merge or update accordingly
-                # For simplicity, since clarification is for portions, apply to the existing structure
-                all_items = []
-                if "pack_groups" in parsed_order:
-                    for group in parsed_order["pack_groups"]:
-                        all_items.extend(group.get("items", []))
+                # If grouped, merge or update
+                if "pack_groups" in clarification_response:
+                    parsed_order["pack_groups"] = clarification_response["pack_groups"]
+                    parsed_order["packs"] = clarification_response["packs"]
                 else:
-                    all_items = parsed_order.get("items", [])
-                for item in all_items:
-                    if item.get("portions") == "unspecified":
-                        for clarified_item in clarification_response.get("items", []):
-                            if clarified_item["name"].lower() == item["name"].lower() and clarified_item["portions"] != "unspecified":
-                                item["portions"] = clarified_item["portions"]
-                                item["total_price"] = float(item["price"]) * float(clarified_item["portions"])
+                    # Apply clarifications to existing pack_groups
+                    for group in parsed_order["pack_groups"]:
+                        for item in group.get("items", []):
+                            if item.get("portions") == "unspecified":
+                                for clarified_item in clarification_response.get("items", []):
+                                    if clarified_item["name"].lower() == item["name"].lower() and clarified_item["portions"] != "unspecified":
+                                        item["portions"] = clarified_item["portions"]
+                                        item["total_price"] = float(item["price"]) * float(clarified_item["portions"])
             else:
                 for item in parsed_order["items"]:
                     if item.get("portions") == "unspecified":
@@ -272,7 +271,7 @@ class AIHandler(BaseHandler):
                                 item["total_price"] = float(item["price"]) * float(clarified_item["portions"])
             
             # Update packs, grouping, and special instructions if provided
-            if clarification_response.get("packs") != "unspecified":
+            if clarification_response.get("packs") != "unspecified" and "pack_groups" not in parsed_order:
                 parsed_order["packs"] = clarification_response["packs"]
             if clarification_response.get("grouping"):
                 parsed_order["grouping"] = clarification_response["grouping"]
@@ -428,39 +427,49 @@ class AIHandler(BaseHandler):
                 )
             
             # Handle modifications
-            # Assuming modifications are flat for simplicity; if grouped, it would be a new order structure
-            if "pack_groups" in modification_response:
-                # If modification is grouped, replace or merge, but for now, replace if present
-                parsed_order["pack_groups"] = modification_response["pack_groups"]
-                parsed_order["packs"] = modification_response["packs"]
-            else:
-                if "pack_groups" in parsed_order:
-                    # If original is grouped, modifications might need to apply per pack, but to simplify, convert to flat if mod is flat
-                    # For now, assume modifications are flat, and if original grouped, flatten first - but skip complex merge
-                    # To handle, perhaps re-parse the entire order, but since modification is additive, it's tricky
-                    # For this update, we'll assume if original is grouped, and mod is flat, add to grouping or something, but to keep simple, let's treat mod as new parse
-                    # Actually, since modification is like "add 2 Jollof", the LLM will output flat, so for grouped, we may need to add logic
-                    # To avoid complexity, perhaps note that grouped modifications are not fully supported yet, but for now, if mod has pack_groups, use it, else apply to flat
-                    if "pack_groups" in parsed_order:
-                        logger.warning("Grouped order modification with flat response; skipping merge for now.")
-                    else:
-                        # Handle removals for flat
-                        if "remove" in original_message.lower():
-                            items_to_remove = [item["name"].lower() for item in modification_response.get("items", [])]
-                            parsed_order["items"] = [item for item in parsed_order["items"] if item["name"].lower() not in items_to_remove]
+            if "pack_groups" in parsed_order or "pack_groups" in modification_response:
+                # Handle grouped orders
+                if "pack_groups" in modification_response:
+                    # Replace with new grouped structure if provided
+                    parsed_order["pack_groups"] = modification_response["pack_groups"]
+                    parsed_order["packs"] = modification_response["packs"]
+                else:
+                    # Update existing pack_groups with flat modifications
+                    for group in parsed_order.get("pack_groups", []):
+                        items = group.get("items", [])
+                        # Handle removals
+                        items_to_remove = [item["name"].lower() for item in modification_response.get("items", []) if item.get("portions") == 0]
+                        group["items"] = [item for item in items if item["name"].lower() not in items_to_remove]
                         
-                        # Handle additions
-                        if "add" in original_message.lower() or "remove" not in original_message.lower():
-                            for new_item in modification_response.get("items", []):
-                                existing_item = next((item for item in parsed_order["items"] if item["name"].lower() == new_item["name"].lower()), None)
-                                if existing_item and new_item["portions"] != "unspecified":
-                                    existing_item["portions"] += new_item["portions"]
-                                    existing_item["total_price"] = float(existing_item["price"]) * float(existing_item["portions"])
-                                elif new_item["portions"] != "unspecified":
-                                    parsed_order["items"].append(new_item)
+                        # Handle additions or updates
+                        for new_item in modification_response.get("items", []):
+                            if new_item.get("portions") == 0:
+                                continue  # Skip items marked for removal
+                            existing_item = next((item for item in group["items"] if item["name"].lower() == new_item["name"].lower()), None)
+                            if existing_item and new_item["portions"] != "unspecified":
+                                existing_item["portions"] += new_item["portions"]
+                                existing_item["total_price"] = float(existing_item["price"]) * float(existing_item["portions"])
+                            elif new_item["portions"] != "unspecified":
+                                group["items"].append(new_item)
+            else:
+                # Handle flat orders
+                # Handle removals
+                items_to_remove = [item["name"].lower() for item in modification_response.get("items", []) if item.get("portions") == 0]
+                parsed_order["items"] = [item for item in parsed_order.get("items", []) if item["name"].lower() not in items_to_remove]
+                
+                # Handle additions or updates
+                for new_item in modification_response.get("items", []):
+                    if new_item.get("portions") == 0:
+                        continue  # Skip items marked for removal
+                    existing_item = next((item for item in parsed_order["items"] if item["name"].lower() == new_item["name"].lower()), None)
+                    if existing_item and new_item["portions"] != "unspecified":
+                        existing_item["portions"] += new_item["portions"]
+                        existing_item["total_price"] = float(existing_item["price"]) * float(existing_item["portions"])
+                    elif new_item["portions"] != "unspecified":
+                        parsed_order["items"].append(new_item)
             
             # Update packs, grouping, and special instructions if provided
-            if modification_response.get("packs") != "unspecified":
+            if modification_response.get("packs") != "unspecified" and "pack_groups" not in parsed_order:
                 parsed_order["packs"] = modification_response["packs"]
             if modification_response.get("grouping"):
                 parsed_order["grouping"] = modification_response["grouping"]

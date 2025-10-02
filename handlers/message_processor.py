@@ -69,7 +69,7 @@ class MessageProcessor:
 
         logger.info("MessageProcessor initialized with lead tracking, AI support, and feedback collection.")
 
-    def process_message(self, message_data, session_id, user_name):
+    def process_message(self, message_data, session_id, whatsapp_username):
         """Main method to process incoming messages with lead tracking."""
         try:
             # Retrieve session state (handles timeout checking and resetting)
@@ -77,7 +77,7 @@ class MessageProcessor:
 
             # Track new interaction for lead tracking
             is_new_interaction = state["current_state"] == "start" and not state.get("user_name")
-            self.lead_tracking_handler.track_user_interaction(session_id, user_name, is_new_interaction)
+            self.lead_tracking_handler.track_user_interaction(session_id, whatsapp_username, is_new_interaction)
 
             # Update session activity
             self.session_manager.update_session_activity(session_id)
@@ -85,7 +85,7 @@ class MessageProcessor:
             # Handle different message types
             if isinstance(message_data, dict):
                 if message_data.get("type") == "location":
-                    return self._handle_location_message(message_data, state, session_id, user_name)
+                    return self._handle_location_message(message_data, state, session_id, whatsapp_username)
                 else:
                     message = message_data.get("text", "")
             else:
@@ -95,15 +95,15 @@ class MessageProcessor:
             message = message.strip().lower() if message else ""
 
             # Update user info in session state
-            self._update_user_info(state, session_id, user_name)
+            self._update_user_info(state, session_id, whatsapp_username)
             self.session_manager.update_session_state(session_id, state)
 
             # Route to appropriate handler
-            response = self._route_to_handler(state, message, original_message, session_id, user_name)
+            response = self._route_to_handler(state, message, original_message, session_id, whatsapp_username)
 
             # Track cart activity if applicable
             if state.get("cart"):
-                self.lead_tracking_handler.track_cart_activity(session_id, user_name, state["cart"])
+                self.lead_tracking_handler.track_cart_activity(session_id, whatsapp_username, state["cart"])
 
             return response
 
@@ -143,12 +143,12 @@ class MessageProcessor:
         """Get feedback analytics summary."""
         return self.feedback_handler.get_feedback_analytics()
 
-    def _update_user_info(self, state, session_id, user_name):
+    def _update_user_info(self, state, session_id, whatsapp_username):
         """Update user information in session state."""
-        if user_name and not state.get("user_name"):
-            state["user_name"] = user_name
+        if whatsapp_username and not state.get("user_name"):
+            state["user_name"] = whatsapp_username
         if not state.get("user_name"):
-            state["user_name"] = "Guest"
+            state["user_name"] = whatsapp_username or "Guest"
         state["phone_number"] = session_id
 
         if not state.get("address"):
@@ -162,13 +162,13 @@ class MessageProcessor:
                     }
                     self.data_manager.save_user_details(session_id, self.data_manager.user_details[session_id])
 
-    def _route_to_handler(self, state, message, original_message, session_id, user_name):
+    def _route_to_handler(self, state, message, original_message, session_id, whatsapp_username):
         """Route messages to appropriate handlers based on current_handler and current_state."""
         current_handler_name = state.get("current_handler", "greeting_handler")
         current_state = state.get("current_state", "start")
         
         if "user_name" not in state:
-            state["user_name"] = user_name or "Guest"
+            state["user_name"] = whatsapp_username or "Guest"
 
         response = None
 
@@ -176,27 +176,27 @@ class MessageProcessor:
             # Add a global escape command to handle messages like "menu" or "start"
             if message in ["menu", "back", "start", "hello"]:
                 logger.info(f"Session {session_id}: Global escape keyword '{message}' detected. Resetting to greeting.")
-                return self.greeting_handler.handle_back_to_main(state, session_id, "Let's start fresh. What can I do for you?")
+                return self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username, "Let's start fresh. What can I do for you?")
             
             # Handle redirect messages explicitly
             if message in ["show_enquiry_menu", "show_faq_categories", "start_track_order", "handle_confirm_order_state"]:
-                return self._handle_redirect_message(state, message, original_message, session_id, user_name)
+                return self._handle_redirect_message(state, message, original_message, session_id, whatsapp_username)
 
             # Route based on current handler and state
             if current_handler_name == "greeting_handler":
                 if current_state == "start":
-                    response = self.greeting_handler.generate_initial_greeting(state, session_id, user_name)
+                    response = self.greeting_handler.generate_initial_greeting(state, session_id, whatsapp_username)
                 elif current_state == "collect_preferred_name":
-                    response = self.greeting_handler.handle_collect_preferred_name_state(state, message, session_id)
+                    response = self.greeting_handler.handle_collect_preferred_name_state(state, message, session_id, whatsapp_username)
                 elif current_state == "collect_delivery_address":
-                    response = self.greeting_handler.handle_collect_delivery_address_state(state, message, session_id)
+                    response = self.greeting_handler.handle_collect_delivery_address_state(state, message, session_id, whatsapp_username)
                 elif current_state == "waiting_for_address_input":
-                    response = self.greeting_handler.handle_collect_delivery_address_state(state, message, session_id)
+                    response = self.greeting_handler.handle_collect_delivery_address_state(state, message, session_id, whatsapp_username)
                 elif current_state == "greeting":
-                    response = self.greeting_handler.handle_greeting_state(state, message, original_message, session_id)
+                    response = self.greeting_handler.handle_greeting_state(state, message, original_message, session_id, whatsapp_username)
                 else:
                     logger.warning(f"Session {session_id}: Unhandled greeting_handler state '{current_state}'. Resetting to greeting.")
-                    response = self.greeting_handler.handle_back_to_main(state, session_id, "I'm sorry, I didn't understand that. Let's return to the main menu.")
+                    response = self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username, "I'm sorry, I didn't understand that. Let's return to the main menu.")
             
             elif current_handler_name == "ai_handler":
                 if current_state == "ai_menu_selection":
@@ -315,7 +315,7 @@ class MessageProcessor:
             
             # Handle global 'menu' command
             if message == "menu" and current_handler_name != "greeting_handler":
-                return self.greeting_handler.handle_back_to_main(state, session_id)
+                return self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username)
 
             # Handle redirects
             if isinstance(response, dict) and response.get("redirect"):
@@ -351,7 +351,7 @@ class MessageProcessor:
                 elif redirect_target_handler_name == "greeting_handler":
                     if redirect_message_for_target == "handle_back_to_main":
                         additional_message = response.get("additional_message", "")
-                        return self.greeting_handler.handle_back_to_main(state, session_id, additional_message)
+                        return self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username, additional_message)
                 
                 elif redirect_target_handler_name == "ai_handler":
                     if redirect_message_for_target == "start_ai_bulk_order":
@@ -372,7 +372,7 @@ class MessageProcessor:
                         return self.payment_handler.handle_payment_processing_state(state, "initiate_payment", session_id)
                 
                 # For other cases, use the standard routing
-                return self._route_to_handler(state, redirect_message_for_target, original_message, session_id, user_name)
+                return self._route_to_handler(state, redirect_message_for_target, original_message, session_id, whatsapp_username)
 
             # Fallback for no response
             if response is None:
@@ -380,7 +380,7 @@ class MessageProcessor:
                 state["current_state"] = "greeting"
                 state["current_handler"] = "greeting_handler"
                 self.session_manager.update_session_state(session_id, state)
-                response = self.greeting_handler.generate_initial_greeting(state, session_id, user_name)
+                response = self.greeting_handler.generate_initial_greeting(state, session_id, whatsapp_username)
 
             return response
 
@@ -394,7 +394,7 @@ class MessageProcessor:
                 "⚠️ Something went wrong. Let's start fresh. Please try again."
             )
 
-    def _handle_redirect_message(self, state, message, original_message, session_id, user_name):
+    def _handle_redirect_message(self, state, message, original_message, session_id, whatsapp_username):
         """Handle specific redirect messages by calling appropriate handler methods."""
         if message == "show_enquiry_menu":
             return self.enquiry_handler.show_enquiry_menu(state, session_id)
@@ -418,9 +418,9 @@ class MessageProcessor:
             state["current_state"] = "greeting"
             state["current_handler"] = "greeting_handler"
             self.session_manager.update_session_state(session_id, state)
-            return self.greeting_handler.generate_initial_greeting(state, session_id, user_name)
+            return self.greeting_handler.generate_initial_greeting(state, session_id, whatsapp_username)
 
-    def _handle_location_message(self, message_data, state, session_id, user_name):
+    def _handle_location_message(self, message_data, state, session_id, whatsapp_username):
         """Handle incoming location messages (WhatsApp 'location' type)."""
         latitude = message_data.get("latitude")
         longitude = message_data.get("longitude")
