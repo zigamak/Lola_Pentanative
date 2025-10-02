@@ -61,18 +61,6 @@
       "food_share_pattern": "Portion"
     },
     {
-      "id": "8",
-      "name": "Ghana wha key rice and beans",
-      "variant": null,
-      "price": 700.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 20,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
       "id": "9",
       "name": "White rice and stew",
       "variant": null,
@@ -113,18 +101,6 @@
       "name": "Basmati special fried rice",
       "variant": null,
       "price": 1000.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 20,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "13",
-      "name": "White spaghetti and sauce",
-      "variant": null,
-      "price": 700.0,
       "currency": null,
       "availability_status": true,
       "description": null,
@@ -337,42 +313,6 @@
       "food_share_pattern": "Portion"
     },
     {
-      "id": "31",
-      "name": "Fish",
-      "variant": null,
-      "price": 700.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 27,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "32",
-      "name": "Egg",
-      "variant": null,
-      "price": 350.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 28,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "33",
-      "name": "Beef",
-      "variant": null,
-      "price": 300.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 29,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
       "id": "34",
       "name": "Chicken Wings",
       "variant": null,
@@ -405,18 +345,6 @@
       "availability_status": true,
       "description": null,
       "quantity": 32,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "37",
-      "name": "Plantain",
-      "variant": null,
-      "price": 200.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 33,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     },
@@ -536,7 +464,19 @@
       "currency": null,
       "availability_status": true,
       "description": null,
-      "quantity": 18,
+      "quantity": 4,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "37",
+      "name": "Plantain",
+      "variant": null,
+      "price": 200.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 29,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     },
@@ -548,7 +488,67 @@
       "currency": null,
       "availability_status": true,
       "description": null,
+      "quantity": 4,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "32",
+      "name": "Egg",
+      "variant": null,
+      "price": 350.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 22,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "33",
+      "name": "Beef",
+      "variant": null,
+      "price": 300.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 19,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "8",
+      "name": "Ghana wha key rice and beans",
+      "variant": null,
+      "price": 700.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
       "quantity": 18,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "13",
+      "name": "White spaghetti and sauce",
+      "variant": null,
+      "price": 700.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 18,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "31",
+      "name": "Fish",
+      "variant": null,
+      "price": 700.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 25,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     }
