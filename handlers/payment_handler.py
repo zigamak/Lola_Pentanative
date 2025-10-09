@@ -87,6 +87,14 @@ class PaymentHandler(BaseHandler):
         try:
             logger.info(f"Initiating manual feedback collection for order {order_id}, session {session_id}")
             
+            if not state or not session_id:
+                logger.warning(f"Cannot initiate feedback collection: empty state or session_id for order {order_id}")
+                self.whatsapp_service.create_text_message(
+                    session_id,
+                    "⚠️ Unable to request feedback at this time. Thank you for your order!"
+                )
+                return
+            
             state["current_state"] = "feedback_rating"
             state["current_handler"] = "feedback_handler"
             state["feedback_order_id"] = order_id
@@ -112,14 +120,15 @@ class PaymentHandler(BaseHandler):
             
         except Exception as e:
             logger.error(f"Failed to send manual feedback prompt for order {order_id}, session {session_id}: {str(e)}", exc_info=True)
-            state["current_state"] = "greeting"
-            state["current_handler"] = "greeting_handler"
-            self.session_manager.update_session_state(session_id, state)
+            if state and session_id:
+                state["current_state"] = "greeting"
+                state["current_handler"] = "greeting_handler"
+                self.session_manager.update_session_state(session_id, state)
             self.whatsapp_service.create_text_message(
                 session_id,
                 "⚠️ Issue sending feedback request. Let's start fresh. How can I help you today?"
             )
-
+            
     def _initiate_feedback_collection_webhook(self, session_id: str, order_id: str, session_manager) -> None:
         """Initiate feedback collection for webhook payments."""
         try:
@@ -346,7 +355,7 @@ class PaymentHandler(BaseHandler):
             return " | ".join(formatted)
         return "\n".join(f"- {item}" for item in formatted)
     
-    def _send_payment_success_message(self, session_id: str, order_id: str, total_amount: float, items: List[Dict], delivery_address: str, maps_info: str = ""):
+    def _send_payment_success_message(self, state: Dict, session_id: str, order_id: str, total_amount: float, items: List[Dict], delivery_address: str, maps_info: str = ""):
         """Send payment success message to customer and detailed notification to merchants via bot."""
         try:
             order_data = self.data_manager.get_order_by_id(order_id)
@@ -357,7 +366,6 @@ class PaymentHandler(BaseHandler):
                 f"✅ *Payment Successful!*\n\n"
                 f"📋 *Order ID:* {order_id}\n"
                 f"💰 *Subtotal:* ₦{subtotal:,}\n"
-            
                 f"💰 *Total:* ₦{total_amount:,.2f}\n"
                 f"🛒 *Items:*\n{formatted_items}\n"
                 f"📍 *Delivery Address:* {delivery_address}{maps_info}\n\n"
@@ -394,7 +402,6 @@ class PaymentHandler(BaseHandler):
         except Exception as e:
             logger.error(f"Error sending payment success messages for order {order_id}: {e}", exc_info=True)
             if self.merchant_phone_numbers:
-                state = self.session_manager.get_session_state(session_id)
                 customer_name = state.get("user_name", "Guest")
                 customer_phone = state.get("phone_number", session_id)
                 customer_notes = state.get("customer_notes", "No special instructions provided")
@@ -407,7 +414,6 @@ class PaymentHandler(BaseHandler):
                     f"📍 *Delivery Address:* {delivery_address}\n"
                     f"🛒 *Items:*\n{formatted_items}\n"
                     f"💰 *Subtotal:* ₦{subtotal if order_data else 0:,}\n"
-                  
                     f"💰 *Total:* ₦{total_amount:,.2f}\n"
                     f"📝 *Customer Notes:* {customer_notes}\n"
                     f"📌 Please process this order promptly."
@@ -415,7 +421,6 @@ class PaymentHandler(BaseHandler):
                 for phone_number in self.merchant_phone_numbers:
                     self.whatsapp_service.create_text_message(phone_number, fallback_message)
                     logger.info(f"Sent detailed fallback merchant notification for order {order_id} to {phone_number}")
-    
     def start_payment_monitoring(self, session_id, payment_reference, order_id):
         """Start monitoring payment status every minute for up to 15 minutes."""
         logger.info(f"Starting payment monitoring for order {order_id}, reference {payment_reference}")
@@ -569,6 +574,7 @@ class PaymentHandler(BaseHandler):
             maps_info = self._generate_maps_info(state)
             total_amount = order_data.get("total_amount", 0) + charges
             self._send_payment_success_message(
+                state,
                 session_id,
                 order_id,
                 total_amount,
@@ -806,6 +812,7 @@ class PaymentHandler(BaseHandler):
                 maps_info = self._generate_maps_info(state)
                 total_amount = order_data.get("total_amount", 0) + charges
                 self._send_payment_success_message(
+                    state,
                     session_id,
                     order_data["id"],
                     total_amount,
@@ -941,6 +948,7 @@ class PaymentHandler(BaseHandler):
             charges = order_data.get("charges", 0)
             total_amount = order_data.get("total_amount", 0) + charges
             self._send_payment_success_message(
+                state,
                 session_id,
                 order_data["id"],
                 total_amount,
@@ -1045,6 +1053,7 @@ class PaymentHandler(BaseHandler):
             charges = order_data.get("charges", 0)
             total_amount = order_data.get("total_amount", 0) + charges
             self._send_payment_success_message(
+                state,
                 session_id,
                 order_id,
                 total_amount,
@@ -1143,6 +1152,7 @@ class PaymentHandler(BaseHandler):
                     maps_info = self._generate_maps_info(state)
                     total_amount = order_data["total_amount"] + charges
                     self._send_payment_success_message(
+                        state,
                         session_id,
                         order_data["id"],
                         total_amount,
@@ -1154,6 +1164,7 @@ class PaymentHandler(BaseHandler):
                     logger.info(f"Order {order_data['id']} confirmed, but no session_id available. Sending merchant notification only.")
                     total_amount = order_data["total_amount"] + charges
                     self._send_payment_success_message(
+                        state if session_id else {},
                         session_id or order_data.get("customer_id", ""),
                         order_data["id"],
                         total_amount,
@@ -1288,6 +1299,7 @@ class PaymentHandler(BaseHandler):
                 maps_info = self._generate_maps_info(state)
                 total_amount = order_data.get("total_amount", 0) + charges
                 self._send_payment_success_message(
+                    state,
                     session_id,
                     order_data["id"],
                     total_amount,
