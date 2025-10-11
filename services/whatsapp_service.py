@@ -303,3 +303,5 @@ class WhatsAppService:
         except Exception as e:
             logger.error("Unexpected error validating contact %s: %s", phone_number, e, exc_info=True)
             return None
+        
+    

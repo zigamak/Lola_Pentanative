@@ -7805,3 +7805,521 @@ AttributeError: 'DataManager' object has no attribute 'merchant_phone_number'
 2025-10-09 13:06:52,484 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
 2025-10-09 13:06:52,678 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
 2025-10-09 13:06:53,158 - __main__ - INFO - Bot server stopped by user.
+2025-10-11 12:45:24,173 - __main__ - INFO - Starting WhatsApp bot server...
+2025-10-11 12:45:26,096 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-10-11 12:45:28,564 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-10-11 12:45:28,769 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-10-11 12:45:28,962 - utils.data_manager - DEBUG - id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:29,198 - utils.data_manager - DEBUG - merchant_details_id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:29,394 - utils.data_manager - DEBUG - product_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:29,597 - utils.data_manager - DEBUG - description column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:29,802 - utils.data_manager - DEBUG - product_category column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:29,998 - utils.data_manager - DEBUG - variant_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:30,237 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:30,438 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:30,657 - utils.data_manager - DEBUG - availability_status column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:30,850 - utils.data_manager - DEBUG - quantity column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:31,048 - utils.data_manager - DEBUG - last_updated column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:31,242 - utils.data_manager - DEBUG - date_created column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:31,458 - utils.data_manager - DEBUG - channel column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:31,653 - utils.data_manager - DEBUG - food_share_pattern column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:33,462 - utils.data_manager - INFO - Successfully loaded 66 user details from database
+2025-10-11 12:45:33,666 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-10-11 12:45:33,667 - services.payment_service - INFO - PaymentService initialized
+2025-10-11 12:45:33,667 - handlers.product_sync_handler - INFO - Starting product sync thread. Sync interval: 5.0 minutes.
+2025-10-11 12:45:33,668 - handlers.product_sync_handler - INFO - Initiating product sync for merchant 20...
+2025-10-11 12:45:34,162 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:45:34,162 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-10-11 12:45:34,163 - app - INFO - GreetingHandler and FeedbackHandler initialized.
+2025-10-11 12:45:34,163 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-10-11 12:45:34,164 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2348096500003, 2347082345056, 2348055614455, 2348129750653
+2025-10-11 12:45:34,164 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:45:34,165 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_iwv6csej0ra4k7g, split percentage 10%
+2025-10-11 12:45:34,165 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-10-11 12:45:35,250 - handlers.product_sync_handler - INFO - Successfully synced 47 products for merchant 20 to data\products.json
+2025-10-11 12:45:35,823 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-10-11 12:45:36,021 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-10-11 12:45:36,223 - utils.data_manager - DEBUG - id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:36,498 - utils.data_manager - DEBUG - merchant_details_id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:36,698 - utils.data_manager - DEBUG - product_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:36,913 - utils.data_manager - DEBUG - description column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:37,111 - utils.data_manager - DEBUG - product_category column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:37,310 - utils.data_manager - DEBUG - variant_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:37,509 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:37,706 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:37,904 - utils.data_manager - DEBUG - availability_status column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:38,103 - utils.data_manager - DEBUG - quantity column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:38,300 - utils.data_manager - DEBUG - last_updated column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:38,497 - utils.data_manager - DEBUG - date_created column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:38,695 - utils.data_manager - DEBUG - channel column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:38,892 - utils.data_manager - DEBUG - food_share_pattern column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:45:40,651 - utils.data_manager - INFO - Successfully loaded 66 user details from database
+2025-10-11 12:45:40,842 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-10-11 12:45:40,843 - services.payment_service - INFO - PaymentService initialized
+2025-10-11 12:45:40,843 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-10-11 12:45:40,843 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-10-11 12:45:41,184 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:45:41,185 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-10-11 12:45:41,185 - handlers.enquiry_handler - WARNING - MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped
+2025-10-11 12:45:41,197 - handlers.complaint_handler - WARNING - MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped
+2025-10-11 12:45:41,197 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-10-11 12:45:41,197 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-10-11 12:45:41,198 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2348096500003, 2347082345056, 2348055614455, 2348129750653
+2025-10-11 12:45:41,198 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:45:41,199 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_iwv6csej0ra4k7g, split percentage 10%
+2025-10-11 12:45:41,545 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:45:41,546 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-10-11 12:45:41,546 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-10-11 12:45:41,546 - handlers.payment_handler - WARNING - FeedbackHandler not provided, feedback collection will be manual
+2025-10-11 12:45:41,547 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2348096500003, 2347082345056, 2348055614455, 2348129750653
+2025-10-11 12:45:41,547 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:45:41,548 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_iwv6csej0ra4k7g, split percentage 10%
+2025-10-11 12:45:41,578 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-10-11 12:45:41,578 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-10-11 12:46:04,357 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-10-11 12:46:04,357 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-10-11 12:46:05,897 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:46:07,278 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:46:06.090005+00:00, interaction_count=100, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:46:07,879 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:46:07,880 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455 (Ziga)
+2025-10-11 12:46:07,880 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:46:09,475 - utils.data_manager - DEBUG - Found address 'Howson Wright' for phone number 2348055614455 in whatsapp_orders
+2025-10-11 12:46:09,670 - handlers.message_processor - INFO - Session 2348055614455: Global escape keyword 'hello' detected. Resetting to greeting.
+2025-10-11 12:46:09,671 - handlers.message_processor - ERROR - Session 2348055614455: Error in message routing for handler 'greeting_handler', state 'start': 'WhatsAppService' object has no attribute 'send_typing_indicator'
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\handlers\message_processor.py", line 179, in _route_to_handler
+    return self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username, "Let's start fresh. What can I do for you?")
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\handlers\greeting_handler.py", line 318, in handle_back_to_main
+    self.whatsapp_service.send_typing_indicator(session_id, duration=1)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'WhatsAppService' object has no attribute 'send_typing_indicator'
+2025-10-11 12:46:09,686 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:46:10,092 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 401 Client Error: Unauthorized for url: https://graph.facebook.com/v17.0/204426689424598/messages - Response: No response
+2025-10-11 12:46:10,094 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:46:10] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:46:25,649 - handlers.product_sync_handler - INFO - Stopping product sync thread...
+2025-10-11 12:46:25,662 - handlers.product_sync_handler - INFO - Product sync thread stopped.
+2025-10-11 12:46:39,522 - __main__ - INFO - Starting WhatsApp bot server...
+2025-10-11 12:46:40,673 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-10-11 12:46:42,219 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-10-11 12:46:42,410 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-10-11 12:46:42,605 - utils.data_manager - DEBUG - id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:42,798 - utils.data_manager - DEBUG - merchant_details_id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:42,989 - utils.data_manager - DEBUG - product_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:43,192 - utils.data_manager - DEBUG - description column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:43,383 - utils.data_manager - DEBUG - product_category column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:43,574 - utils.data_manager - DEBUG - variant_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:43,774 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:43,965 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:44,157 - utils.data_manager - DEBUG - availability_status column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:44,363 - utils.data_manager - DEBUG - quantity column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:44,557 - utils.data_manager - DEBUG - last_updated column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:44,752 - utils.data_manager - DEBUG - date_created column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:45,005 - utils.data_manager - DEBUG - channel column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:45,196 - utils.data_manager - DEBUG - food_share_pattern column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:46,910 - utils.data_manager - INFO - Successfully loaded 66 user details from database
+2025-10-11 12:46:47,097 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-10-11 12:46:47,098 - services.payment_service - INFO - PaymentService initialized
+2025-10-11 12:46:47,098 - handlers.product_sync_handler - INFO - Starting product sync thread. Sync interval: 5.0 minutes.
+2025-10-11 12:46:47,099 - handlers.product_sync_handler - INFO - Initiating product sync for merchant 20...
+2025-10-11 12:46:47,486 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:46:47,487 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-10-11 12:46:47,487 - app - INFO - GreetingHandler and FeedbackHandler initialized.
+2025-10-11 12:46:47,488 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-10-11 12:46:47,488 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2348096500003, 2347082345056, 2348055614455, 2348129750653
+2025-10-11 12:46:47,489 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:46:47,489 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_iwv6csej0ra4k7g, split percentage 10%
+2025-10-11 12:46:47,489 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-10-11 12:46:48,677 - handlers.product_sync_handler - INFO - Successfully synced 47 products for merchant 20 to data\products.json
+2025-10-11 12:46:49,211 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-10-11 12:46:49,409 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-10-11 12:46:49,606 - utils.data_manager - DEBUG - id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:49,804 - utils.data_manager - DEBUG - merchant_details_id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:50,001 - utils.data_manager - DEBUG - product_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:50,203 - utils.data_manager - DEBUG - description column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:50,401 - utils.data_manager - DEBUG - product_category column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:50,598 - utils.data_manager - DEBUG - variant_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:50,797 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:50,994 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:51,192 - utils.data_manager - DEBUG - availability_status column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:51,390 - utils.data_manager - DEBUG - quantity column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:51,602 - utils.data_manager - DEBUG - last_updated column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:51,799 - utils.data_manager - DEBUG - date_created column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:51,998 - utils.data_manager - DEBUG - channel column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:52,195 - utils.data_manager - DEBUG - food_share_pattern column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:46:53,976 - utils.data_manager - INFO - Successfully loaded 66 user details from database
+2025-10-11 12:46:54,170 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-10-11 12:46:54,171 - services.payment_service - INFO - PaymentService initialized
+2025-10-11 12:46:54,171 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-10-11 12:46:54,171 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-10-11 12:46:54,521 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:46:54,521 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-10-11 12:46:54,521 - handlers.enquiry_handler - WARNING - MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped
+2025-10-11 12:46:54,522 - handlers.complaint_handler - WARNING - MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped
+2025-10-11 12:46:54,522 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-10-11 12:46:54,523 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-10-11 12:46:54,523 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2348096500003, 2347082345056, 2348055614455, 2348129750653
+2025-10-11 12:46:54,524 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:46:54,524 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_iwv6csej0ra4k7g, split percentage 10%
+2025-10-11 12:46:54,869 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:46:54,869 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-10-11 12:46:54,870 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-10-11 12:46:54,870 - handlers.payment_handler - WARNING - FeedbackHandler not provided, feedback collection will be manual
+2025-10-11 12:46:54,871 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2348096500003, 2347082345056, 2348055614455, 2348129750653
+2025-10-11 12:46:54,871 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:46:54,872 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_iwv6csej0ra4k7g, split percentage 10%
+2025-10-11 12:46:54,891 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-10-11 12:46:54,891 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-10-11 12:47:00,475 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-10-11 12:47:00,475 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-10-11 12:47:02,054 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:47:03,397 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:47:02.248248+00:00, interaction_count=101, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:47:03,965 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:47:03,966 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455 (Ziga)
+2025-10-11 12:47:03,967 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:47:05,501 - utils.data_manager - DEBUG - Found address 'Howson Wright' for phone number 2348055614455 in whatsapp_orders
+2025-10-11 12:47:05,694 - handlers.message_processor - INFO - Session 2348055614455: Global escape keyword 'hello' detected. Resetting to greeting.
+2025-10-11 12:47:05,694 - handlers.message_processor - ERROR - Session 2348055614455: Error in message routing for handler 'greeting_handler', state 'start': 'WhatsAppService' object has no attribute 'send_typing_indicator'
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\handlers\message_processor.py", line 179, in _route_to_handler
+    return self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username, "Let's start fresh. What can I do for you?")
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\handlers\greeting_handler.py", line 318, in handle_back_to_main
+    self.whatsapp_service.send_typing_indicator(session_id, duration=1)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'WhatsAppService' object has no attribute 'send_typing_indicator'
+2025-10-11 12:47:05,697 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:47:07,456 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjIyQjA5RDI1NEMxRDI4QUZEOAA="}]}
+2025-10-11 12:47:07,456 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjIyQjA5RDI1NEMxRDI4QUZEOAA='}]}
+2025-10-11 12:47:07,457 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:07] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:09,625 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:09] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:09,751 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-10-11 12:47:09,959 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:09] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:09,972 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:09] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:11,326 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:47:12,716 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:47:11.522121+00:00, interaction_count=102, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:47:13,286 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:47:13,287 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-10-11 12:47:13,288 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:47:13,288 - handlers.message_processor - INFO - Session 2348055614455: Global escape keyword 'hello' detected. Resetting to greeting.
+2025-10-11 12:47:13,288 - handlers.message_processor - ERROR - Session 2348055614455: Error in message routing for handler 'greeting_handler', state 'greeting': 'WhatsAppService' object has no attribute 'send_typing_indicator'
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\handlers\message_processor.py", line 179, in _route_to_handler
+    return self.greeting_handler.handle_back_to_main(state, session_id, whatsapp_username, "Let's start fresh. What can I do for you?")
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\handlers\greeting_handler.py", line 318, in handle_back_to_main
+    self.whatsapp_service.send_typing_indicator(session_id, duration=1)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'WhatsAppService' object has no attribute 'send_typing_indicator'
+2025-10-11 12:47:13,290 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:47:14,631 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkY2RTBBRDZERkYzM0IyRDYwMwA="}]}
+2025-10-11 12:47:14,632 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkY2RTBBRDZERkYzM0IyRDYwMwA='}]}
+2025-10-11 12:47:14,633 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:14] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:15,706 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:15] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:16,108 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:16] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:16,227 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:47:16] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:47:35,444 - handlers.product_sync_handler - INFO - Stopping product sync thread...
+2025-10-11 12:47:35,445 - handlers.product_sync_handler - INFO - Product sync thread stopped.
+2025-10-11 12:52:47,049 - __main__ - INFO - Starting WhatsApp bot server...
+2025-10-11 12:52:48,779 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-10-11 12:52:51,245 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-10-11 12:52:51,436 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-10-11 12:52:51,633 - utils.data_manager - DEBUG - id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:51,824 - utils.data_manager - DEBUG - merchant_details_id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:52,025 - utils.data_manager - DEBUG - product_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:52,220 - utils.data_manager - DEBUG - description column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:52,410 - utils.data_manager - DEBUG - product_category column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:52,603 - utils.data_manager - DEBUG - variant_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:52,796 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:52,988 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:53,180 - utils.data_manager - DEBUG - availability_status column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:53,371 - utils.data_manager - DEBUG - quantity column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:53,562 - utils.data_manager - DEBUG - last_updated column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:53,754 - utils.data_manager - DEBUG - date_created column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:53,945 - utils.data_manager - DEBUG - channel column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:54,146 - utils.data_manager - DEBUG - food_share_pattern column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:55,874 - utils.data_manager - INFO - Successfully loaded 66 user details from database
+2025-10-11 12:52:56,067 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-10-11 12:52:56,068 - services.payment_service - INFO - PaymentService initialized
+2025-10-11 12:52:56,068 - handlers.product_sync_handler - INFO - Starting product sync thread. Sync interval: 5.0 minutes.
+2025-10-11 12:52:56,069 - handlers.product_sync_handler - INFO - Initiating product sync for merchant 20...
+2025-10-11 12:52:56,521 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:52:56,521 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-10-11 12:52:56,521 - app - INFO - GreetingHandler and FeedbackHandler initialized.
+2025-10-11 12:52:56,522 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-10-11 12:52:56,522 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2349030918492, 2347082345056, 2348055614455
+2025-10-11 12:52:56,523 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:52:56,523 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_u9knhyzn5eq4iop, split percentage 10%
+2025-10-11 12:52:56,524 - utils.session_manager - INFO - SessionManager initialized. Default timeouts: Unpaid=3000s, Paid=12000s
+2025-10-11 12:52:57,575 - handlers.product_sync_handler - INFO - Successfully synced 47 products for merchant 20 to data\products.json
+2025-10-11 12:52:58,115 - utils.data_manager - DEBUG - customers_note column already exists in whatsapp_orders table.
+2025-10-11 12:52:58,312 - utils.data_manager - DEBUG - service_charge column already exists in whatsapp_orders table.
+2025-10-11 12:52:58,508 - utils.data_manager - DEBUG - id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:58,703 - utils.data_manager - DEBUG - merchant_details_id column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:58,899 - utils.data_manager - DEBUG - product_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:59,095 - utils.data_manager - DEBUG - description column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:59,293 - utils.data_manager - DEBUG - product_category column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:59,537 - utils.data_manager - DEBUG - variant_name column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:59,733 - utils.data_manager - DEBUG - currency column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:52:59,929 - utils.data_manager - DEBUG - price column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:00,126 - utils.data_manager - DEBUG - availability_status column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:00,322 - utils.data_manager - DEBUG - quantity column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:00,518 - utils.data_manager - DEBUG - last_updated column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:00,714 - utils.data_manager - DEBUG - date_created column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:00,912 - utils.data_manager - DEBUG - channel column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:01,109 - utils.data_manager - DEBUG - food_share_pattern column already exists in whatsapp_merchant_product_inventory table.
+2025-10-11 12:53:02,875 - utils.data_manager - INFO - Successfully loaded 66 user details from database
+2025-10-11 12:53:03,519 - services.whatsapp_service - DEBUG - WhatsAppService initialized with phone_number_id: 204426689424598
+2025-10-11 12:53:03,520 - services.payment_service - INFO - PaymentService initialized
+2025-10-11 12:53:03,520 - services.lead_tracker - INFO - LeadTracker initialized with DataManager
+2025-10-11 12:53:03,520 - handlers.lead_tracking_handler - INFO - LeadTrackingHandler initialized.
+2025-10-11 12:53:03,873 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:53:03,873 - handlers.feedback_handler - INFO - FeedbackHandler initialized.
+2025-10-11 12:53:03,874 - handlers.enquiry_handler - WARNING - MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped
+2025-10-11 12:53:03,875 - handlers.complaint_handler - WARNING - MERCHANT_PHONE_NUMBER not configured, merchant notifications will be skipped
+2025-10-11 12:53:03,875 - handlers.order_handler - INFO - OrderHandler initialized.
+2025-10-11 12:53:03,876 - handlers.payment_handler - INFO - FeedbackHandler successfully provided to PaymentHandler
+2025-10-11 12:53:03,876 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2349030918492, 2347082345056, 2348055614455
+2025-10-11 12:53:03,877 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:53:03,877 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_u9knhyzn5eq4iop, split percentage 10%
+2025-10-11 12:53:04,231 - services.ai_service - INFO - Azure OpenAI client initialized successfully in AIService.
+2025-10-11 12:53:04,231 - handlers.ai_handler - INFO - AIHandler: AIService successfully initialized.
+2025-10-11 12:53:04,231 - handlers.message_processor - INFO - MessageProcessor initialized with lead tracking, AI support, and feedback collection.
+2025-10-11 12:53:04,232 - handlers.payment_handler - WARNING - FeedbackHandler not provided, feedback collection will be manual
+2025-10-11 12:53:04,232 - handlers.payment_handler - INFO - PaymentHandler initialized with merchant phone numbers: 2349030918492, 2347082345056, 2348055614455
+2025-10-11 12:53:04,233 - handlers.payment_handler - INFO - ProductSyncHandler successfully provided to PaymentHandler
+2025-10-11 12:53:04,233 - handlers.payment_handler - INFO - PaymentHandler initialized with subaccount ACCT_u9knhyzn5eq4iop, split percentage 10%
+2025-10-11 12:53:04,252 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+2025-10-11 12:53:04,252 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-10-11 12:53:26,027 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Hello'}
+2025-10-11 12:53:26,028 - utils.session_manager - INFO - New session 2348055614455 initialized.
+2025-10-11 12:53:27,613 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:53:28,992 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:53:27.812238+00:00, interaction_count=103, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:53:29,561 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:53:29,562 - services.lead_tracker - INFO - Updated lead interaction: 2348055614455 (Ziga)
+2025-10-11 12:53:29,563 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:53:31,105 - utils.data_manager - DEBUG - Found address 'Howson Wright' for phone number 2348055614455 in whatsapp_orders
+2025-10-11 12:53:31,297 - handlers.message_processor - INFO - Session 2348055614455: Global escape keyword 'hello' detected. Resetting to greeting.
+2025-10-11 12:53:31,297 - utils.data_manager - DEBUG - Retrieved user data for 2348055614455: {'name': 'Ziga', 'phone_number': '2348055614455', 'address': 'Howson Wright', 'user_perferred_name': 'Ziga', 'address2': '', 'address3': '', 'display_name': 'Ziga'}
+2025-10-11 12:53:31,298 - handlers.base_handler - INFO - Session 2348055614455 returned to main menu (greeting state). Address preserved: Howson Wright
+2025-10-11 12:53:31,298 - services.whatsapp_service - DEBUG - Created image message payload for 2348055614455
+2025-10-11 12:53:32,180 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkY0Q0FDRTc1MjI2NzRDRjZDMQA="}]}
+2025-10-11 12:53:32,182 - services.whatsapp_service - DEBUG - Created button message payload for 2348055614455
+2025-10-11 12:53:32,926 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkIxODkwMzY0M0M1REZEOTYyQQA="}]}
+2025-10-11 12:53:32,927 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkIxODkwMzY0M0M1REZEOTYyQQA='}]}
+2025-10-11 12:53:32,928 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:32] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:34,135 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:34] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:34,394 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:34] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:34,409 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:34] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:34,987 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:34] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:35,886 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'ai_bulk_order_direct'}
+2025-10-11 12:53:37,453 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:53:38,839 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:53:37.649430+00:00, interaction_count=104, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:53:39,440 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:53:39,441 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-10-11 12:53:39,441 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:53:39,441 - handlers.base_handler - INFO - Session 2348055614455: Handling message 'ai_bulk_order_direct' in greeting state with WhatsApp username 'Ziga'.
+2025-10-11 12:53:39,441 - handlers.base_handler - INFO - Session 2348055614455 redirecting to AIHandler for AI Bulk Order (Make an Order).
+2025-10-11 12:53:39,442 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'ai_handler' with message 'start_ai_bulk_order'.
+2025-10-11 12:53:39,442 - handlers.base_handler - INFO - AIHandler: Handling message 'start_ai_bulk_order' in AI bulk order state for session 2348055614455. Original: 'ai_bulk_order_direct'
+2025-10-11 12:53:39,442 - services.whatsapp_service - DEBUG - Created image message payload for 2348055614455
+2025-10-11 12:53:39,443 - services.whatsapp_service - INFO - Sending WhatsApp payload to 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'image', 'image': {'link': 'https://rsvp.eventio.africa/wp-content/uploads/2025/08/tuesday.jpg', 'caption': 'Our Delicious Menu!'}}
+2025-10-11 12:53:40,135 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjYxODk5MTgwN0I3MTI1NTIxQQA="}]}
+2025-10-11 12:53:40,136 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:53:40,137 - services.whatsapp_service - INFO - Sending WhatsApp payload to 2348055614455: {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': '2348055614455', 'type': 'text', 'text': {'body': "Hi, I'm Lola from Ganador Express!\n\nHow to order:\n• List the items and portions\n• Say how many packs you want\n\nExample: '1 portion of Jollof Rice and 1 portion of Fried Rice in 2 packs'\n\nTake a look at the menu and tell me what you'd like to order.\n\n"}}
+2025-10-11 12:53:40,807 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkVBRTc0Q0ZFRDAwMEE5QjU3RgA="}]}
+2025-10-11 12:53:40,808 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkVBRTc0Q0ZFRDAwMEE5QjU3RgA='}]}
+2025-10-11 12:53:40,809 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:40] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:41,897 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:41] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:42,304 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:42] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:42,426 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:42] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:42,780 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:42] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:49,193 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'Jellof rice'}
+2025-10-11 12:53:50,776 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:53:52,182 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:53:50.971993+00:00, interaction_count=105, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:53:52,781 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:53:52,782 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-10-11 12:53:52,782 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:53:52,782 - handlers.base_handler - INFO - AIHandler: Handling message 'jellof rice' in AI bulk order state for session 2348055614455. Original: 'Jellof rice'
+2025-10-11 12:53:56,867 - httpx - INFO - HTTP Request: POST https://insig-maduyfup-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2024-12-01-preview "HTTP/1.1 200 OK"
+2025-10-11 12:53:56,883 - services.whatsapp_service - DEBUG - Created button message payload for 2348055614455
+2025-10-11 12:53:57,912 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjAwRkQyNUU0QTNFQUI4RUU5NgA="}]}
+2025-10-11 12:53:57,912 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjAwRkQyNUU0QTNFQUI4RUU5NgA='}]}
+2025-10-11 12:53:57,913 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:57] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:58,884 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:58] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:59,500 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:59] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:53:59,572 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:53:59] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:04,380 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'confirm_ai_order'}
+2025-10-11 12:54:05,959 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:07,333 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:06.155268+00:00, interaction_count=106, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=3500.0, conversion_stage=order_completed, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:54:07,924 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:07,925 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-10-11 12:54:07,925 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:54:07,926 - handlers.base_handler - INFO - AI order confirmed. Cart: {'Jollof rice': {'item_id': 1, 'quantity': 1, 'price': 500.0, 'total_price': 500.0, 'variations': {}, 'food_share_pattern': 'Portion'}}. Redirecting to order handler.
+2025-10-11 12:54:07,926 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'order_handler' with message 'process_final_order'.
+2025-10-11 12:54:07,926 - utils.data_manager - DEBUG - Retrieved user data for 2348055614455: {'name': 'Ziga', 'phone_number': '2348055614455', 'address': 'Howson Wright', 'user_perferred_name': 'Ziga', 'address2': '', 'address3': '', 'display_name': 'Ziga'}
+2025-10-11 12:54:07,927 - handlers.order_handler - INFO - AI initiated order processing for session 2348055614455.
+2025-10-11 12:54:07,927 - handlers.order_handler - INFO - Prompting for note after AI order confirmation for session 2348055614455.
+2025-10-11 12:54:07,936 - services.whatsapp_service - DEBUG - Created button message payload for 2348055614455
+2025-10-11 12:54:08,781 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjk1OEIwRUFDQzAyRTZCQTlGNAA="}]}
+2025-10-11 12:54:09,743 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:09] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:10,129 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:10] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:10,281 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:10,342 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:10] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:11,664 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:10.467527+00:00, interaction_count=107, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=cart_added, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:54:12,253 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:12,264 - handlers.lead_tracking_handler - INFO - Successfully tracked cart activity for phone number 2348055614455
+2025-10-11 12:54:12,264 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjk1OEIwRUFDQzAyRTZCQTlGNAA='}]}
+2025-10-11 12:54:12,266 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:12] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:13,274 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'proceed_to_confirmation'}
+2025-10-11 12:54:14,830 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:16,257 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:15.054115+00:00, interaction_count=108, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=cart_added, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:54:16,851 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:16,852 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-10-11 12:54:16,852 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:54:16,852 - handlers.order_handler - INFO - User chose to proceed to final confirmation without adding a note for session 2348055614455.
+2025-10-11 12:54:16,853 - utils.data_manager - DEBUG - Retrieved user data for 2348055614455: {'name': 'Ziga', 'phone_number': '2348055614455', 'address': 'Howson Wright', 'user_perferred_name': 'Ziga', 'address2': '', 'address3': '', 'display_name': 'Ziga'}
+2025-10-11 12:54:16,864 - services.whatsapp_service - DEBUG - Created button message payload for 2348055614455
+2025-10-11 12:54:17,654 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjM0NUQxMEI5NTFBNzI4NUNBQQA="}]}
+2025-10-11 12:54:18,574 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:18] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:18,989 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:18] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:19,195 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:19,259 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:19] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:20,534 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:19.389130+00:00, interaction_count=109, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=cart_added, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:54:21,091 - handlers.webhook_handler - INFO - Processing message from 2348055614455 (User: Ziga): {'type': 'text', 'text': 'final_confirm'}
+2025-10-11 12:54:21,096 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:21,101 - handlers.lead_tracking_handler - INFO - Successfully tracked cart activity for phone number 2348055614455
+2025-10-11 12:54:21,102 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjM0NUQxMEI5NTFBNzI4NUNBQQA='}]}
+2025-10-11 12:54:21,103 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:21] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:22,674 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:24,049 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:22.869080+00:00, interaction_count=110, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=cart_added, final_order_value=4350.0, converted_at=2025-10-09 12:36:45.121977+00:00
+2025-10-11 12:54:24,619 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:24,620 - services.lead_tracker - INFO - Updated ongoing interaction: 2348055614455
+2025-10-11 12:54:24,620 - handlers.lead_tracking_handler - INFO - Successfully tracked user interaction for phone number 2348055614455
+2025-10-11 12:54:24,620 - handlers.order_handler - INFO - User confirmed final order for session 2348055614455.
+2025-10-11 12:54:27,345 - utils.data_manager - DEBUG - Found product_id 1 for product_name Jollof rice
+2025-10-11 12:54:27,548 - utils.data_manager - DEBUG - Assigned product_id 1 to item Jollof rice
+2025-10-11 12:54:27,549 - utils.data_manager - WARNING - No payment_reference provided for order. Generated default: PAY-ORD-94A062C0
+2025-10-11 12:54:27,979 - utils.data_manager - INFO - Saved order 232 for customer 2348055614455 with payment_reference PAY-ORD-94A062C0
+2025-10-11 12:54:28,181 - utils.data_manager - INFO - Saved order item Jollof rice for order 232
+2025-10-11 12:54:28,376 - handlers.order_handler - INFO - Order ORD-94A062C0 saved to database with DB ID 232 for session 2348055614455.
+2025-10-11 12:54:28,377 - utils.data_manager - DEBUG - Retrieved user data for 2348055614455: {'name': 'Ziga', 'phone_number': '2348055614455', 'address': 'Howson Wright', 'user_perferred_name': 'Ziga', 'address2': '', 'address3': '', 'display_name': 'Ziga'}
+2025-10-11 12:54:29,979 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:31,343 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:30.174578+00:00, interaction_count=111, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=order_completed, final_order_value=1050.0, converted_at=2025-10-11 11:54:30.174578+00:00
+2025-10-11 12:54:31,931 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:31,938 - handlers.lead_tracking_handler - INFO - Successfully tracked order conversion for phone number 2348055614455, order ID ORD-94A062C0
+2025-10-11 12:54:31,944 - handlers.message_processor - INFO - Session 2348055614455: Redirecting to handler 'payment_handler' with message 'initiate_payment'.
+2025-10-11 12:54:31,944 - handlers.payment_handler - INFO - Handling payment processing for session 2348055614455, message: initiate_payment
+2025-10-11 12:54:31,944 - handlers.payment_handler - INFO - Creating payment link for session 2348055614455
+2025-10-11 12:54:35,501 - utils.data_manager - INFO - Updated order 232 to status pending_payment
+2025-10-11 12:54:35,502 - services.payment_service - INFO - Adding subaccount split: code=ACCT_u9knhyzn5eq4iop, percentage=10%
+2025-10-11 12:54:35,502 - services.payment_service - INFO - Attempting to create payment link for reference: PAY-ORD-94A062C0 with amount: 105000, email: ziga4455@lola.com
+2025-10-11 12:54:36,218 - services.payment_service - INFO - Payment link created for Ziga Ziga (2348055614455), URL: https://checkout.paystack.com/0uhydxwccghysb9
+2025-10-11 12:54:36,219 - handlers.payment_handler - INFO - Starting payment monitoring for order 232, reference PAY-ORD-94A062C0
+2025-10-11 12:54:36,219 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-ORD-94A062C0
+2025-10-11 12:54:36,756 - services.payment_service - WARNING - Payment not successful for reference PAY-ORD-94A062C0. Paystack status: abandoned. Response: {'status': True, 'message': 'Verification successful', 'data': {'id': 5419538737, 'domain': 'test', 'status': 'abandoned', 'reference': 'PAY-ORD-94A062C0', 'receipt_number': None, 'amount': 105000, 'message': None, 'gateway_response': 'The transaction was not completed', 'paid_at': None, 'created_at': '2025-10-11T11:54:36.000Z', 'channel': 'card', 'currency': 'NGN', 'ip_address': '169.255.124.4, 172.69.43.182, 172.31.68.120', 'metadata': {'customer_name': 'Ziga', 'customer_phone': '2348055614455', 'first_name': 'Ziga', 'last_name': 'Ziga', 'order_id': 'ORD-94A062C0', 'db_order_id': '232', 'delivery_address': 'Howson Wright', 'charges': '50', 'phone_number': '2348055614455'}, 'log': None, 'fees': None, 'fees_split': {'paystack': 1575, 'integration': 8925, 'subaccount': 94500, 'params': {'bearer': 'account', 'transaction_charge': '10500', 'percentage_charge': '0'}}, 'authorization': {}, 'customer': {'id': 296816511, 'first_name': None, 'last_name': None, 'email': 'ziga4455@lola.com', 'customer_code': 'CUS_3maokfy2as1d6qe', 'phone': None, 'metadata': None, 'risk_action': 'default', 'international_format_phone': None}, 'plan': None, 'split': {}, 'order_id': None, 'paidAt': None, 'createdAt': '2025-10-11T11:54:36.000Z', 'requested_amount': 105000, 'pos_transaction_data': None, 'source': None, 'fees_breakdown': None, 'connect': None, 'transaction_date': '2025-10-11T11:54:36.000Z', 'plan_object': {}, 'subaccount': {'id': 1381359, 'subaccount_code': 'ACCT_u9knhyzn5eq4iop', 'business_name': 'MAKINDE VICTOR OLUWASEGUN', 'description': 'MAKINDE VICTOR OLUWASEGUN', 'primary_contact_name': None, 'primary_contact_email': None, 'primary_contact_phone': None, 'metadata': None, 'percentage_charge': 0, 'settlement_bank': 'First City Monument Bank', 'bank_id': 8, 'account_number': '4955073017', 'currency': 'NGN', 'active': True, 'is_verified': True}}}
+2025-10-11 12:54:36,756 - handlers.payment_handler - INFO - Payment not yet verified for order 232, attempt 1/15
+2025-10-11 12:54:36,757 - handlers.payment_handler - INFO - Payment link created successfully for order 232 with subaccount ACCT_u9knhyzn5eq4iop
+2025-10-11 12:54:38,289 - utils.data_manager - INFO - Retrieved 1 items for order 232
+2025-10-11 12:54:38,480 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:54:39,508 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkI3NjNBQUUxQzAzMzkxNzgwQwA="}]}
+2025-10-11 12:54:40,579 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:40] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:41,047 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:41] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:41,106 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:54:41,245 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:41] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:54:42,464 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:54:41.302457+00:00, interaction_count=112, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=cart_added, final_order_value=1050.0, converted_at=2025-10-11 11:54:30.174578+00:00
+2025-10-11 12:54:43,039 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:54:43,046 - handlers.lead_tracking_handler - INFO - Successfully tracked cart activity for phone number 2348055614455
+2025-10-11 12:54:43,046 - services.whatsapp_service - ERROR - Missing 'to' parameter in payload: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkI3NjNBQUUxQzAzMzkxNzgwQwA='}]}
+2025-10-11 12:54:43,047 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:54:43] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:55:36,760 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-ORD-94A062C0
+2025-10-11 12:55:37,269 - services.payment_service - WARNING - Payment not successful for reference PAY-ORD-94A062C0. Paystack status: abandoned. Response: {'status': True, 'message': 'Verification successful', 'data': {'id': 5419538737, 'domain': 'test', 'status': 'abandoned', 'reference': 'PAY-ORD-94A062C0', 'receipt_number': None, 'amount': 105000, 'message': None, 'gateway_response': 'The transaction was not completed', 'paid_at': None, 'created_at': '2025-10-11T11:54:36.000Z', 'channel': 'card', 'currency': 'NGN', 'ip_address': '169.255.124.4, 172.69.43.182, 172.31.68.120', 'metadata': {'customer_name': 'Ziga', 'customer_phone': '2348055614455', 'first_name': 'Ziga', 'last_name': 'Ziga', 'order_id': 'ORD-94A062C0', 'db_order_id': '232', 'delivery_address': 'Howson Wright', 'charges': '50', 'phone_number': '2348055614455'}, 'log': None, 'fees': None, 'fees_split': {'paystack': 1575, 'integration': 8925, 'subaccount': 94500, 'params': {'bearer': 'account', 'transaction_charge': '10500', 'percentage_charge': '0'}}, 'authorization': {}, 'customer': {'id': 296816511, 'first_name': None, 'last_name': None, 'email': 'ziga4455@lola.com', 'customer_code': 'CUS_3maokfy2as1d6qe', 'phone': None, 'metadata': None, 'risk_action': 'default', 'international_format_phone': None}, 'plan': None, 'split': {}, 'order_id': None, 'paidAt': None, 'createdAt': '2025-10-11T11:54:36.000Z', 'requested_amount': 105000, 'pos_transaction_data': None, 'source': None, 'fees_breakdown': None, 'connect': None, 'transaction_date': '2025-10-11T11:54:36.000Z', 'plan_object': {}, 'subaccount': {'id': 1381359, 'subaccount_code': 'ACCT_u9knhyzn5eq4iop', 'business_name': 'MAKINDE VICTOR OLUWASEGUN', 'description': 'MAKINDE VICTOR OLUWASEGUN', 'primary_contact_name': None, 'primary_contact_email': None, 'primary_contact_phone': None, 'metadata': None, 'percentage_charge': 0, 'settlement_bank': 'First City Monument Bank', 'bank_id': 8, 'account_number': '4955073017', 'currency': 'NGN', 'active': True, 'is_verified': True}}}
+2025-10-11 12:55:37,270 - handlers.payment_handler - INFO - Payment not yet verified for order 232, attempt 2/15
+2025-10-11 12:55:44,975 - handlers.payment_handler - INFO - Received 'charge.success' webhook for reference: PAY-ORD-94A062C0
+2025-10-11 12:55:48,445 - utils.data_manager - INFO - Updated order 232 to status confirmed
+2025-10-11 12:55:50,037 - utils.data_manager - INFO - Retrieved 1 items for order 232
+2025-10-11 12:55:51,968 - utils.data_manager - INFO - Reduced inventory for product_id 1 by 1 for order 232
+2025-10-11 12:55:52,162 - handlers.product_sync_handler - INFO - Initiating product sync for merchant 20...
+2025-10-11 12:55:53,711 - handlers.product_sync_handler - INFO - Successfully synced 47 products for merchant 20 to data\products.json
+2025-10-11 12:55:53,902 - handlers.payment_handler - INFO - Successfully synced products to JSON after inventory reduction for order 232
+2025-10-11 12:55:55,421 - utils.data_manager - WARNING - Low inventory for product id 1: 0 units remaining
+2025-10-11 12:55:55,605 - utils.data_manager - ERROR - Unexpected error checking low inventory for product 1: 'DataManager' object has no attribute 'merchant_phone_number'
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\utils\data_manager.py", line 244, in check_low_inventory
+    if self.merchant_phone_number and self.whatsapp_service:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DataManager' object has no attribute 'merchant_phone_number'
+2025-10-11 12:55:55,610 - handlers.payment_handler - DEBUG - Lead tracking handler not available for order conversion tracking
+2025-10-11 12:55:55,610 - handlers.payment_handler - DEBUG - No location coordinates or valid address/API key to generate maps info.
+2025-10-11 12:55:57,451 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:55:58,166 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEkJCNDc2QURDRkU2M0E2NEE1NgA="}]}
+2025-10-11 12:55:58,167 - handlers.payment_handler - INFO - Sent payment success text message for order 232 to customer 2348055614455
+2025-10-11 12:55:58,167 - handlers.payment_handler - INFO - Initiating manual feedback collection for order 232, session 2348055614455
+2025-10-11 12:55:58,168 - handlers.payment_handler - DEBUG - Updated state for session 2348055614455: {'current_state': 'feedback_rating', 'current_handler': 'feedback_handler', 'cart': {}, 'user_name': 'Ziga', 'phone_number': '2348055614455', 'address': 'Howson Wright', 'quantity_prompt_sent': False, 'last_activity': datetime.datetime(2025, 10, 11, 12, 55, 58, 168369), 'payment_reference': 'PAY-ORD-94A062C0', 'total_cost': 0, 'is_paid_user': False, 'extended_session': False, 'recent_order_id': None, 'paid_session_expires': None, 'freshly_reset_timestamp': None, 'ai_mode': 'bulk_order', 'parsed_order': {'success': True, 'items': [{'name': 'Jollof rice', 'portions': 1, 'item_id': 1, 'price': 500.0, 'total_price': 500.0, 'variations': {}, 'food_share_pattern': 'Portion'}], 'packs': 1, 'grouping': 'None', 'special_instructions': '', 'order_total': 500.0, 'unrecognized_items': []}, 'total_price': 500.0, 'from_ai_order': True, 'order_id': 'ORD-94A062C0', 'db_order_id': '232', 'feedback_order_id': 232, 'feedback_started_at': '2025-10-11T12:55:58.168356'}
+2025-10-11 12:55:58,173 - services.whatsapp_service - DEBUG - Created button message payload for 2348055614455
+2025-10-11 12:55:58,831 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjhEN0EzOTQ5NDE5Q0EwM0ZCOAA="}]}
+2025-10-11 12:55:58,832 - handlers.payment_handler - INFO - Manual feedback prompt sent for order 232, session 2348055614455, response: {'messaging_product': 'whatsapp', 'contacts': [{'input': '2348055614455', 'wa_id': '2348055614455'}], 'messages': [{'id': 'wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjhEN0EzOTQ5NDE5Q0EwM0ZCOAA='}]}
+2025-10-11 12:55:58,833 - services.whatsapp_service - DEBUG - Created text message payload for 2349030918492
+2025-10-11 12:55:59,164 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:55:59] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:55:59,172 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 400 Client Error: Bad Request for url: https://graph.facebook.com/v17.0/204426689424598/messages - Response: No response
+2025-10-11 12:55:59,173 - handlers.payment_handler - INFO - Sent detailed merchant notification for order 232 to 2349030918492
+2025-10-11 12:55:59,174 - services.whatsapp_service - DEBUG - Created text message payload for 2347082345056
+2025-10-11 12:55:59,819 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:55:59] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:00,025 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:00] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:00,065 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:00] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:00,081 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2347082345056","wa_id":"2347082345056"}],"messages":[{"id":"wamid.HBgNMjM0NzA4MjM0NTA1NhUCABEYEkE1MUU3MkQyNzg4QUZFOTczNAA="}]}
+2025-10-11 12:56:00,082 - handlers.payment_handler - INFO - Sent detailed merchant notification for order 232 to 2347082345056
+2025-10-11 12:56:00,082 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:56:00,254 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:00] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:00,294 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:00] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:01,172 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjNFMDBENUNBQkRBRDYzQTlBNwA="}]}
+2025-10-11 12:56:01,173 - handlers.payment_handler - INFO - Sent detailed merchant notification for order 232 to 2348055614455
+2025-10-11 12:56:01,174 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:01] "POST /api/paystack/webhook HTTP/1.1" 200 -
+2025-10-11 12:56:02,110 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:02,163 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:02,575 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:02,601 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:37,285 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-ORD-94A062C0
+2025-10-11 12:56:37,842 - services.payment_service - INFO - Payment verified successfully for reference PAY-ORD-94A062C0. Status: success
+2025-10-11 12:56:37,843 - handlers.payment_handler - INFO - Payment verified for order 232 on attempt 3
+2025-10-11 12:56:37,843 - services.payment_service - INFO - Attempting to verify payment for reference: PAY-ORD-94A062C0
+2025-10-11 12:56:38,359 - services.payment_service - INFO - Payment verified successfully for reference PAY-ORD-94A062C0. Status: success
+2025-10-11 12:56:41,904 - utils.data_manager - INFO - Updated order 232 to status confirmed
+2025-10-11 12:56:43,478 - utils.data_manager - INFO - Retrieved 1 items for order 232
+2025-10-11 12:56:45,260 - utils.data_manager - ERROR - Insufficient inventory for product_id 1 in order 232: available 0, requested 1
+2025-10-11 12:56:45,455 - handlers.payment_handler - ERROR - Failed to reduce inventory for order 232
+2025-10-11 12:56:45,456 - services.whatsapp_service - DEBUG - Created text message payload for 2349030918492
+2025-10-11 12:56:46,229 - services.whatsapp_service - ERROR - HTTP error sending WhatsApp message: 400 Client Error: Bad Request for url: https://graph.facebook.com/v17.0/204426689424598/messages - Response: No response
+2025-10-11 12:56:46,229 - services.whatsapp_service - DEBUG - Created text message payload for 2347082345056
+2025-10-11 12:56:46,971 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2347082345056","wa_id":"2347082345056"}],"messages":[{"id":"wamid.HBgNMjM0NzA4MjM0NTA1NhUCABEYEjNDRjEwNUExRTk0MjgzOEVFNgA="}]}
+2025-10-11 12:56:46,972 - services.whatsapp_service - DEBUG - Created text message payload for 2348055614455
+2025-10-11 12:56:47,950 - services.whatsapp_service - INFO - WhatsApp API response: 200 - {"messaging_product":"whatsapp","contacts":[{"input":"2348055614455","wa_id":"2348055614455"}],"messages":[{"id":"wamid.HBgNMjM0ODA1NTYxNDQ1NRUCABEYEjBBMjBFMjEzMENDNzRBNzU2OAA="}]}
+2025-10-11 12:56:47,952 - handlers.product_sync_handler - INFO - Initiating product sync for merchant 20...
+2025-10-11 12:56:48,084 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:48] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:49,053 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:49] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:49,377 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:49] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:49,459 - handlers.product_sync_handler - INFO - Successfully synced 47 products for merchant 20 to data\products.json
+2025-10-11 12:56:49,544 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:56:49] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:56:49,644 - handlers.payment_handler - INFO - Successfully synced products to JSON after inventory reduction for order 232
+2025-10-11 12:56:51,187 - utils.data_manager - WARNING - Low inventory for product id 1: 0 units remaining
+2025-10-11 12:56:51,377 - utils.data_manager - ERROR - Unexpected error checking low inventory for product 1: 'DataManager' object has no attribute 'merchant_phone_number'
+Traceback (most recent call last):
+  File "C:\Users\zigam\Documents\Coding\Pentanative\Lola_Pentanative\utils\data_manager.py", line 244, in check_low_inventory
+    if self.merchant_phone_number and self.whatsapp_service:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DataManager' object has no attribute 'merchant_phone_number'
+2025-10-11 12:56:52,922 - utils.data_manager - INFO - Retrieved lead 2348055614455 for merchant 20 from whatsapp_leads
+2025-10-11 12:56:54,279 - utils.data_manager - DEBUG - Saving or updating lead 2348055614455: merchant_details_id=20, user_id=2348055614455, user_name=Ziga, phone_number=2348055614455, source=whatsapp, first_contact=2025-10-01 11:34:07.628376+00:00, last_interaction=2025-10-11 11:56:53.112388+00:00, interaction_count=113, status=converted, has_added_to_cart=True, has_placed_order=True, total_cart_value=500.0, conversion_stage=order_completed, final_order_value=1050.0, converted_at=2025-10-11 11:56:53.112388+00:00
+2025-10-11 12:56:54,850 - utils.data_manager - INFO - Lead 2348055614455 saved or updated in whatsapp_leads table
+2025-10-11 12:56:54,855 - handlers.lead_tracking_handler - INFO - Successfully tracked order conversion for phone number 2348055614455, order ID 232
+2025-10-11 12:57:02,635 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:57:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:57:02,752 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:57:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:57:02,754 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:57:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:57:02,898 - werkzeug - INFO - 127.0.0.1 - - [11/Oct/2025 12:57:02] "POST /webhook HTTP/1.1" 200 -
+2025-10-11 12:57:57,771 - handlers.product_sync_handler - INFO - Initiating product sync for merchant 20...
+2025-10-11 12:57:59,844 - handlers.product_sync_handler - INFO - Successfully synced 47 products for merchant 20 to data\products.json
+2025-10-11 13:00:18,496 - handlers.product_sync_handler - INFO - Stopping product sync thread...
+2025-10-11 13:00:18,497 - handlers.product_sync_handler - INFO - Product sync thread stopped.

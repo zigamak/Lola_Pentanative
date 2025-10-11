@@ -145,18 +145,6 @@
       "food_share_pattern": "Portion"
     },
     {
-      "id": "17",
-      "name": "Jollof spaghetti",
-      "variant": null,
-      "price": 600.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 20,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
       "id": "18",
       "name": "Spaghetti Bolognese",
       "variant": null,
@@ -285,18 +273,6 @@
       "availability_status": true,
       "description": null,
       "quantity": 24,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "29",
-      "name": "Chicken",
-      "variant": null,
-      "price": 1000.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 25,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     },
@@ -457,38 +433,14 @@
       "food_share_pattern": "Combo"
     },
     {
-      "id": "1",
-      "name": "Jollof rice",
+      "id": "33",
+      "name": "Beef",
       "variant": null,
-      "price": 500.0,
+      "price": 300.0,
       "currency": null,
       "availability_status": true,
       "description": null,
-      "quantity": 4,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "37",
-      "name": "Plantain",
-      "variant": null,
-      "price": 200.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 29,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "2",
-      "name": "Fried rice",
-      "variant": null,
-      "price": 550.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 4,
+      "quantity": 3,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     },
@@ -500,19 +452,7 @@
       "currency": null,
       "availability_status": true,
       "description": null,
-      "quantity": 22,
-      "channel": "WhatsApp",
-      "food_share_pattern": "Portion"
-    },
-    {
-      "id": "33",
-      "name": "Beef",
-      "variant": null,
-      "price": 300.0,
-      "currency": null,
-      "availability_status": true,
-      "description": null,
-      "quantity": 19,
+      "quantity": 4,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     },
@@ -524,7 +464,43 @@
       "currency": null,
       "availability_status": true,
       "description": null,
+      "quantity": 16,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "17",
+      "name": "Jollof spaghetti",
+      "variant": null,
+      "price": 600.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
       "quantity": 18,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "31",
+      "name": "Fish",
+      "variant": null,
+      "price": 700.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 21,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "37",
+      "name": "Plantain",
+      "variant": null,
+      "price": 200.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 15,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     },
@@ -541,14 +517,38 @@
       "food_share_pattern": "Portion"
     },
     {
-      "id": "31",
-      "name": "Fish",
+      "id": "1",
+      "name": "Jollof rice",
       "variant": null,
-      "price": 700.0,
+      "price": 500.0,
       "currency": null,
       "availability_status": true,
       "description": null,
-      "quantity": 25,
+      "quantity": 0,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "2",
+      "name": "Fried rice",
+      "variant": null,
+      "price": 550.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 1,
+      "channel": "WhatsApp",
+      "food_share_pattern": "Portion"
+    },
+    {
+      "id": "29",
+      "name": "Chicken",
+      "variant": null,
+      "price": 1000.0,
+      "currency": null,
+      "availability_status": true,
+      "description": null,
+      "quantity": 23,
       "channel": "WhatsApp",
       "food_share_pattern": "Portion"
     }

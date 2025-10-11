@@ -24,15 +24,15 @@ class Config:
         # Payment configuration
         self.PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
         self.PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
-        self.SUBACCOUNT_CODE = "ACCT_iwv6csej0ra4k7g"
+        #self.SUBACCOUNT_CODE = "ACCT_iwv6csej0ra4k7g"
         
-        #self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
+        self.SUBACCOUNT_CODE = "ACCT_u9knhyzn5eq4iop"
         self.SUBACCOUNT_PERCENTAGE = 10
         self.MERCHANT_PHONE_NUMBERS = [
-        "2348096500003",
+        "2349030918492",
         "2347082345056",
-        "2348055614455",
-        "2348129750653"]
+        "2348055614455"
+    ]
       
         
         
