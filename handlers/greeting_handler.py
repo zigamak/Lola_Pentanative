@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Optional
 import sys
 from services.ai_service import AIService
 from .base_handler import BaseHandler
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -21,6 +22,11 @@ class GreetingHandler(BaseHandler):
     def handle_greeting_state(self, state: Dict, message: str, original_message: str, session_id: str, whatsapp_username: str = None) -> Dict[str, Any]:
         """Handle greeting state messages based on user's main menu selection. Also dispatches to new user onboarding states."""
         self.logger.info(f"Session {session_id}: Handling message '{message}' in greeting state with WhatsApp username '{whatsapp_username}'.")
+
+        # Check for merchant activation commands
+        message_lower = message.strip().lower()
+        if message_lower in ["hello, activate", "activate"]:
+            return self._handle_merchant_activation(state, session_id, whatsapp_username)
 
         if state.get("current_state") == "collect_preferred_name":
             return self.handle_collect_preferred_name_state(state, message, session_id, whatsapp_username)
@@ -47,6 +53,20 @@ class GreetingHandler(BaseHandler):
                 return self._handle_complaint_request(state, session_id)
             else:
                 return self._handle_invalid_option(state, session_id, message, whatsapp_username)
+
+    def _handle_merchant_activation(self, state: Dict, session_id: str, whatsapp_username: str = None) -> Dict[str, Any]:
+        """Handle merchant activation request with a response indicating the current date."""
+        user_data = self.data_manager.get_user_data(session_id)
+        user_name = user_data.get("display_name", user_data.get("name", whatsapp_username or "Guest")) if user_data else (whatsapp_username or "Guest")
+        self.logger.info(f"Session {session_id}: Processing merchant activation request for user '{user_name}'.")
+
+        # Use the current date
+        current_date = datetime.now()
+        formatted_date = current_date.strftime("%A, %b %d, %Y")
+
+        # Construct the activation message
+        activation_message = f"Good Day @{user_name}\nGanador has been activated for {formatted_date}"
+        return self.whatsapp_service.create_text_message(session_id, activation_message)
 
     def _has_user_made_payment(self, session_id: str) -> bool:
         """Checks if the user has made a payment by looking at the session state."""
